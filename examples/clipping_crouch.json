@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "name": "clipping_crouch",
+  "fps": 60,
+  "archetype": "light",
+  "striker": "Right Arm",
+  "events": {},
+  "tracks": {
+    "Torso": [
+      {
+        "frame": 0,
+        "easing": "linear",
+        "pos": [
+          0.0,
+          -0.0,
+          0.0
+        ],
+        "rot": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "frame": 12,
+        "easing": "linear",
+        "pos": [
+          0.0,
+          -0.6,
+          0.0
+        ],
+        "rot": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    ]
+  }
+}

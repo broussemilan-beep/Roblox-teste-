@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "name": "robotic_punch",
+  "fps": 60,
+  "archetype": "heavy",
+  "striker": "Right Arm",
+  "events": {
+    "windup": 0,
+    "impact": 10
+  },
+  "tracks": {
+    "Torso": [
+      {
+        "frame": 0,
+        "easing": "linear",
+        "pos": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rot": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "frame": 10,
+        "easing": "linear",
+        "pos": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rot": [
+          0,
+          5,
+          0
+        ]
+      }
+    ],
+    "Head": [
+      {
+        "frame": 0,
+        "easing": "linear",
+        "pos": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rot": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "frame": 10,
+        "easing": "linear",
+        "pos": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rot": [
+          0,
+          5,
+          0
+        ]
+      }
+    ],
+    "Right Arm": [
+      {
+        "frame": 0,
+        "easing": "linear",
+        "pos": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rot": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "frame": 10,
+        "easing": "linear",
+        "pos": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rot": [
+          90,
+          0,
+          0
+        ]
+      }
+    ],
+    "Left Arm": [
+      {
+        "frame": 0,
+        "easing": "linear",
+        "pos": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rot": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "frame": 10,
+        "easing": "linear",
+        "pos": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rot": [
+          90,
+          0,
+          0
+        ]
+      }
+    ]
+  }
+}
