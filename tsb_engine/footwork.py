@@ -29,6 +29,8 @@ from .model import Animation, Pose
 
 LEGS = ("Right Leg", "Left Leg")
 SIDE = {"Right Leg": 1.0, "Left Leg": -1.0}
+SOLE_REACH = 0.5  # fraction of the sole (per axis) that must clear the floor
+SOLE_TOL = 0.03  # studs a planted foot may sink before the leg tilts
 
 
 @dataclass(frozen=True)
@@ -74,39 +76,56 @@ def _angles(d_world: Vec, torso_rot_t) -> tuple[float, float]:
 
 
 def solve_leg(anim: Animation, leg: str, frame: int, target: Vec, planted: bool) -> Pose:
-    """Leg pose whose foot sits at ``target`` height (0 when planted) and heads towards its (x, z).
+    """Leg pose that leans towards the (x, z) of ``target`` until the inner sole sits at the
+    target height (0 when planted; the swing height otherwise).
 
-    The leg is rigid, so the foot is always 2 studs from the hip: the target's height fixes how
-    far away horizontally it can be (reach); the target's x/z only gives the direction.
-    A planted foot is pulled to touch the ground exactly; a swinging foot is only kept from
-    going through it.
+    A hip higher than the leg can reach leaves the leg straight (foot slightly above the ground).
     """
     root = root_transform(anim.sample_root(frame))
     base_sample = anim.sample(frame)
     tf = part_transforms(base_sample, root=root)
     hip = joint_world_position(leg, tf)
     torso_rot_t = transpose(tf["Torso"][0])
+    want = target[1]
 
-    foot_y = target[1]
-    pose = Pose()
-    for _ in range(12):
-        dy = hip[1] - foot_y
-        reach = math.sqrt(max(LEG_LENGTH**2 - dy * dy, 0.0))
-        hx, hz = target[0] - hip[0], target[2] - hip[2]
-        norm = math.hypot(hx, hz)
-        if norm < 1e-9:
-            hx, hz, norm = SIDE[leg], 0.0, 1.0
-        d_world = (hx / norm * reach, -dy, hz / norm * reach)
-        rx, rz = _angles(d_world, torso_rot_t)
-        pose = Pose(rot=(rx, 0.0, rz))
+    hx, hz = target[0] - hip[0], target[2] - hip[2]
+    norm = math.hypot(hx, hz)
+    if norm < 1e-9:
+        hx, hz, norm = SIDE[leg], 0.0, 1.0
+    hx, hz = hx / norm, hz / norm
+
+    def pose_for(theta_deg: float) -> Pose:
+        th = math.radians(theta_deg)
+        rx, rz = _angles((math.sin(th) * hx, -math.cos(th), math.sin(th) * hz), torso_rot_t)
+        return Pose(rot=(rx, 0.0, rz))
+
+    def sole_y(theta_deg: float) -> float:
+        """Height (above the wanted one) of the lowest point of the inner half of the sole."""
         sample = dict(base_sample)
-        sample[leg] = pose
-        y_min = lowest_point(leg, part_transforms(sample, root=root)[leg])[1]
-        err = -y_min  # > 0: a corner is below the ground
-        if (planted and abs(err) < 1e-4) or (not planted and err < 1e-4):
-            break
-        foot_y += err
-    return pose
+        sample[leg] = pose_for(theta_deg)
+        tfl = part_transforms(sample, root=root)[leg]
+        sy = -SIZES[leg][1] / 2
+        hx_, hz_ = SIZES[leg][0] * SOLE_REACH / 2, SIZES[leg][2] * SOLE_REACH / 2
+        return min(apply(tfl, (sx, sy, sz))[1] for sx in (-hx_, hx_) for sz in (-hz_, hz_)) - want
+
+    # The foot is a rigid box: tilting the leg digs the sole edge into the floor. Contact is taken
+    # on the inner half of the sole (0.25 stud from its centre), so the outer edge dips by at most
+    # 0.25*sin(tilt) while the leg does not pop when the hip crosses 2 studs.
+    if sole_y(0.0) >= -SOLE_TOL:
+        return pose_for(0.0)
+    t, prev = 0.0, 0.0
+    while t < 88.0:
+        prev, t = t, t + 1.0
+        if sole_y(t) >= -SOLE_TOL:
+            lo, hi = prev, t
+            for _ in range(14):
+                mid = (lo + hi) / 2
+                if sole_y(mid) >= -SOLE_TOL:
+                    hi = mid
+                else:
+                    lo = mid
+            return pose_for(hi)
+    return pose_for(88.0)
 
 
 def _sole_xz(anim: Animation, leg: str, frame: int, pose: Pose) -> tuple[float, float]:

@@ -29,7 +29,7 @@
   h1 { font-size: 1.25rem; margin: 0 0 2px; }
   .sub { color: var(--muted); margin: 0 0 12px; font-size: .9rem; }
   .stage { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-  canvas { display: block; width: 100%; aspect-ratio: 16 / 9; background: var(--ground); touch-action: none; cursor: grab; }
+  canvas { display: block; width: 100%; aspect-ratio: 16 / 9; background: #111; touch-action: none; cursor: grab; }
   canvas:active { cursor: grabbing; }
   .bar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--line); }
   button, select { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line);
@@ -37,15 +37,16 @@
   button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); min-width: 92px; font-weight: 600; }
   button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   label { color: var(--muted); font-size: .88rem; display: inline-flex; gap: 6px; align-items: center; }
-  .scrub { position: relative; flex: 1 1 100%; padding-top: 14px; }
+  .scrub { position: relative; flex: 1 1 100%; padding-top: 18px; }
   .scrub input[type=range] { width: 100%; margin: 0; accent-color: var(--accent); }
-  .ticks { position: absolute; left: 0; right: 0; top: 0; height: 12px; pointer-events: none; font-size: 11px; color: var(--muted); }
+  .ticks { position: absolute; left: 8px; right: 8px; top: 0; height: 16px; pointer-events: none; font-size: 11px; color: var(--muted); }
   .tick { position: absolute; transform: translateX(-50%); white-space: nowrap; }
   .tick::after { content: ""; display: block; width: 1px; height: 5px; background: var(--muted); margin: 0 auto; }
-  .hitband { position: absolute; top: 10px; height: 4px; background: var(--warn); opacity: .55; border-radius: 2px; }
+  .tick.act { color: var(--text); font-weight: 600; }
+  .tick.act::after { height: 8px; background: var(--accent); width: 2px; }
+  .hitband { position: absolute; top: 12px; height: 4px; background: var(--warn); opacity: .55; border-radius: 2px; }
   .readout { font-variant-numeric: tabular-nums; color: var(--muted); margin-left: auto; }
   .readout b { color: var(--text); }
-  .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--warn); color: #000; font-size: .78rem; font-weight: 600; }
   details { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-top: 12px; padding: 8px 12px; }
   summary { cursor: pointer; font-weight: 600; }
   ul.f { margin: 8px 0 2px; padding-left: 18px; }
@@ -66,14 +67,10 @@
       <label>Vitesse
         <select id="speed">
           <option value="1">1× (60 fps)</option><option value="0.5">0,5×</option>
-          <option value="0.25" selected>0,25×</option><option value="0.1">0,1×</option>
+          <option value="0.25">0,25×</option><option value="0.1">0,1×</option>
         </select></label>
       <label>Caméra
-        <select id="cam">
-          <option value="side" selected>Profil</option><option value="game">Jeu (3/4 dos)</option>
-          <option value="front">Face</option><option value="top">Dessus</option>
-          <option value="close">Gros plan impact</option>
-        </select></label>
+        <select id="cam"></select></label>
       <label><input type="checkbox" id="trail" checked> Trajectoire du poing</label>
       <span class="readout" id="readout"></span>
       <div class="scrub">
@@ -82,21 +79,59 @@
       </div>
     </div>
   </div>
-  <p class="hint">Glisser pour tourner · molette pour zoomer · Espace : lecture · ← → : image par image</p>
+  <p class="hint">Glisser pour tourner (passe en caméra libre) · molette pour zoomer · Espace : lecture · ← → : image par image</p>
   <div id="findings"></div>
 </main>
 <script>
 const DATA = /*__DATA__*/null;
 (() => {
-  const D = DATA, PARTS = D.parts, SZ = D.sizes;
+  const D = DATA, PARTS = D.parts, SZ = D.sizes, CINE = D.cine || null;
   const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
   const $ = (id) => document.getElementById(id);
   const q = new URLSearchParams(location.search);
   const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  const lerp = (a, b, t) => a + (b - a) * t;
 
   $('title').textContent = D.name;
-  $('subtitle').textContent = D.characters.map(c => c.name).join(' → ') + ' · ' + D.nFrames + ' images à ' + D.fps + ' fps';
+  $('subtitle').textContent = D.characters.map(c => c.name).join(' · ') + ' · ' + D.nFrames + ' images à ' + D.fps + ' fps (' + (D.nFrames / D.fps).toFixed(1).replace('.', ',') + ' s)';
 
+  // ------------------------------------------------------------------ math
+  const sub = (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+  const add = (a, b) => [a[0]+b[0], a[1]+b[1], a[2]+b[2]];
+  const mul = (a, k) => [a[0]*k, a[1]*k, a[2]*k];
+  const dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+  const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+  const len = (a) => Math.hypot(a[0], a[1], a[2]);
+  const norm = (a) => { const l = len(a) || 1; return [a[0]/l, a[1]/l, a[2]/l]; };
+  const apply = (t, v) => [ t[0]*v[0]+t[1]*v[1]+t[2]*v[2]+t[9], t[3]*v[0]+t[4]*v[1]+t[5]*v[2]+t[10], t[6]*v[0]+t[7]*v[1]+t[8]*v[2]+t[11] ];
+  const rotv = (t, v) => [ t[0]*v[0]+t[1]*v[1]+t[2]*v[2], t[3]*v[0]+t[4]*v[1]+t[5]*v[2], t[6]*v[0]+t[7]*v[1]+t[8]*v[2] ];
+  function eulerT(rx, ry, rz, p) {  // Rx*Ry*Rz (radians) + translation, 12 floats row-major rot then pos
+    const cx = Math.cos(rx), sx = Math.sin(rx), cy = Math.cos(ry), sy = Math.sin(ry), cz = Math.cos(rz), sz = Math.sin(rz);
+    // Rx*Ry
+    const a = [cy, 0, sy, sx*sy, cx, -sx*cy, -cx*sy, sx, cx*cy];
+    // (Rx*Ry)*Rz
+    return [a[0]*cz + a[1]*sz, -a[0]*sz + a[1]*cz, a[2],
+            a[3]*cz + a[4]*sz, -a[3]*sz + a[4]*cz, a[5],
+            a[6]*cz + a[7]*sz, -a[6]*sz + a[7]*cz, a[8], p[0], p[1], p[2]];
+  }
+  function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  const EASE = {
+    constant: () => 0, linear: (t) => t, quad_in: (t) => t*t, cubic_in: (t) => t*t*t, quad_out: (t) => 1 - (1-t)*(1-t),
+    cubic_out: (t) => 1 - Math.pow(1-t, 3), expo_out: (t) => t >= 1 ? 1 : 1 - Math.pow(2, -10*t),
+    sine_inout: (t) => -(Math.cos(Math.PI*t) - 1) / 2,
+  };
+  const ease = (n, u) => (EASE[n] || EASE.linear)(clamp(u, 0, 1));
+  function hex(c) { const n = parseInt(c.slice(1), 16); return [(n>>16)&255, (n>>8)&255, n&255]; }
+  const rgba = (rgb, a) => `rgba(${rgb[0]|0},${rgb[1]|0},${rgb[2]|0},${clamp(a, 0, 1).toFixed(3)})`;
+  function planeBasis(n) {
+    const nn = norm(n), h = Math.abs(nn[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
+    const t1 = norm(cross(nn, h)), t2 = cross(nn, t1);
+    return [t1, t2];
+  }
+
+  // ------------------------------------------------------------------ state
+  const ACT = (D.markers || []).filter(m => m.act);
   const PRESETS = {
     side:  { yaw: 90, pitch: 6, dist: 15.5, target: [0, 2.8, -3.6] },
     game:  { yaw: 36, pitch: 22, dist: 19, target: [0, 2.6, -3.2] },
@@ -104,21 +139,72 @@ const DATA = /*__DATA__*/null;
     top:   { yaw: 0, pitch: 86, dist: 19, target: [0, 0, -3.8] },
     close: { yaw: 62, pitch: 6, dist: 8, target: [0, 3.2, -2.2] },
   };
-  let cam = { ...PRESETS.side };
-  const st = { frame: Math.min(+(q.get('frame') || 0), D.nFrames - 1), playing: q.get('paused') !== '1', speed: +(q.get('speed') || 0.25), acc: 0, last: 0 };
-  if (q.get('cam') && PRESETS[q.get('cam')]) { cam = { ...PRESETS[q.get('cam')] }; $('cam').value = q.get('cam'); }
-  $('speed').value = String(st.speed); if ($('speed').value !== String(st.speed)) st.speed = +$('speed').value;
+  const camSel = $('cam');
+  const opts = [];
+  if (CINE) opts.push(['film', 'Caméra du film']);
+  opts.push(['side', 'Profil'], ['game', 'Jeu (3/4 dos)'], ['front', 'Face'], ['top', 'Dessus'], ['close', 'Gros plan']);
+  if (CINE) opts.push(['free', 'Libre']);
+  camSel.innerHTML = opts.map(o => `<option value="${o[0]}">${o[1]}</option>`).join('');
+  let camMode = q.get('cam') && (q.get('cam') === 'film' ? CINE : PRESETS[q.get('cam')]) ? q.get('cam') : (CINE ? 'film' : 'side');
+  let free = { ...(PRESETS[camMode] || PRESETS.side) };
+  camSel.value = camMode;
+  const st = { frame: clamp(+(q.get('frame') || 0), 0, D.nFrames - 1), playing: q.get('paused') !== '1', speed: +(q.get('speed') || (CINE ? 1 : 0.25)), acc: 0, last: 0 };
+  $('speed').value = String(st.speed); if ($('speed').value !== String(st.speed)) { st.speed = +$('speed').value; }
   if (q.get('trail') === '0') $('trail').checked = false;
+  if (!D.striker) $('trail').parentElement.hidden = true;
 
-  // ---- vector helpers
-  const sub = (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
-  const dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
-  const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
-  const norm = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0]/l, a[1]/l, a[2]/l]; };
-  const apply = (t, v) => [ t[0]*v[0]+t[1]*v[1]+t[2]*v[2]+t[9], t[3]*v[0]+t[4]*v[1]+t[5]*v[2]+t[10], t[6]*v[0]+t[7]*v[1]+t[8]*v[2]+t[11] ];
-  const rotv = (t, v) => [ t[0]*v[0]+t[1]*v[1]+t[2]*v[2], t[3]*v[0]+t[4]*v[1]+t[5]*v[2], t[6]*v[0]+t[7]*v[1]+t[8]*v[2] ];
+  let W = 0, H = 0, dpr = 1;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const rect = cv.getBoundingClientRect();
+    W = Math.max(320, Math.round(rect.width * dpr)); H = Math.round(W * 9 / 16);
+    cv.width = W; cv.height = H;
+  }
 
-  // faces: corner sign triples (x,y,z) in CCW order seen from outside, plus normal
+  // ------------------------------------------------------------------ camera
+  function freeState() {
+    const yaw = free.yaw * Math.PI/180, pit = free.pitch * Math.PI/180, t = free.target;
+    return { pos: [t[0] + free.dist*Math.sin(yaw)*Math.cos(pit), t[1] + free.dist*Math.sin(pit), t[2] + free.dist*Math.cos(yaw)*Math.cos(pit)], tgt: t, fov: 47, roll: 0 };
+  }
+  function filmState(f) { const c = CINE.camera[f]; return { pos: [c[0], c[1], c[2]], tgt: [c[3], c[4], c[5]], fov: c[6], roll: c[7] }; }
+  function camState(f) { return camMode === 'film' ? filmState(f) : freeState(); }
+  function basis(cs) {
+    const f = norm(sub(cs.tgt, cs.pos)); const up = Math.abs(f[1]) > 0.98 ? [0, 0, -1] : [0, 1, 0];
+    let r = norm(cross(f, up)), u = cross(r, f);
+    if (cs.roll) { const c = Math.cos(cs.roll*Math.PI/180), s = Math.sin(cs.roll*Math.PI/180); const r2 = add(mul(r, c), mul(u, s)); u = add(mul(u, c), mul(r, -s)); r = r2; }
+    return { pos: cs.pos, f, r, u, focal: (H / 2) / Math.tan(cs.fov * Math.PI / 360) };
+  }
+  const NEAR = 0.25;
+  function toCam(B, p) { const d = sub(p, B.pos); return [dot(d, B.r), dot(d, B.u), dot(d, B.f)]; }
+  function scr(B, c) { return { x: W/2 + B.focal * c[0] / c[2], y: H/2 - B.focal * c[1] / c[2], z: c[2] }; }
+  function project(B, p) { return scr(B, toCam(B, p)); }
+  function clipPoly(cpts) {   // Sutherland–Hodgman against z = NEAR (camera space)
+    const out = [];
+    for (let i = 0; i < cpts.length; i++) {
+      const a = cpts[i], b = cpts[(i + 1) % cpts.length], ina = a[2] >= NEAR, inb = b[2] >= NEAR;
+      if (ina) out.push(a);
+      if (ina !== inb) { const t = (NEAR - a[2]) / (b[2] - a[2]); out.push([lerp(a[0], b[0], t), lerp(a[1], b[1], t), NEAR]); }
+    }
+    return out;
+  }
+  function polyScreen(B, pts3) { const c = clipPoly(pts3.map(p => toCam(B, p))); return c.length < 3 ? null : c.map(p => scr(B, p)); }
+  function segScreen(B, a, b) {
+    let ca = toCam(B, a), cb = toCam(B, b);
+    if (ca[2] < NEAR && cb[2] < NEAR) return null;
+    if (ca[2] < NEAR) { const t = (NEAR - ca[2]) / (cb[2] - ca[2]); ca = [lerp(ca[0], cb[0], t), lerp(ca[1], cb[1], t), NEAR]; }
+    if (cb[2] < NEAR) { const t = (NEAR - cb[2]) / (ca[2] - cb[2]); cb = [lerp(cb[0], ca[0], t), lerp(cb[1], ca[1], t), NEAR]; }
+    return [scr(B, ca), scr(B, cb)];
+  }
+  function hull(pts) {
+    const p = pts.slice().sort((a, b) => a[0]-b[0] || a[1]-b[1]);
+    const cr = (o, a, b) => (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0]);
+    const lo = [], up = [];
+    for (const a of p) { while (lo.length > 1 && cr(lo[lo.length-2], lo[lo.length-1], a) <= 0) lo.pop(); lo.push(a); }
+    for (const a of p.slice().reverse()) { while (up.length > 1 && cr(up[up.length-2], up[up.length-1], a) <= 0) up.pop(); up.push(a); }
+    return lo.slice(0, -1).concat(up.slice(0, -1));
+  }
+
+  // ------------------------------------------------------------------ geometry tables
   const FACES = [
     { n: [0,0,-1], c: [[-1,1,-1],[1,1,-1],[1,-1,-1],[-1,-1,-1]], name: 'front' },
     { n: [0,0,1],  c: [[1,1,1],[-1,1,1],[-1,-1,1],[1,-1,1]], name: 'back' },
@@ -129,59 +215,100 @@ const DATA = /*__DATA__*/null;
   ];
   const LIGHT = norm([0.45, 0.85, 0.35]);
 
-  function hex(c) { const n = parseInt(c.slice(1), 16); return [(n>>16)&255, (n>>8)&255, n&255]; }
-  function shade(rgb, k) { return `rgb(${Math.round(rgb[0]*k)},${Math.round(rgb[1]*k)},${Math.round(rgb[2]*k)})`; }
-
-  function cameraBasis() {
-    const yaw = cam.yaw * Math.PI/180, pit = cam.pitch * Math.PI/180;
-    const t = cam.target;
-    const pos = [t[0] + cam.dist*Math.sin(yaw)*Math.cos(pit), t[1] + cam.dist*Math.sin(pit), t[2] + cam.dist*Math.cos(yaw)*Math.cos(pit)];
-    const f = norm(sub(t, pos));
-    let up = Math.abs(f[1]) > 0.98 ? [0,0,-1] : [0,1,0];
-    const r = norm(cross(f, up)), u = cross(r, f);
-    return { pos, f, r, u };
+  // ------------------------------------------------------------------ cinematic precompute
+  const debrisFrames = [];   // per piece: array per frame of [x,y,z,rx,ry,rz] | null
+  const particles = [];
+  const crackSets = [];
+  function attachPos(att, f) {
+    const ch = D.characters[att.char], pi = PARTS.indexOf(att.part);
+    return apply(ch.frames[clamp(f, 0, D.nFrames - 1)][pi], att.off || [0, 0, 0]);
+  }
+  function buildCine() {
+    if (!CINE) return;
+    for (const d of CINE.debris) {
+      const arr = new Array(D.nFrames).fill(null);
+      const p = d.p.slice(), v = d.v.slice(), w = d.w.map(x => x * Math.PI / 180), ang = [0, 0, 0];
+      const half = Math.min(...d.size) / 2;
+      for (let f = d.t0; f < Math.min(D.nFrames, d.t0 + d.life); f++) {
+        arr[f] = [p[0], p[1], p[2], ang[0], ang[1], ang[2]];
+        v[1] -= (d.tg != null && f >= d.tg ? d.g2 : d.g); p[0] += v[0]; p[1] += v[1]; p[2] += v[2];
+        ang[0] += w[0]; ang[1] += w[1]; ang[2] += w[2];
+        if (p[1] < half) { p[1] = half; v[1] = Math.abs(v[1]) > 0.06 ? -v[1] * d.bounce : 0; v[0] *= 0.8; v[2] *= 0.8; w[0] *= 0.7; w[1] *= 0.7; w[2] *= 0.7; }
+      }
+      debrisFrames.push(arr);
+    }
+    for (const e of CINE.fx) {
+      if (e.type === 'emit') {
+        const rnd = mulberry32(e.seed); let acc = 0;
+        const c0 = hex(e.color[0]), c1 = hex(e.color[1]), dir = norm(e.dir);
+        for (let f = e.t0; f <= Math.min(e.t1, D.nFrames - 1); f++) {
+          let n = f === e.t0 ? e.burst : 0; acc += e.rate; while (acc >= 1) { n++; acc -= 1; }
+          for (let i = 0; i < n; i++) {
+            const org = e.attach ? attachPos(e.attach, f) : e.origin.slice();
+            const ru = norm([rnd() - 0.5, rnd() - 0.5, rnd() - 0.5]);
+            let d = norm(add(mul(dir, 1 - e.spread), mul(ru, e.spread)));
+            const sp = lerp(e.vel[0], e.vel[1], rnd());
+            const life = Math.max(2, Math.round(lerp(e.life[0], e.life[1], rnd())));
+            let p = org, v = mul(d, sp);
+            if (e.converge > 0) { const off = mul(ru, e.converge); p = add(org, off); v = mul(off, -1 / life); }
+            else if (e.radius > 0) p = add(org, mul(ru, e.radius * rnd()));
+            const sv = 1 + (rnd() - 0.5) * 2 * e.sizeVar;
+            particles.push({ t0: f, life, p, v, g: e.grav, k: e.drag, s0: e.size[0] * sv, s1: e.size[1] * sv, a0: e.alpha[0], a1: e.alpha[1], c0, c1, add: e.add, stretch: e.stretch });
+          }
+        }
+      } else if (e.type === 'cracks') {
+        const rnd = mulberry32(e.seed), [t1, t2] = planeBasis(e.n);
+        function grow2(origin, a0, L) {
+          let x = origin[0], y = origin[1], a = a0; const pts = [[x, y]], seg = 0.6, n = Math.max(3, Math.round(L / seg));
+          for (let i = 0; i < n; i++) { a += (rnd() - 0.5) * 0.8; x += Math.cos(a) * seg; y += Math.sin(a) * seg; pts.push([x, y]); }
+          return pts;
+        }
+        const out = [];
+        for (let b = 0; b < e.branches; b++) {
+          const a0 = (b / e.branches) * Math.PI * 2 + (rnd() - 0.5) * 0.5, L = e.len * (0.55 + 0.45 * rnd());
+          let x = 0, y = 0, a = a0; const pts = [[0, 0]], seg = 0.7, n = Math.max(3, Math.round(L / seg));
+          for (let i = 0; i < n; i++) {
+            a += (rnd() - 0.5) * 0.6; x += Math.cos(a) * seg; y += Math.sin(a) * seg; pts.push([x, y]);
+            if (i > 2 && i < n - 2 && rnd() < 0.18) out.push(grow2([x, y], a + (rnd() < 0.5 ? -1 : 1) * (0.5 + rnd() * 0.7), L * 0.4));
+          }
+          out.push(pts);
+        }
+        crackSets.push({ e, t1, t2, lines: out });
+      }
+    }
   }
 
-  let W = 0, H = 0, dpr = 1;
-  function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const rect = cv.getBoundingClientRect();
-    W = Math.max(320, Math.round(rect.width * dpr)); H = Math.round(W * 9 / 16);
-    cv.width = W; cv.height = H;
-  }
-
-  function project(B, p) {
-    const d = sub(p, B.pos);
-    const x = dot(d, B.r), y = dot(d, B.u), z = dot(d, B.f);
-    const focal = H * 1.15;
-    return { x: W/2 + focal * x / z, y: H/2 - focal * y / z, z };
-  }
-
-  function hull(pts) {
-    const p = pts.slice().sort((a, b) => a[0]-b[0] || a[1]-b[1]);
-    const cr = (o, a, b) => (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0]);
-    const lo = [], up = [];
-    for (const a of p) { while (lo.length > 1 && cr(lo[lo.length-2], lo[lo.length-1], a) <= 0) lo.pop(); lo.push(a); }
-    for (const a of p.slice().reverse()) { while (up.length > 1 && cr(up[up.length-2], up[up.length-1], a) <= 0) up.pop(); up.push(a); }
-    return lo.slice(0, -1).concat(up.slice(0, -1));
-  }
-
-  function strikerTip(frame) {
-    const part = PARTS.indexOf(D.striker), t = D.characters[0].frames[frame][part];
-    return apply(t, [0, -SZ[D.striker][1]/2, 0]);
+  // ------------------------------------------------------------------ drawing
+  function boxFaces(polys, B, t, s, rgb, light, extra) {
+    for (const fc of FACES) {
+      const nW = rotv(t, fc.n), cW = apply(t, [fc.n[0]*s[0]/2, fc.n[1]*s[1]/2, fc.n[2]*s[2]/2]);
+      if (dot(nW, sub(B.pos, cW)) <= 0) continue;
+      const cc = fc.c.map(c => toCam(B, apply(t, [c[0]*s[0]/2, c[1]*s[1]/2, c[2]*s[2]/2])));
+      const clipped = clipPoly(cc); if (clipped.length < 3) continue;
+      const pts = clipped.map(p => scr(B, p));
+      const k = (0.5 + 0.5 * Math.max(0, dot(nW, LIGHT))) * light;
+      polys.push({ pts, fill: `rgb(${Math.round(rgb[0]*k)},${Math.round(rgb[1]*k)},${Math.round(rgb[2]*k)})`, z: toCam(B, cW)[2], face: extra && fc.name === 'front' });
+    }
   }
 
   function draw() {
-    const B = cameraBasis();
+    const f = st.frame, cs = camState(f), B = basis(cs), S = CINE ? CINE.screen : null;
+    const bright = S ? S.bright[f] : 1;
+    const sky = CINE ? hex(CINE.skyColor) : hex('#e9ecf1'), floor = CINE ? hex(CINE.floorColor) : sky;
+    const roll = cs.roll || 0;
+    ctx.save();
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = css('--ground'); ctx.fillRect(0, 0, W, H);
-
-    // grid
-    const G = D.ground; ctx.lineWidth = Math.max(1, dpr); ctx.strokeStyle = css('--grid'); ctx.beginPath();
-    for (let i = -G; i <= G; i += 2) {
-      for (const [a, b] of [[[i,0,-G-4],[i,0,G-4]], [[-G,0,i-4],[G,0,i-4]]]) {
-        const pa = project(B, a), pb = project(B, b);
-        if (pa.z > 0.5 && pb.z > 0.5) { ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); }
+    // sky + ground (the ground is a big quad so the horizon is right)
+    ctx.fillStyle = rgba(mul(sky, bright), 1); ctx.fillRect(0, 0, W, H);
+    const gc = [cs.pos[0], 0, cs.pos[2]], R = 400;
+    const gq = polyScreen(B, [[gc[0]-R, 0, gc[2]-R], [gc[0]+R, 0, gc[2]-R], [gc[0]+R, 0, gc[2]+R], [gc[0]-R, 0, gc[2]+R]]);
+    if (gq) { ctx.fillStyle = rgba(mul(floor, bright), 1); ctx.beginPath(); gq.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.fill(); }
+    ctx.lineWidth = Math.max(1, dpr); ctx.strokeStyle = rgba(mul(floor, bright * 0.86), 1); ctx.beginPath();
+    const G = D.ground, ox = Math.round((CINE ? cs.tgt[0] : 0) / 2) * 2, oz = Math.round((CINE ? cs.tgt[2] : -4) / 2) * 2;
+    const GG = CINE ? 30 : G;
+    for (let i = -GG; i <= GG; i += 2) {
+      for (const [a, b] of [[[ox + i, 0, oz - GG], [ox + i, 0, oz + GG]], [[ox - GG, 0, oz + i], [ox + GG, 0, oz + i]]]) {
+        const sg = segScreen(B, a, b); if (sg) { ctx.moveTo(sg[0].x, sg[0].y); ctx.lineTo(sg[1].x, sg[1].y); }
       }
     }
     ctx.stroke();
@@ -191,31 +318,30 @@ const DATA = /*__DATA__*/null;
     for (const ch of D.characters) {
       const pts = [];
       PARTS.forEach((part, i) => {
-        const t = ch.frames[st.frame][i], s = SZ[part];
+        const t = ch.frames[f][i], s = SZ[part];
         for (const sx of [-1,1]) for (const sy of [-1,1]) for (const sz of [-1,1]) {
           const w = apply(t, [sx*s[0]/2, sy*s[1]/2, sz*s[2]/2]);
-          const g = project(B, [w[0], 0, w[2]]);
-          if (g.z > 0.5) pts.push([g.x, g.y]);
+          const g = project(B, [w[0], 0, w[2]]); if (g.z > NEAR) pts.push([g.x, g.y]);
         }
       });
       if (pts.length > 2) { const h = hull(pts); h.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); }
     }
     ctx.fill();
 
-    // faces
+    // solids: characters, props, debris
     const polys = [];
     for (const ch of D.characters) {
-      PARTS.forEach((part, i) => {
-        const t = ch.frames[st.frame][i], s = SZ[part], base = hex(ch.colors[part]);
-        FACES.forEach((fc) => {
-          const nW = rotv(t, fc.n);
-          const cW = apply(t, [fc.n[0]*s[0]/2, fc.n[1]*s[1]/2, fc.n[2]*s[2]/2]);
-          if (dot(nW, sub(B.pos, cW)) <= 0) return;
-          const pts = fc.c.map(c => project(B, apply(t, [c[0]*s[0]/2, c[1]*s[1]/2, c[2]*s[2]/2])));
-          if (pts.some(p => p.z < 0.3)) return;
-          const k = 0.5 + 0.5 * Math.max(0, dot(nW, LIGHT));
-          polys.push({ pts, fill: shade(base, k), z: project(B, cW).z, face: part === 'Head' && fc.name === 'front' });
-        });
+      PARTS.forEach((part, i) => boxFaces(polys, B, ch.frames[f][i], SZ[part], hex(ch.colors[part]), bright, part === 'Head'));
+    }
+    if (CINE) {
+      for (const p of CINE.props) {
+        if (f < p.v[0] || f >= p.v[1]) continue;
+        const a = p.yaw * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+        boxFaces(polys, B, [c, 0, s, 0, 1, 0, -s, 0, c, p.c[0], p.c[1], p.c[2]], p.size, hex(p.color), bright, false);
+      }
+      CINE.debris.forEach((d, i) => {
+        const e = debrisFrames[i][f]; if (!e) return;
+        boxFaces(polys, B, eulerT(e[3], e[4], e[5], [e[0], e[1], e[2]]), d.size, hex(d.color), bright, false);
       });
     }
     polys.sort((a, b) => b.z - a.z);
@@ -223,7 +349,7 @@ const DATA = /*__DATA__*/null;
     for (const p of polys) {
       ctx.beginPath(); p.pts.forEach((q2, i) => i ? ctx.lineTo(q2.x, q2.y) : ctx.moveTo(q2.x, q2.y)); ctx.closePath();
       ctx.fillStyle = p.fill; ctx.fill(); ctx.stroke();
-      if (p.face) {
+      if (p.face && p.pts.length === 4) {
         const [c0, c1, , c3] = p.pts, P = (u, v) => [c0.x + u*(c1.x-c0.x) + v*(c3.x-c0.x), c0.y + u*(c1.y-c0.y) + v*(c3.y-c0.y)];
         ctx.fillStyle = 'rgba(20,20,20,0.85)';
         for (const [u, v] of [[0.3, 0.38], [0.7, 0.38]]) { const [x, y] = P(u, v); ctx.beginPath(); ctx.arc(x, y, Math.max(1.5, 2.2*dpr), 0, 7); ctx.fill(); }
@@ -232,39 +358,130 @@ const DATA = /*__DATA__*/null;
       }
     }
 
-    // fist trail
-    if ($('trail').checked) {
-      const n = 10; ctx.lineWidth = 3*dpr; ctx.lineCap = 'round';
-      for (let k = 0; k < n; k++) {
-        const f0 = st.frame - k - 1, f1 = st.frame - k;
-        if (f0 < 0) break;
-        const a = project(B, strikerTip(f0)), b = project(B, strikerTip(f1));
-        ctx.strokeStyle = `rgba(255,170,40,${0.85 * (1 - k/n)})`;
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    if (CINE) drawFx(B, f);
+
+    // fist trail (viewer helper for the punch scene)
+    if (D.striker && !CINE && $('trail').checked) {
+      const part = PARTS.indexOf(D.striker), tip = (fr) => apply(D.characters[0].frames[fr][part], [0, -SZ[D.striker][1]/2, 0]);
+      ctx.lineWidth = 3*dpr; ctx.lineCap = 'round';
+      for (let k = 0; k < 10; k++) {
+        const f0 = f - k - 1, f1 = f - k; if (f0 < 0) break;
+        const a = project(B, tip(f0)), b = project(B, tip(f1));
+        ctx.strokeStyle = `rgba(255,170,40,${0.85 * (1 - k/10)})`; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
       }
     }
+    ctx.restore();
+    if (S) drawScreen(S, f);
+    hud(f);
+  }
 
-    // HUD
-    const ev = D.events || {}, hs = ev.hitstop;
-    let label = '';
-    if (ev.impact === st.frame) label = 'IMPACT';
-    else if (ev.windup === st.frame) label = 'WINDUP';
-    if (hs && st.frame >= hs[0] && st.frame <= hs[1]) label = (label ? label + ' · ' : '') + 'HITSTOP';
+  function drawFx(B, f) {
+    const items = [];
+    const col = (hx) => hex(hx);
+    for (const e of CINE.fx) {
+      if (e.type === 'ring' || e.type === 'dome' || e.type === 'line') {
+        const u = (f - e.t0) / e.dur; if (u < 0 || u > 1) continue;
+        const k = ease(e.ease, u), al = lerp(e.a0, e.a1, u), rgb = col(e.color);
+        if (e.type === 'ring') {
+          const r = lerp(e.r0, e.r1, k), w = Math.max(0.02, lerp(e.w0, e.w1, k)), [t1, t2] = planeBasis(e.n), N = 56;
+          const outer = [], inner = [];
+          for (let i = 0; i < N; i++) { const a = i / N * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
+            const d = add(mul(t1, c), mul(t2, s)); outer.push(add(e.c, mul(d, r + w / 2))); inner.push(add(e.c, mul(d, Math.max(0.01, r - w / 2)))); }
+          const po = polyScreen(B, outer), pi = polyScreen(B, inner); if (!po) continue;
+          items.push({ z: toCam(B, e.c)[2], add: e.add, fn: () => { ctx.fillStyle = rgba(rgb, al); ctx.beginPath(); po.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); if (pi) { pi.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); } ctx.fill('evenodd'); } });
+        } else if (e.type === 'dome') {
+          const r = lerp(e.r0, e.r1, k), cc = toCam(B, e.c); if (cc[2] < NEAR) continue;
+          const s = scr(B, cc), pr = Math.max(1, r * B.focal / cc[2]);
+          items.push({ z: cc[2], add: e.add, fn: () => { const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, pr); g.addColorStop(0, rgba(rgb, al)); g.addColorStop(0.6, rgba(rgb, al * 0.55)); g.addColorStop(1, rgba(rgb, 0)); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(s.x, s.y, pr, 0, 7); ctx.fill(); } });
+        } else {
+          const sg = segScreen(B, e.a, e.b); if (!sg) continue;
+          const mid = toCam(B, mul(add(e.a, e.b), 0.5)), w = Math.max(1, lerp(e.w0, e.w1, k) * B.focal / Math.max(NEAR, mid[2]));
+          items.push({ z: mid[2], add: e.add, fn: () => { ctx.strokeStyle = rgba(rgb, al); ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(sg[0].x, sg[0].y); ctx.lineTo(sg[1].x, sg[1].y); ctx.stroke(); } });
+        }
+      } else if (e.type === 'trail') {
+        if (f < e.t0 || f > e.t1 + e.len) continue;
+        const ch = D.characters[e.char], pi = PARTS.indexOf(e.part), pts = [];
+        for (let k = 0; k <= e.len; k++) { const fr = f - k; if (fr < e.t0 || fr > e.t1) { pts.push(null); continue; } pts.push(apply(ch.frames[clamp(fr, 0, D.nFrames - 1)][pi], e.tip)); }
+        const rgb = col(e.color);
+        items.push({ z: 1e9 - 1, add: true, fn: () => {
+          ctx.lineCap = 'round';
+          for (let k = 0; k < e.len; k++) { if (!pts[k] || !pts[k + 1]) continue; const sg = segScreen(B, pts[k], pts[k + 1]); if (!sg) continue; const u = k / e.len, cz = toCam(B, pts[k])[2];
+            ctx.strokeStyle = rgba(rgb, e.a * (1 - u)); ctx.lineWidth = Math.max(1, lerp(e.w0, e.w1, u) * B.focal / Math.max(NEAR, cz)); ctx.beginPath(); ctx.moveTo(sg[0].x, sg[0].y); ctx.lineTo(sg[1].x, sg[1].y); ctx.stroke(); } } });
+      } else if (e.type === 'strip') {
+        const u = (f - e.t0) / e.dur; if (f < e.t0) continue;
+        const g = ease(e.ease, Math.min(1, u)); let fa = 1;
+        if (e.fade) fa = clamp(1 - (f - e.fade[0]) / (e.fade[1] - e.fade[0]), 0, 1); if (fa <= 0) continue;
+        const a = e.a, b = add(e.a, mul(sub(e.b, e.a), g)), dd = norm(sub(e.b, e.a)), pp = [-dd[2], 0, dd[0]];
+        for (const [w, c, al] of e.layers) {
+          const quad = [add(a, mul(pp, w / 2)), add(b, mul(pp, w / 2)), add(b, mul(pp, -w / 2)), add(a, mul(pp, -w / 2))].map(p => [p[0], 0.03, p[2]]);
+          const ps = polyScreen(B, quad); if (!ps) continue; const rgb = col(c);
+          items.push({ z: toCam(B, mul(add(a, b), 0.5))[2] + 0.01, add: e.add, fn: () => { ctx.fillStyle = rgba(rgb, al * fa); ctx.beginPath(); ps.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.fill(); } });
+        }
+      }
+    }
+    for (const cs of crackSets) {
+      const e = cs.e; if (f < e.t0) continue;
+      const g = ease('expo_out', Math.min(1, (f - e.t0) / e.dur)); let fa = 1;
+      if (e.fade) fa = clamp(1 - (f - e.fade[0]) / (e.fade[1] - e.fade[0]), 0, 1); if (fa <= 0) continue;
+      const toW = (p) => add(e.c, add(mul(cs.t1, p[0]), mul(cs.t2, p[1])));
+      const segs = [];
+      for (const ln of cs.lines) { const n = Math.max(1, Math.floor((ln.length - 1) * g)); for (let i = 0; i < n && i < ln.length - 1; i++) { const sg = segScreen(B, toW(ln[i]), toW(ln[i + 1])); if (sg) segs.push(sg); } }
+      if (!segs.length) continue; const cz = toCam(B, e.c)[2];
+      items.push({ z: cz + 0.02, add: false, fn: () => {
+        ctx.lineCap = 'round'; ctx.lineWidth = clamp(e.w * B.focal / Math.max(NEAR, cz), 1, W * 0.02);
+        if (e.glow) { ctx.save(); ctx.strokeStyle = rgba(col(e.glow), 0.55 * fa); ctx.lineWidth *= 2.2; ctx.beginPath(); for (const s of segs) { ctx.moveTo(s[0].x, s[0].y); ctx.lineTo(s[1].x, s[1].y); } ctx.stroke(); ctx.restore(); ctx.lineWidth /= 2.2; }
+        ctx.strokeStyle = rgba(col(e.color), 0.95 * fa); ctx.beginPath(); for (const s of segs) { ctx.moveTo(s[0].x, s[0].y); ctx.lineTo(s[1].x, s[1].y); } ctx.stroke(); } });
+    }
+    for (const p of particles) {
+      const a = f - p.t0; if (a < 0 || a >= p.life) continue;
+      const u = a / p.life, kk = p.k > 0 ? (1 - Math.exp(-p.k * a)) / p.k : a;
+      const pos = [p.p[0] + p.v[0] * kk, p.p[1] + p.v[1] * kk - 0.5 * p.g * a * a, p.p[2] + p.v[2] * kk];
+      const cc = toCam(B, pos); if (cc[2] < NEAR) continue;
+      const s = scr(B, cc), size = Math.max(0.6, lerp(p.s0, p.s1, u) * B.focal / cc[2]), al = lerp(p.a0, p.a1, u);
+      const rgb = [lerp(p.c0[0], p.c1[0], u), lerp(p.c0[1], p.c1[1], u), lerp(p.c0[2], p.c1[2], u)];
+      items.push({ z: cc[2], add: p.add, fn: () => { ctx.fillStyle = rgba(rgb, al); ctx.beginPath(); ctx.arc(s.x, s.y, size, 0, 7); ctx.fill(); } });
+    }
+    items.sort((a, b) => b.z - a.z);
+    for (const it of items) if (!it.add) it.fn();
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (const it of items) if (it.add) it.fn();
+    ctx.restore();
+  }
+
+  function drawScreen(S, f) {
+    const vg = S.vignette[f], tint = S.tint[f], bars = S.bars[f], speed = S.speed[f];
+    if (tint > 0.001) { ctx.fillStyle = rgba(hex(S.tintColor), tint); ctx.fillRect(0, 0, W, H); }
+    if (speed > 0.01) {
+      const rnd = mulberry32(Math.floor(f / 2) * 7919 + 13), cx = W / 2, cy = H / 2, n = 90;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < n; i++) {
+        const a = rnd() * Math.PI * 2, r0 = H * (0.32 + rnd() * 0.25), r1 = H * (0.75 + rnd() * 0.5);
+        ctx.strokeStyle = `rgba(255,255,255,${(speed * (0.25 + rnd() * 0.5)).toFixed(3)})`; ctx.lineWidth = (1 + rnd() * 2.5) * dpr;
+        ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); ctx.stroke();
+      }
+    }
+    if (vg > 0.001) { const g = ctx.createRadialGradient(W/2, H/2, H * 0.3, W/2, H/2, H * 1.0); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${vg})`); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
+    for (const fl of S.flashes) { const u = (f - fl.t0) / fl.dur; if (u < 0 || u > 1) continue; ctx.fillStyle = rgba(hex(fl.color), fl.peak * Math.pow(1 - u, 1.6)); ctx.fillRect(0, 0, W, H); }
+    if (bars > 0.001) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H * bars); ctx.fillRect(0, H * (1 - bars), W, H * bars); }
+  }
+
+  function hud(f) {
+    const labels = [];
+    for (const m of (D.markers || [])) if (m.f === f || (m.hold && f >= m.f && f < m.f + m.hold)) labels.push(m.label);
+    for (const b of (D.bands || [])) if (f >= b.f0 && f <= b.f1) labels.push(b.label);
+    let label = labels.join(' · ');
     ctx.font = `600 ${14*dpr}px system-ui, sans-serif`; ctx.textBaseline = 'top';
-    if (label) { const w = ctx.measureText(label).width + 20*dpr; ctx.fillStyle = css('--warn'); ctx.fillRect(12*dpr, 12*dpr, w, 26*dpr); ctx.fillStyle = '#000'; ctx.fillText(label, 22*dpr, 17*dpr); }
-    $('readout').innerHTML = `image <b>${st.frame}</b> / ${D.nFrames - 1} · ${(st.frame / D.fps * 1000).toFixed(0)} ms`;
-    $('scrub').value = st.frame;
+    if (label) { label = label.toUpperCase(); const w = ctx.measureText(label).width + 20*dpr; ctx.fillStyle = css('--warn'); ctx.fillRect(12*dpr, 12*dpr, w, 26*dpr); ctx.fillStyle = '#000'; ctx.fillText(label, 22*dpr, 17*dpr); }
+    $('readout').innerHTML = `image <b>${f}</b> / ${D.nFrames - 1} · ${(f / D.fps).toFixed(2).replace('.', ',')} s`;
+    $('scrub').value = f;
   }
 
-  // ---- ticks on the timeline
+  // ------------------------------------------------------------------ UI
   function buildTicks() {
-    const el = $('ticks'); el.innerHTML = ''; const max = D.nFrames - 1, ev = D.events || {};
-    const add = (f, txt) => { const d = document.createElement('div'); d.className = 'tick'; d.style.left = (f / max * 100) + '%'; d.textContent = txt; el.appendChild(d); };
-    if (ev.windup != null) add(ev.windup, 'armé');
-    if (ev.impact != null) add(ev.impact, 'impact');
-    if (ev.hitstop) { const b = document.createElement('div'); b.className = 'hitband'; b.style.left = (ev.hitstop[0]/max*100) + '%'; b.style.width = ((ev.hitstop[1]-ev.hitstop[0])/max*100) + '%'; el.appendChild(b); }
+    const el = $('ticks'); el.innerHTML = ''; const max = D.nFrames - 1;
+    for (const m of (D.markers || [])) { const d = document.createElement('div'); d.className = 'tick' + (m.act ? ' act' : ''); d.style.left = (m.f / max * 100) + '%'; d.textContent = m.label; el.appendChild(d); }
+    for (const b of (D.bands || [])) if (b.show !== false) { const d = document.createElement('div'); d.className = 'hitband'; d.style.left = (b.f0 / max * 100) + '%'; d.style.width = ((b.f1 - b.f0) / max * 100) + '%'; el.appendChild(d); }
   }
-
   function buildFindings() {
     const host = $('findings'); host.innerHTML = '';
     for (const ch of D.characters) {
@@ -279,12 +496,16 @@ const DATA = /*__DATA__*/null;
       host.appendChild(d);
     }
   }
-
-  // ---- interaction
   function setPlaying(v) { st.playing = v; $('play').textContent = v ? 'Pause' : 'Lecture'; st.last = 0; }
+  function toFree() {
+    if (camMode !== 'film') return;
+    const cs = filmState(st.frame), d = sub(cs.pos, cs.tgt), dist = len(d);
+    free = { yaw: Math.atan2(d[0], d[2]) * 180 / Math.PI, pitch: clamp(Math.asin(d[1] / dist) * 180 / Math.PI, -5, 88), dist, target: cs.tgt };
+    camMode = 'free'; camSel.value = 'free';
+  }
   $('play').onclick = () => setPlaying(!st.playing);
   $('speed').onchange = (e) => { st.speed = +e.target.value; };
-  $('cam').onchange = (e) => { cam = { ...PRESETS[e.target.value] }; draw(); };
+  camSel.onchange = (e) => { camMode = e.target.value; if (PRESETS[camMode]) free = { ...PRESETS[camMode] }; draw(); };
   $('trail').onchange = draw;
   $('scrub').max = D.nFrames - 1;
   $('scrub').oninput = (e) => { setPlaying(false); st.frame = +e.target.value; draw(); };
@@ -295,10 +516,10 @@ const DATA = /*__DATA__*/null;
     if (e.code === 'ArrowLeft') { setPlaying(false); st.frame = Math.max(0, st.frame - 1); draw(); }
   });
   let drag = null;
-  cv.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, yaw: cam.yaw, pitch: cam.pitch }; cv.setPointerCapture(e.pointerId); });
-  cv.addEventListener('pointermove', (e) => { if (!drag) return; cam.yaw = drag.yaw - (e.clientX - drag.x) * 0.4; cam.pitch = Math.max(-5, Math.min(88, drag.pitch + (e.clientY - drag.y) * 0.3)); draw(); });
+  cv.addEventListener('pointerdown', (e) => { toFree(); drag = { x: e.clientX, y: e.clientY, yaw: free.yaw, pitch: free.pitch }; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', (e) => { if (!drag) return; free.yaw = drag.yaw - (e.clientX - drag.x) * 0.4; free.pitch = clamp(drag.pitch + (e.clientY - drag.y) * 0.3, -5, 88); draw(); });
   cv.addEventListener('pointerup', () => { drag = null; });
-  cv.addEventListener('wheel', (e) => { e.preventDefault(); cam.dist = Math.max(5, Math.min(40, cam.dist * (e.deltaY > 0 ? 1.08 : 0.92))); draw(); }, { passive: false });
+  cv.addEventListener('wheel', (e) => { e.preventDefault(); toFree(); free.dist = clamp(free.dist * (e.deltaY > 0 ? 1.08 : 0.92), 3, 80); draw(); }, { passive: false });
   window.addEventListener('resize', () => { resize(); draw(); });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
 
@@ -310,7 +531,7 @@ const DATA = /*__DATA__*/null;
     requestAnimationFrame(loop);
   }
 
-  resize(); buildTicks(); buildFindings(); setPlaying(st.playing); draw();
+  resize(); buildCine(); buildTicks(); buildFindings(); setPlaying(st.playing); draw();
   window.__ready = true; requestAnimationFrame(loop);
 })();
 </script>

@@ -28,6 +28,25 @@ animation "looks great". Say what the linter measured and what still needs the u
 7. **Report honestly**: findings fixed, findings accepted (with reason), and what the linter
    cannot judge (silhouette appeal, weight, style). Ask the user to review in their viewer.
 
+## Ultimates and cinematics
+
+For long set-pieces (ultimates, finishers) author a `Scene` with a `Cinematic` (see
+`examples/ultimate.py`, ~13 s, four acts). The loop is: author an act, `python tools/build_viewer.py <scene>`,
+render the `film` camera on key frames, build a contact sheet, **look**, fix, repeat.
+
+- `tsb_engine/authoring.py`: `K(anim, frame, easing, T=, H=, RA=, LA=, RL=, LL=, R=)` keys several parts at
+  once; `tremble`, `attach` (victim's part sits on the holder's hand), `lying_root_rot`,
+  `keep_above_ground`. Sprint: `footwork.gait_steps` + `bake_footwork` — bake legs **after** every torso/root key,
+  or the feet will not match the body.
+- `tsb_engine/cinematic.py`: camera shots (`dolly`, `orbit`, `tracking`; later shots override earlier ones), shake,
+  props, debris/`shatter`, rings, domes, particles (`emit`, `converge` for charge-ups), trails, ground
+  `strip`, cracks, and screen tracks (bright, vignette, bars, speed lines, tint, flashes).
+- Camera traps seen while building the demo: a camera inside rubble/dust fills the frame with one polygon
+  (raise it or pull back); additive glows wash out on a bright floor (cap alpha); particle clusters on the
+  character hide the pose (keep the silhouette readable).
+- The viewer only imitates Roblox primitives (parts, ParticleEmitter, Beam, Trail, PointLight,
+  ColorCorrection). No custom shaders, no global hitstop, no impact frames: do not rely on them.
+
 ## Rules of engagement
 
 - Tag every number you introduce: `[physical]` follows from the rig, `[heuristic]` a starting
@@ -51,8 +70,8 @@ C0/C1 — verify when writing an exporter).
 
 ## Files
 
-- `tsb_engine/` – model, forward kinematics, `moves.py` (pose helpers), `linter.py`, CLI.
-- `examples/builders.py` – a worked heavy punch plus two deliberately bad animations.
+- `tsb_engine/` – model, forward kinematics, `moves.py`/`footwork.py` (planted feet, steps, gaits), `authoring.py`, `cinematic.py`, `linter.py`, CLI.
+- `examples/builders.py` – a worked heavy punch plus two deliberately bad animations; `examples/ultimate.py` – the 13 s berserker ultimate.
 - `examples/scenes.py` + `viewer/` + `tools/` – attacker/victim scene, HTML viewer, frame rendering.
 - `references/principles.md` – craft rules by archetype, with confidence tags.
 - `references/roblox-facts.md` – verified facts and known traps.

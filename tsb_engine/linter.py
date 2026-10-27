@@ -22,7 +22,7 @@ from .model import PARTS, Animation, Pose
 
 @dataclass
 class Thresholds:
-    ground_eps: float = 0.03
+    ground_eps: float = 0.4  # a tilted rigid foot dips its edge up to 0.5*sin(tilt) into the floor
     snap_max_frames: dict[str, int] = field(
         default_factory=lambda: {"light": 4, "heavy": 2, "power": 2}
     )
@@ -309,7 +309,7 @@ def lint(anim: Animation, thresholds: Thresholds | None = None) -> list[Finding]
     t = thresholds or Thresholds()
     findings: list[Finding] = []
     findings += check_clipping(anim, t)
-    if anim.archetype == "reaction":  # victim/idle clips have no windup -> impact structure
+    if anim.archetype in ("reaction", "cinematic"):  # victim/idle clips have no windup -> impact structure
         w = i = None
     else:
         w, i, ev = check_events(anim)

@@ -39,6 +39,7 @@ EASINGS: dict[str, Callable[[float], float]] = {
     "constant": lambda t: 0.0,  # hold the starting key until the next key
     "linear": lambda t: t,
     "quad_in": lambda t: t * t,
+    "cubic_in": lambda t: t * t * t,
     "quad_out": lambda t: 1 - (1 - t) ** 2,
     "cubic_out": lambda t: 1 - (1 - t) ** 3,
     "expo_out": lambda t: 1.0 if t >= 1 else 1 - 2 ** (-10 * t),

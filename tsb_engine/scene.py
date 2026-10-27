@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .kinematics import ROOT_REST_Y, SIZES, apply, compose, part_transforms, pose_transform
+from .cinematic import Cinematic
 from .linter import lint
 from .mathutil import Transform, Vec, rot_y, translate
 from .model import PARTS, Animation
@@ -48,9 +49,14 @@ class Scene:
     characters: list[Character]
     fps: int = 60
     events: dict[str, object] = field(default_factory=dict)  # shown on the viewer timeline
+    markers: list[dict] = field(default_factory=list)  # {"f": 12, "label": "...", "act": bool, "hold": n}
+    bands: list[dict] = field(default_factory=list)  # {"f0": a, "f1": b, "label": "...", "show": bool}
+    cine: Cinematic | None = None
 
     @property
     def n_frames(self) -> int:
+        if self.cine is not None:
+            return self.cine.n_frames
         return max(c.anim.last_frame for c in self.characters) + 1
 
 
@@ -69,7 +75,16 @@ def export_viewer_data(scene: Scene) -> dict:
             )
         findings = [fd.to_dict() for fd in lint(c.anim)]
         chars.append({"name": c.name, "colors": c.colors, "frames": frames, "findings": findings})
-    return {
+    markers = list(scene.markers)
+    bands = list(scene.bands)
+    ev = scene.events
+    if isinstance(ev.get("windup"), int):
+        markers.append({"f": ev["windup"], "label": "armé"})
+    if isinstance(ev.get("impact"), int):
+        markers.append({"f": ev["impact"], "label": "impact"})
+    if isinstance(ev.get("hitstop"), (list, tuple)):
+        bands.append({"f0": ev["hitstop"][0], "f1": ev["hitstop"][1], "label": "hitstop"})
+    data = {
         "name": scene.name,
         "fps": scene.fps,
         "nFrames": scene.n_frames,
@@ -79,5 +94,10 @@ def export_viewer_data(scene: Scene) -> dict:
         "characters": chars,
         "lookAt": [0.0, 3.0, -2.0],
         "ground": 16,
-        "striker": scene.characters[0].anim.striker,
+        "striker": scene.characters[0].anim.striker if scene.cine is None else None,
+        "markers": markers,
+        "bands": bands,
     }
+    if scene.cine is not None:
+        data["cine"] = scene.cine.to_dict()
+    return data
