@@ -63,8 +63,13 @@ render the `film` camera on key frames, build a contact sheet, **look**, fix, re
   `references/roblox-facts.md` first; if it is not there, say it is unverified.
 - Do not silently "auto-fix". Prefer explicit helpers and report what you changed.
 - The linter reports; the user decides. The user's eye is the final judge, not the linter.
-- The export to Roblox (`KeyframeSequence`/`.rbxmx`) is **not implemented** yet. Do not claim
-  the JSON loads in Roblox Studio. Ask the user which format their pipeline expects.
+- Roblox export exists (`tsb_engine/roblox_export.py`: `.rbxmx` + a Luau builder script). The pose mapping is
+  verified against Roblox's forward kinematics in the tests, but **Studio import of a Python-written file is not
+  verified** (Roblox warns such files "might not upload or function"): say so, and offer the Luau builder as fallback.
+  Root travel of many studs belongs to game code, not to the animation.
+- Textures: `python -m tsb_engine.textures` bakes flipbook sheets; the frame order inside a sheet is unverified in
+  Roblox, so have the user check `assets/flipbooks/order_test_*.png` in Studio first.
+- Before inventing a VFX recipe, read `docs/research/github-survey.md` (numbers, licences, traps such as forge-vfx's licence).
 
 ## Conventions (must match the engine)
 

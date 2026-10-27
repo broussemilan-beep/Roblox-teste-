@@ -144,6 +144,7 @@ class Cinematic:
     floor_color: str = "#d8dce3"
     sky_color: str = "#c9d3e3"
     seed: int = 7
+    sheets: dict = field(default_factory=dict)
 
     # --- camera
     def shot(self, f0: int, f1: int, fn: Callable[[float, float], CamState]) -> None:
@@ -290,11 +291,26 @@ class Cinematic:
         self.fx.append({"type": "strip", "t0": t0, "dur": dur, "a": list(a), "b": list(b),
                         "layers": [list(l) for l in layers], "ease": easing, "fade": list(fade) if fade else None, "add": add})
 
+    def use_sheet(self, name: str, path: str, grid: int, frames: int) -> None:
+        """Embed a baked flipbook sheet (tsb_engine.textures) so sprites/particles can play it like a Roblox flipbook."""
+        import base64
+
+        with open(path, "rb") as fh:
+            self.sheets[name] = {"src": "data:image/png;base64," + base64.b64encode(fh.read()).decode(), "grid": grid, "frames": frames}
+
+    def sprite(self, sheet: str, t0: int, dur: int, c: Vec, size0: float, size1: float, rot: float = 0.0,
+               alpha: float = 1.0, add: bool = False, speed: float = 1.0) -> None:
+        """Camera-facing flipbook quad (a ParticleEmitter with a flipbook texture, Lifetime = dur frames)."""
+        if sheet in self.sheets:
+            self.fx.append({"type": "sprite", "sheet": sheet, "t0": t0, "dur": dur, "c": list(c), "size0": size0, "size1": size1,
+                            "rot": rot, "alpha": alpha, "add": add, "speed": speed})
+
     def burst(self, t0: int, dur: int, c: Vec, r0: float, r1: float, color: str = "#ffb43a", core: str = "#ffffff",
               spikes: int = 11, streaks: int = 9, rot: float = 0.0, seed: int = 1) -> None:
         """Camera-facing hit sprite: jagged star + hot core + radial streaks (a flipbook-style impact burst)."""
         self.fx.append({"type": "burst", "t0": t0, "dur": dur, "c": list(c), "r0": r0, "r1": r1, "color": color, "core": core,
                         "n": spikes, "streaks": streaks, "rot": rot, "seed": self.seed * 100 + seed})
+        self.sprite("impact_star", t0, dur + 3, c, r0 * 1.6, r1 * 2.1, rot=rot * 1.7, alpha=0.9 if r1 < 4.5 else 0.5, add=False)
 
     def glow(self, t0: int, t1: int, c: Vec | None = None, attach: dict | None = None, r0: float = 1.0, r1: float = 1.0,
              color: str = "#ffb43a", a0: float = 0.9, a1: float = 0.9, flare: float = 0.0, pulse: float = 0.0) -> None:
@@ -341,5 +357,5 @@ class Cinematic:
                 "tint": [round(self.tint.at(f), 3) for f in rng],
                 "tintColor": self.tint_color, "flashes": self.flashes,
             },
-            "floorColor": self.floor_color, "skyColor": self.sky_color,
+            "floorColor": self.floor_color, "skyColor": self.sky_color, "sheets": self.sheets,
         }

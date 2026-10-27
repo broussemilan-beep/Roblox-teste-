@@ -639,6 +639,8 @@ def build(n_frames: int = N_FRAMES) -> Scene:
     atk = Character("Barbare", Animation("berserker", fps=60, archetype="cinematic"), base_pos=(0, 0, 0), colors=ATK_COLORS)
     vic = Character("Victime", Animation("victim", fps=60, archetype="cinematic"), base_pos=(0, 0, -6), base_yaw=180.0, colors=VIC_COLORS)
     cine = Cinematic(n_frames)
+    for name, (grid, frames) in {"impact_star": (4, 8), "smoke": (8, 64)}.items():  # baked by `python -m tsb_engine.textures`
+        cine.use_sheet(name, f"assets/flipbooks/{name}_{grid}x{grid}_{'24' if name != 'smoke' else '15'}fps.png", grid, frames)
     cine.sky_color, cine.floor_color = "#39406a", "#4a4a5e"  # dusk: glows need a dark ground to read
     cine.shot(0, n_frames, dolly((6, 3, 6), (6, 3, 6), (0, 2, -4), (0, 2, -4)))  # fallback, overridden by acts
     act1(atk, vic, cine)

@@ -389,6 +389,21 @@ const DATA = {"name":"Coup lourd \u2014 r\u00e9action de la victime","fps":60,"n
 
 
   // ------------------------------------------------------------------ vfx sprites
+  const SHEETS = {};   // flipbook sheets baked by tsb_engine.textures (same layout Roblox ParticleEmitter flipbooks use)
+  function loadSheets() {
+    const jobs = [];
+    for (const [k, v] of Object.entries((CINE && CINE.sheets) || {})) {
+      const img = new Image(); SHEETS[k] = { img, grid: v.grid, frames: v.frames };
+      jobs.push(new Promise(res => { img.onload = res; img.onerror = res; })); img.src = v.src;
+    }
+    return Promise.all(jobs);
+  }
+  function drawSheet(name, frame, x, y, size, rot, alpha) {
+    const sh = SHEETS[name]; if (!sh || !sh.img.complete || !sh.img.naturalWidth || size < 0.5 || alpha <= 0.003) return;
+    const cell = sh.img.naturalWidth / sh.grid, i = clamp(Math.floor(frame), 0, sh.frames - 1);
+    ctx.save(); ctx.translate(x, y); if (rot) ctx.rotate(rot); ctx.globalAlpha = clamp(alpha, 0, 1);
+    ctx.drawImage(sh.img, (i % sh.grid) * cell, Math.floor(i / sh.grid) * cell, cell, cell, -size / 2, -size / 2, size, size); ctx.restore();
+  }
   function SOFT(x, y, r, rgb, al, core) {   // soft round glow (radial gradient), the building block of most fx
     if (r < 0.5 || al <= 0.002) return;
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
@@ -403,6 +418,11 @@ const DATA = {"name":"Coup lourd \u2014 r\u00e9action de la victime","fps":60,"n
     const s = scr(B, cc), size = Math.max(0.6, lerp(p.s0, p.s1, u) * B.focal / cc[2]), al = lerp(p.a0, p.a1, u);
     if (al <= 0.003) return;
     const rgb = [lerp(p.c0[0], p.c1[0], u), lerp(p.c0[1], p.c1[1], u), lerp(p.c0[2], p.c1[2], u)], z = cc[2], shape = p.shape;
+    const sheetName = shape.startsWith('sheet:') ? shape.slice(6) : (shape === 'smoke' && SHEETS.smoke ? 'smoke' : null);
+    if (sheetName && SHEETS[sheetName]) {
+      const sh = SHEETS[sheetName], frame = Math.min(sh.frames - 1, Math.floor(u * sh.frames)), rot = p.id * 2.1;
+      items.push({ z, add: p.add, fn: () => drawSheet(sheetName, frame, s.x, s.y, size * 2.2, rot, al) }); return;
+    }
     if (shape === 'disc') { items.push({ z, add: p.add, fn: () => { ctx.fillStyle = rgba(rgb, al); ctx.beginPath(); ctx.arc(s.x, s.y, size, 0, 7); ctx.fill(); } }); return; }
     if (shape === 'spark') {
       const pc = toCam(B, ppos(p, Math.max(0, a - 1))); if (pc[2] < NEAR) return; const q = scr(B, pc);
@@ -481,6 +501,7 @@ const DATA = {"name":"Coup lourd \u2014 r\u00e9action de la victime","fps":60,"n
         const rot = e.rot * Math.PI / 180, outer = col(e.color), core = col(e.core);
         const streaks = []; for (let i = 0; i < e.streaks; i++) streaks.push([rnd() * Math.PI * 2, 0.6 + rnd() * 0.5, 1.2 + rnd() * 1.6]);
         items.push({ z: cc[2] - 0.3, add: false, fn: () => {
+          ctx.fillStyle = rgba([12, 10, 22], al * 0.6); starPath(s.x, s.y, R * 1.16, R * 0.28, e.n, rot, rv); ctx.fill();
           ctx.fillStyle = rgba(outer, al * 0.95); starPath(s.x, s.y, R, R * 0.22, e.n, rot, rv); ctx.fill();
           ctx.fillStyle = rgba(core, al); starPath(s.x, s.y, R * 0.62, R * 0.15, e.n, rot + 0.15, rv.map(x => x * 0.95)); ctx.fill(); } });
         items.push({ z: cc[2] - 0.31, add: true, fn: () => {
@@ -488,6 +509,12 @@ const DATA = {"name":"Coup lourd \u2014 r\u00e9action de la victime","fps":60,"n
           ctx.lineCap = 'round';
           for (const [ang, a0, a1] of streaks) { ctx.strokeStyle = rgba(core, al * 0.8); ctx.lineWidth = Math.max(1, R * 0.03); ctx.beginPath();
             ctx.moveTo(s.x + Math.cos(ang) * R * a0, s.y + Math.sin(ang) * R * a0); ctx.lineTo(s.x + Math.cos(ang) * R * a1 * 1.15, s.y + Math.sin(ang) * R * a1 * 1.15); ctx.stroke(); } } });
+      } else if (e.type === 'sprite') {
+        const u = (f - e.t0) / e.dur; if (u < 0 || u > 1) continue;
+        const sh = SHEETS[e.sheet]; if (!sh) continue;
+        const cc = toCam(B, e.c); if (cc[2] < NEAR) continue; const s = scr(B, cc);
+        const size = lerp(e.size0, e.size1, ease('expo_out', Math.min(1, u * 1.6))) * B.focal / cc[2], frame = Math.min(sh.frames - 1, Math.floor(u * sh.frames * e.speed)), al = e.alpha * (u > 0.85 ? (1 - u) / 0.15 : 1);
+        items.push({ z: cc[2] - 0.35, add: e.add, fn: () => drawSheet(e.sheet, frame, s.x, s.y, size, e.rot * Math.PI / 180, al) });
       } else if (e.type === 'glow') {
         if (f < e.t0 || f > e.t1) continue;
         const u = (f - e.t0) / Math.max(1, e.t1 - e.t0), pos = e.attach ? attachPos(e.attach, f) : e.c, cc = toCam(B, pos); if (cc[2] < NEAR) continue;
@@ -653,7 +680,7 @@ const DATA = {"name":"Coup lourd \u2014 r\u00e9action de la victime","fps":60,"n
   }
 
   resize(); buildCine(); buildTicks(); buildFindings(); setPlaying(st.playing); draw();
-  window.__ready = true; requestAnimationFrame(loop);
+  loadSheets().then(() => { draw(); window.__ready = true; requestAnimationFrame(loop); });
 })();
 </script>
 </body>

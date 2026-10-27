@@ -127,3 +127,70 @@ class AuthoringTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RobloxExportTest(unittest.TestCase):
+    def test_pose_mapping_matches_roblox_forward_kinematics(self):
+        from tsb_engine.kinematics import part_transforms, root_transform
+        from tsb_engine.model import PARTS
+        from tsb_engine.roblox_export import pose_cframe, roblox_forward_kinematics
+
+        a = Animation("t", archetype="cinematic")
+        K(a, 0, T=tp(0.4, -20, 15), H=P((10, 20, 5)), RA=P((90, 10, 30), (0.1, 0, -0.5)), LA=P((-40, 0, -20)),
+          RL=P((30, 5, 8)), LL=P((-25, 0, -4)), R=P((10, 40, 0), (1.0, 0.5, -2.0)))
+        s, r = a.sample(0), a.sample_root(0)
+        rb = roblox_forward_kinematics({p: pose_cframe(p, s, r) for p in PARTS})
+        ours = part_transforms(s, root=root_transform(r))
+        worst = 0.0
+        for p in PARTS:
+            worst = max(worst, math.dist(rb[p][1], ours[p][1]),
+                        max(abs(rb[p][0][i][j] - ours[p][0][i][j]) for i in range(3) for j in range(3)))
+        self.assertLess(worst, 1e-9)
+        # the test is sensitive: an identity CFrame for a rotated arm would not match
+        bad = {p: pose_cframe(p, s, r) for p in PARTS}
+        bad["Right Arm"] = ((( 1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)), (0.0, 0.0, 0.0))
+        self.assertGreater(math.dist(roblox_forward_kinematics(bad)["Right Arm"][1], ours["Right Arm"][1]), 0.1)
+
+    def test_rbxmx_is_wellformed_and_has_markers(self):
+        import xml.dom.minidom as minidom
+
+        from tsb_engine.roblox_export import to_luau, to_rbxmx
+
+        a = Animation("punch", archetype="heavy")
+        K(a, 0, T=tp(0, 0))
+        K(a, 10, T=tp(0.2, -10))
+        a.events["impact"] = 6
+        text = to_rbxmx(a)
+        doc = minidom.parseString(text)
+        classes = [n.getAttribute("class") for n in doc.getElementsByTagName("Item")]
+        self.assertEqual(classes.count("Keyframe"), 11)
+        self.assertEqual(classes.count("KeyframeMarker"), 1)
+        self.assertEqual(classes.count("Pose"), 11 * 7)
+        self.assertIn("Instance.new(\"KeyframeSequence\")", to_luau(a))
+
+
+class TexturesAndCuesTest(unittest.TestCase):
+    def test_flipbook_sheet_layout_and_alpha(self):
+        from tsb_engine import textures
+
+        frames = textures.starburst(n=64, frames=8)
+        self.assertEqual(len(frames), 8)
+        self.assertEqual(frames[0].shape, (64, 64, 4))
+        sheet = textures.pack_flipbook(frames, 4, size=256, pad=2)
+        self.assertEqual(sheet.size, (256, 256))
+        self.assertGreater(max(f[..., 3].max() for f in frames), 0.9)  # a bright frame exists
+        self.assertEqual(frames[-1][..., 3].max() < frames[3][..., 3].max(), True)  # it fades out
+        with self.assertRaises(ValueError):
+            textures.pack_flipbook(textures.smoke(n=32, frames=20), 4, size=256)
+
+    def test_cue_sheet_converts_units(self):
+        from tsb_engine.roblox_cues import cue_sheet
+
+        c = Cinematic(60)
+        c.shot(0, 59, dolly((0, 0, 5), (0, 0, 5), (0, 0, 0), (0, 0, 0)))
+        c.emit(6, 6, origin=(0, 1, 0), rate=0, burst=10, vel=(0.5, 1.0), dir=(0, 1, 0), life=(30, 60), grav=0.01, shape="spark")
+        c.ring(12, 30, (0, 0, 0), 1, 10, 1, 0.1, "#ffffff")
+        sheet = cue_sheet(c)
+        self.assertIn("Speed 30-60", sheet)  # 0.5-1.0 studs/frame at 60 fps
+        self.assertIn("Lifetime 0.50-1.00s", sheet)
+        self.assertIn("shockwave ring", sheet)
