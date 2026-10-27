@@ -15,7 +15,7 @@ from __future__ import annotations
 import math
 from dataclasses import asdict, dataclass, field
 
-from .kinematics import SIZES, lowest_point, lowest_y, part_transforms
+from .kinematics import SIZES, lowest_point, lowest_y, part_transforms, root_transform
 from .mathutil import apply
 from .model import PARTS, Animation, Pose
 
@@ -83,11 +83,11 @@ def _peak_frame(anim: Animation, part: str, lo: int, hi: int, t: Thresholds) -> 
 
 
 def check_clipping(anim: Animation, t: Thresholds) -> list[Finding]:
-    bad = [
-        (f, lowest_y(anim.sample(f)))
+    depths = [
+        (f, lowest_y(anim.sample(f), root=root_transform(anim.sample_root(f))))
         for f in range(anim.last_frame + 1)
-        if lowest_y(anim.sample(f)) < -t.ground_eps
     ]
+    bad = [(f, d) for f, d in depths if d < -t.ground_eps]
     if not bad:
         return []
     worst = min(d for _, d in bad)
@@ -279,7 +279,7 @@ def check_foot_slide(anim: Animation, t: Thresholds) -> list[Finding]:
     worst, worst_f = 0.0, 0
     prev: dict[str, tuple[float, float] | None] = {"Right Leg": None, "Left Leg": None}
     for f in range(anim.last_frame + 1):
-        tf = part_transforms(anim.sample(f))
+        tf = part_transforms(anim.sample(f), root=root_transform(anim.sample_root(f)))
         for leg in prev:
             contact = lowest_point(leg, tf[leg])
             sole = apply(tf[leg], (0.0, -SIZES[leg][1] / 2, 0.0))  # stable point: sole centre
@@ -309,8 +309,11 @@ def lint(anim: Animation, thresholds: Thresholds | None = None) -> list[Finding]
     t = thresholds or Thresholds()
     findings: list[Finding] = []
     findings += check_clipping(anim, t)
-    w, i, ev = check_events(anim)
-    findings += ev
+    if anim.archetype == "reaction":  # victim/idle clips have no windup -> impact structure
+        w = i = None
+    else:
+        w, i, ev = check_events(anim)
+        findings += ev
     if w is not None and i is not None:
         findings += check_snap(anim, w, i, t)
         findings += check_twist(anim, w, i, t)

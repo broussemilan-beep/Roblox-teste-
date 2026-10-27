@@ -21,7 +21,8 @@ from .model import Animation, Pose
 def torso_pose(drop: float = 0.0, pitch: float = 0.0, yaw: float = 0.0, roll: float = 0.0) -> Pose:
     """Torso relative to the root. ``drop`` lowers the centre of mass (studs, >= 0).
 
-    ``pitch`` > 0 leans forward (towards -Z) in this engine's convention (rx).
+    ``pitch`` is rx: **negative leans the torso forward** (towards -Z), positive leans it back.
+    (For hanging limbs such as arms and legs the opposite holds: rx > 0 swings forward.)
     """
     return Pose(pos=(0.0, -drop, 0.0), rot=(pitch, yaw, roll))
 

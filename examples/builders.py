@@ -3,8 +3,8 @@
 ``heavy_punch`` is a worked example of the workflow (block -> plant legs -> lint), NOT a
 canonical "TSB animation". Its numbers are starting values, not measurements.
 
-Conventions: character faces -Z; rx > 0 swings a limb forward; ry < 0 on the torso winds the
-right shoulder back (towards +Z); ``Pose.pos`` z < 0 pushes a limb forward.
+Conventions: character faces -Z; rx > 0 swings a hanging limb (arm/leg) forward; on the torso and head rx < 0
+leans/nods forward; ry < 0 on the torso winds the right shoulder back (towards +Z); ``Pose.pos`` z < 0 pushes a limb forward.
 """
 
 from __future__ import annotations
@@ -23,26 +23,26 @@ def heavy_punch() -> Animation:
 
     # Torso: guard stance -> coil (keeps compressing: moving hold) -> 2-frame snap -> follow-through
     t = a.set_key
-    t("Torso", 0, torso_pose(drop=0.30, pitch=4, yaw=-10), "quad_out")
-    t("Torso", 12, torso_pose(drop=0.45, pitch=10, yaw=-55), "linear")
-    t("Torso", 14, torso_pose(drop=0.52, pitch=12, yaw=-62), "linear")  # windup (still compressing)
-    t("Torso", 15, torso_pose(drop=0.40, pitch=16, yaw=-10), "linear")
-    t("Torso", 16, torso_pose(drop=0.35, pitch=18, yaw=42), "linear")  # impact
-    t("Torso", 22, torso_pose(drop=0.35, pitch=18, yaw=45), "cubic_out")  # hitstop drift
-    t("Torso", 28, torso_pose(drop=0.33, pitch=14, yaw=52), "sine_inout")  # overshoot
-    t("Torso", 40, torso_pose(drop=0.30, pitch=6, yaw=18), "sine_inout")
-    t("Torso", 55, torso_pose(drop=0.30, pitch=4, yaw=-10), "linear")
+    t("Torso", 0, torso_pose(drop=0.30, pitch=-4, yaw=-10), "quad_out")
+    t("Torso", 12, torso_pose(drop=0.45, pitch=-10, yaw=-55), "linear")
+    t("Torso", 14, torso_pose(drop=0.52, pitch=-12, yaw=-62), "linear")  # windup (still compressing)
+    t("Torso", 15, torso_pose(drop=0.40, pitch=-16, yaw=-10), "linear")
+    t("Torso", 16, torso_pose(drop=0.35, pitch=-18, yaw=42), "linear")  # impact
+    t("Torso", 22, torso_pose(drop=0.35, pitch=-18, yaw=45), "cubic_out")  # hitstop drift
+    t("Torso", 28, torso_pose(drop=0.33, pitch=-14, yaw=52), "sine_inout")  # overshoot
+    t("Torso", 40, torso_pose(drop=0.30, pitch=-6, yaw=18), "sine_inout")
+    t("Torso", 55, torso_pose(drop=0.30, pitch=-4, yaw=-10), "linear")
 
     # Striking arm: cocked back, then snaps 90 deg forward with a brief dislocation
     _key(a, "Right Arm", 0, rot=(15, 0, -5), easing="quad_out")
     _key(a, "Right Arm", 12, rot=(-25, 0, -8))
     _key(a, "Right Arm", 14, rot=(-38, 0, -10), pos=(0, 0, 0.2))
     _key(a, "Right Arm", 15, rot=(-36, 0, -10), pos=(0, 0, 0.2))
-    _key(a, "Right Arm", 16, rot=(90, 0, 0), pos=(0, 0, -0.9))  # impact
-    _key(a, "Right Arm", 18, rot=(91, 0, 0), pos=(0, 0, -0.9))
-    _key(a, "Right Arm", 19, rot=(92, 0, 0), pos=(0, 0, -0.15))
-    _key(a, "Right Arm", 22, rot=(94, 0, 0), easing="cubic_out")
-    _key(a, "Right Arm", 28, rot=(104, 0, 4), easing="sine_inout")
+    _key(a, "Right Arm", 16, rot=(102, 0, 0), pos=(0, 0, -0.9))  # impact
+    _key(a, "Right Arm", 18, rot=(103, 0, 0), pos=(0, 0, -0.9))
+    _key(a, "Right Arm", 19, rot=(104, 0, 0), pos=(0, 0, -0.15))
+    _key(a, "Right Arm", 22, rot=(106, 0, 0), easing="cubic_out")
+    _key(a, "Right Arm", 28, rot=(114, 0, 4), easing="sine_inout")
     _key(a, "Right Arm", 45, rot=(25, 0, -5), easing="sine_inout")
     _key(a, "Right Arm", 55, rot=(15, 0, -5))
 
@@ -63,6 +63,15 @@ def heavy_punch() -> Animation:
     _key(a, "Head", 24, rot=(-8, -34, 0), easing="sine_inout")
     _key(a, "Head", 40, rot=(0, -14, 0), easing="sine_inout")
     _key(a, "Head", 55, rot=(0, 8, 0))
+
+    # Lunge: the whole body steps into the punch (root +Z is backwards)
+    _key(a, "Root", 0, pos=(0, 0, 1.6), easing="linear")
+    _key(a, "Root", 12, pos=(0, 0, 1.6))
+    _key(a, "Root", 14, pos=(0, 0, 1.5))
+    _key(a, "Root", 15, pos=(0, 0, 0.55))
+    _key(a, "Root", 16, pos=(0, 0, 0.0), easing="cubic_out")
+    _key(a, "Root", 24, pos=(0, 0, -0.15), easing="sine_inout")
+    _key(a, "Root", 55, pos=(0, 0, -0.15))
 
     # Legs: asymmetric guard stance, feet held in world space for the whole move
     bake_planted_legs(a, 0, 55, lateral=0.5, front_leg="Left Leg", stance_yaw=0)

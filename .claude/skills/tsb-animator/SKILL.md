@@ -21,7 +21,11 @@ animation "looks great". Say what the linter measured and what still needs the u
 4. **Lint.** `python -m tsb_engine lint anim.json` (or `tsb_engine.lint`). Fix every error;
    for each warning either fix it or state why it is intentional.
 5. **Refine** using the archetype checklist in `references/principles.md`, re-lint, repeat.
-6. **Report honestly**: findings fixed, findings accepted (with reason), and what the linter
+6. **Show it.** Add the animation to a scene in `examples/scenes.py`, run
+   `python tools/build_viewer.py`, render frames with `node tools/render_frames.js` and a
+   contact sheet with `tools/contact_sheet.py`, and *look at the images* before judging. Publish
+   `viewer/output/<scene>.artifact.html` so the user can scrub it.
+7. **Report honestly**: findings fixed, findings accepted (with reason), and what the linter
    cannot judge (silhouette appeal, weight, style). Ask the user to review in their viewer.
 
 ## Rules of engagement
@@ -39,7 +43,8 @@ animation "looks great". Say what the linter measured and what still needs the u
 ## Conventions (must match the engine)
 
 Y up, character faces **-Z**, +X is the character's right. Rotations in degrees, `CFrame.Angles`
-order. `rx > 0` swings a limb forward; negative torso `ry` winds the right shoulder back.
+order. For hanging limbs (arms, legs) `rx > 0` swings forward; for the torso and head `rx < 0`
+leans/nods forward. Negative torso `ry` winds the right shoulder back.
 `Pose.pos` z < 0 pushes a limb forward (used for dislocation). Standing: root y = 3, feet y = 0.
 Limb rotations are in the torso frame, not raw Motor6D axes (the real R6 joints have rotated
 C0/C1 — verify when writing an exporter).
@@ -48,6 +53,7 @@ C0/C1 — verify when writing an exporter).
 
 - `tsb_engine/` – model, forward kinematics, `moves.py` (pose helpers), `linter.py`, CLI.
 - `examples/builders.py` – a worked heavy punch plus two deliberately bad animations.
+- `examples/scenes.py` + `viewer/` + `tools/` – attacker/victim scene, HTML viewer, frame rendering.
 - `references/principles.md` – craft rules by archetype, with confidence tags.
 - `references/roblox-facts.md` – verified facts and known traps.
 - `references/vfx-notes.md` – VFX layering notes (reference only; no VFX tooling yet).

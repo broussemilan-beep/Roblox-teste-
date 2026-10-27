@@ -55,10 +55,17 @@ def pose_transform(pose: Pose) -> Transform:
 
 
 def part_transforms(
-    sample: dict[str, Pose], root_pos: Vec = (0.0, ROOT_REST_Y, 0.0)
+    sample: dict[str, Pose],
+    root_pos: Vec = (0.0, ROOT_REST_Y, 0.0),
+    root: Transform | None = None,
 ) -> dict[str, Transform]:
-    """World transform of every part for a sampled pose."""
-    torso = compose(translate(root_pos), pose_transform(sample.get("Torso", Pose())))
+    """World transform of every part for a sampled pose.
+
+    ``root`` (a full transform) overrides ``root_pos``; the scene module uses it to place a
+    character in the world and apply its Root track.
+    """
+    root_tf = root if root is not None else translate(root_pos)
+    torso = compose(root_tf, pose_transform(sample.get("Torso", Pose())))
     result: dict[str, Transform] = {"Torso": torso}
     for part in PARTS:
         if part == "Torso":
@@ -89,6 +96,13 @@ def lowest_point(part: str, transform: Transform) -> Vec:
     return min(corners(part, transform), key=lambda p: p[1])
 
 
-def lowest_y(sample: dict[str, Pose], parts: tuple[str, ...] = PARTS) -> float:
-    tf = part_transforms(sample)
+def lowest_y(
+    sample: dict[str, Pose], parts: tuple[str, ...] = PARTS, root: Transform | None = None
+) -> float:
+    tf = part_transforms(sample, root=root)
     return min(lowest_point(p, tf[p])[1] for p in parts)
+
+
+def root_transform(root_pose: Pose) -> Transform:
+    """Root transform for a character standing at the origin with a Root-track pose applied."""
+    return compose(translate((0.0, ROOT_REST_Y, 0.0)), pose_transform(root_pose))

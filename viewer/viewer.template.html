@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visionneuse R6</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #15171c; --muted: #5d6573; --line: #d9dde4;
+    --accent: #2f6fdd; --accent-text: #ffffff; --ground: #e9ecf1; --grid: #cfd5de;
+    --warn: #b26a00; --err: #c0262d; --ok: #1f8a4c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1115; --panel: #181b21; --text: #eceef2; --muted: #9aa3b2; --line: #2a2f38;
+      --accent: #6a9bff; --accent-text: #0b0d12; --ground: #1d2129; --grid: #2f3541;
+      --warn: #e0a64a; --err: #ff7b82; --ok: #5ccf8e;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1115; --panel: #181b21; --text: #eceef2; --muted: #9aa3b2; --line: #2a2f38;
+    --accent: #6a9bff; --accent-text: #0b0d12; --ground: #1d2129; --grid: #2f3541;
+    --warn: #e0a64a; --err: #ff7b82; --ok: #5ccf8e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding-block: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  h1 { font-size: 1.25rem; margin: 0 0 2px; }
+  .sub { color: var(--muted); margin: 0 0 12px; font-size: .9rem; }
+  .stage { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  canvas { display: block; width: 100%; aspect-ratio: 16 / 9; background: var(--ground); touch-action: none; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--line); }
+  button, select { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); min-width: 92px; font-weight: 600; }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  label { color: var(--muted); font-size: .88rem; display: inline-flex; gap: 6px; align-items: center; }
+  .scrub { position: relative; flex: 1 1 100%; padding-top: 14px; }
+  .scrub input[type=range] { width: 100%; margin: 0; accent-color: var(--accent); }
+  .ticks { position: absolute; left: 0; right: 0; top: 0; height: 12px; pointer-events: none; font-size: 11px; color: var(--muted); }
+  .tick { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  .tick::after { content: ""; display: block; width: 1px; height: 5px; background: var(--muted); margin: 0 auto; }
+  .hitband { position: absolute; top: 10px; height: 4px; background: var(--warn); opacity: .55; border-radius: 2px; }
+  .readout { font-variant-numeric: tabular-nums; color: var(--muted); margin-left: auto; }
+  .readout b { color: var(--text); }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--warn); color: #000; font-size: .78rem; font-weight: 600; }
+  details { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-top: 12px; padding: 8px 12px; }
+  summary { cursor: pointer; font-weight: 600; }
+  ul.f { margin: 8px 0 2px; padding-left: 18px; }
+  ul.f li { margin: 4px 0; }
+  .sev-error { color: var(--err); font-weight: 600; } .sev-warning { color: var(--warn); font-weight: 600; } .sev-info { color: var(--muted); font-weight: 600; }
+  .hint { color: var(--muted); font-size: .85rem; margin-top: 10px; }
+  @media (max-width: 560px) { main { padding-block: 12px; } .readout { margin-left: 0; flex: 1 1 100%; } }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title"></h1>
+  <p class="sub" id="subtitle"></p>
+  <div class="stage">
+    <canvas id="cv" role="img" aria-label="Visionneuse 3D des personnages R6"></canvas>
+    <div class="bar">
+      <button id="play" class="primary" aria-label="Lecture / pause">Pause</button>
+      <label>Vitesse
+        <select id="speed">
+          <option value="1">1× (60 fps)</option><option value="0.5">0,5×</option>
+          <option value="0.25" selected>0,25×</option><option value="0.1">0,1×</option>
+        </select></label>
+      <label>Caméra
+        <select id="cam">
+          <option value="side" selected>Profil</option><option value="game">Jeu (3/4 dos)</option>
+          <option value="front">Face</option><option value="top">Dessus</option>
+          <option value="close">Gros plan impact</option>
+        </select></label>
+      <label><input type="checkbox" id="trail" checked> Trajectoire du poing</label>
+      <span class="readout" id="readout"></span>
+      <div class="scrub">
+        <div class="ticks" id="ticks"></div>
+        <input type="range" id="scrub" min="0" value="0" step="1" aria-label="Image courante">
+      </div>
+    </div>
+  </div>
+  <p class="hint">Glisser pour tourner · molette pour zoomer · Espace : lecture · ← → : image par image</p>
+  <div id="findings"></div>
+</main>
+<script>
+const DATA = /*__DATA__*/null;
+(() => {
+  const D = DATA, PARTS = D.parts, SZ = D.sizes;
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  const $ = (id) => document.getElementById(id);
+  const q = new URLSearchParams(location.search);
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  $('title').textContent = D.name;
+  $('subtitle').textContent = D.characters.map(c => c.name).join(' → ') + ' · ' + D.nFrames + ' images à ' + D.fps + ' fps';
+
+  const PRESETS = {
+    side:  { yaw: 90, pitch: 6, dist: 15.5, target: [0, 2.8, -3.6] },
+    game:  { yaw: 36, pitch: 22, dist: 19, target: [0, 2.6, -3.2] },
+    front: { yaw: 180, pitch: 8, dist: 15, target: [0, 3.0, -3.4] },
+    top:   { yaw: 0, pitch: 86, dist: 19, target: [0, 0, -3.8] },
+    close: { yaw: 62, pitch: 6, dist: 8, target: [0, 3.2, -2.2] },
+  };
+  let cam = { ...PRESETS.side };
+  const st = { frame: Math.min(+(q.get('frame') || 0), D.nFrames - 1), playing: q.get('paused') !== '1', speed: +(q.get('speed') || 0.25), acc: 0, last: 0 };
+  if (q.get('cam') && PRESETS[q.get('cam')]) { cam = { ...PRESETS[q.get('cam')] }; $('cam').value = q.get('cam'); }
+  $('speed').value = String(st.speed); if ($('speed').value !== String(st.speed)) st.speed = +$('speed').value;
+  if (q.get('trail') === '0') $('trail').checked = false;
+
+  // ---- vector helpers
+  const sub = (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+  const dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+  const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+  const norm = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0]/l, a[1]/l, a[2]/l]; };
+  const apply = (t, v) => [ t[0]*v[0]+t[1]*v[1]+t[2]*v[2]+t[9], t[3]*v[0]+t[4]*v[1]+t[5]*v[2]+t[10], t[6]*v[0]+t[7]*v[1]+t[8]*v[2]+t[11] ];
+  const rotv = (t, v) => [ t[0]*v[0]+t[1]*v[1]+t[2]*v[2], t[3]*v[0]+t[4]*v[1]+t[5]*v[2], t[6]*v[0]+t[7]*v[1]+t[8]*v[2] ];
+
+  // faces: corner sign triples (x,y,z) in CCW order seen from outside, plus normal
+  const FACES = [
+    { n: [0,0,-1], c: [[-1,1,-1],[1,1,-1],[1,-1,-1],[-1,-1,-1]], name: 'front' },
+    { n: [0,0,1],  c: [[1,1,1],[-1,1,1],[-1,-1,1],[1,-1,1]], name: 'back' },
+    { n: [1,0,0],  c: [[1,1,-1],[1,1,1],[1,-1,1],[1,-1,-1]], name: 'right' },
+    { n: [-1,0,0], c: [[-1,1,1],[-1,1,-1],[-1,-1,-1],[-1,-1,1]], name: 'left' },
+    { n: [0,1,0],  c: [[-1,1,1],[1,1,1],[1,1,-1],[-1,1,-1]], name: 'top' },
+    { n: [0,-1,0], c: [[-1,-1,-1],[1,-1,-1],[1,-1,1],[-1,-1,1]], name: 'bottom' },
+  ];
+  const LIGHT = norm([0.45, 0.85, 0.35]);
+
+  function hex(c) { const n = parseInt(c.slice(1), 16); return [(n>>16)&255, (n>>8)&255, n&255]; }
+  function shade(rgb, k) { return `rgb(${Math.round(rgb[0]*k)},${Math.round(rgb[1]*k)},${Math.round(rgb[2]*k)})`; }
+
+  function cameraBasis() {
+    const yaw = cam.yaw * Math.PI/180, pit = cam.pitch * Math.PI/180;
+    const t = cam.target;
+    const pos = [t[0] + cam.dist*Math.sin(yaw)*Math.cos(pit), t[1] + cam.dist*Math.sin(pit), t[2] + cam.dist*Math.cos(yaw)*Math.cos(pit)];
+    const f = norm(sub(t, pos));
+    let up = Math.abs(f[1]) > 0.98 ? [0,0,-1] : [0,1,0];
+    const r = norm(cross(f, up)), u = cross(r, f);
+    return { pos, f, r, u };
+  }
+
+  let W = 0, H = 0, dpr = 1;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const rect = cv.getBoundingClientRect();
+    W = Math.max(320, Math.round(rect.width * dpr)); H = Math.round(W * 9 / 16);
+    cv.width = W; cv.height = H;
+  }
+
+  function project(B, p) {
+    const d = sub(p, B.pos);
+    const x = dot(d, B.r), y = dot(d, B.u), z = dot(d, B.f);
+    const focal = H * 1.15;
+    return { x: W/2 + focal * x / z, y: H/2 - focal * y / z, z };
+  }
+
+  function hull(pts) {
+    const p = pts.slice().sort((a, b) => a[0]-b[0] || a[1]-b[1]);
+    const cr = (o, a, b) => (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0]);
+    const lo = [], up = [];
+    for (const a of p) { while (lo.length > 1 && cr(lo[lo.length-2], lo[lo.length-1], a) <= 0) lo.pop(); lo.push(a); }
+    for (const a of p.slice().reverse()) { while (up.length > 1 && cr(up[up.length-2], up[up.length-1], a) <= 0) up.pop(); up.push(a); }
+    return lo.slice(0, -1).concat(up.slice(0, -1));
+  }
+
+  function strikerTip(frame) {
+    const part = PARTS.indexOf(D.striker), t = D.characters[0].frames[frame][part];
+    return apply(t, [0, -SZ[D.striker][1]/2, 0]);
+  }
+
+  function draw() {
+    const B = cameraBasis();
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = css('--ground'); ctx.fillRect(0, 0, W, H);
+
+    // grid
+    const G = D.ground; ctx.lineWidth = Math.max(1, dpr); ctx.strokeStyle = css('--grid'); ctx.beginPath();
+    for (let i = -G; i <= G; i += 2) {
+      for (const [a, b] of [[[i,0,-G-4],[i,0,G-4]], [[-G,0,i-4],[G,0,i-4]]]) {
+        const pa = project(B, a), pb = project(B, b);
+        if (pa.z > 0.5 && pb.z > 0.5) { ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); }
+      }
+    }
+    ctx.stroke();
+
+    // shadows (one union path)
+    ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.beginPath();
+    for (const ch of D.characters) {
+      const pts = [];
+      PARTS.forEach((part, i) => {
+        const t = ch.frames[st.frame][i], s = SZ[part];
+        for (const sx of [-1,1]) for (const sy of [-1,1]) for (const sz of [-1,1]) {
+          const w = apply(t, [sx*s[0]/2, sy*s[1]/2, sz*s[2]/2]);
+          const g = project(B, [w[0], 0, w[2]]);
+          if (g.z > 0.5) pts.push([g.x, g.y]);
+        }
+      });
+      if (pts.length > 2) { const h = hull(pts); h.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); }
+    }
+    ctx.fill();
+
+    // faces
+    const polys = [];
+    for (const ch of D.characters) {
+      PARTS.forEach((part, i) => {
+        const t = ch.frames[st.frame][i], s = SZ[part], base = hex(ch.colors[part]);
+        FACES.forEach((fc) => {
+          const nW = rotv(t, fc.n);
+          const cW = apply(t, [fc.n[0]*s[0]/2, fc.n[1]*s[1]/2, fc.n[2]*s[2]/2]);
+          if (dot(nW, sub(B.pos, cW)) <= 0) return;
+          const pts = fc.c.map(c => project(B, apply(t, [c[0]*s[0]/2, c[1]*s[1]/2, c[2]*s[2]/2])));
+          if (pts.some(p => p.z < 0.3)) return;
+          const k = 0.5 + 0.5 * Math.max(0, dot(nW, LIGHT));
+          polys.push({ pts, fill: shade(base, k), z: project(B, cW).z, face: part === 'Head' && fc.name === 'front' });
+        });
+      });
+    }
+    polys.sort((a, b) => b.z - a.z);
+    ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(1, dpr); ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    for (const p of polys) {
+      ctx.beginPath(); p.pts.forEach((q2, i) => i ? ctx.lineTo(q2.x, q2.y) : ctx.moveTo(q2.x, q2.y)); ctx.closePath();
+      ctx.fillStyle = p.fill; ctx.fill(); ctx.stroke();
+      if (p.face) {
+        const [c0, c1, , c3] = p.pts, P = (u, v) => [c0.x + u*(c1.x-c0.x) + v*(c3.x-c0.x), c0.y + u*(c1.y-c0.y) + v*(c3.y-c0.y)];
+        ctx.fillStyle = 'rgba(20,20,20,0.85)';
+        for (const [u, v] of [[0.3, 0.38], [0.7, 0.38]]) { const [x, y] = P(u, v); ctx.beginPath(); ctx.arc(x, y, Math.max(1.5, 2.2*dpr), 0, 7); ctx.fill(); }
+        ctx.strokeStyle = 'rgba(20,20,20,0.85)'; ctx.beginPath(); const m0 = P(0.35, 0.72), m1 = P(0.65, 0.72); ctx.moveTo(m0[0], m0[1]); ctx.lineTo(m1[0], m1[1]); ctx.stroke();
+        ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+      }
+    }
+
+    // fist trail
+    if ($('trail').checked) {
+      const n = 10; ctx.lineWidth = 3*dpr; ctx.lineCap = 'round';
+      for (let k = 0; k < n; k++) {
+        const f0 = st.frame - k - 1, f1 = st.frame - k;
+        if (f0 < 0) break;
+        const a = project(B, strikerTip(f0)), b = project(B, strikerTip(f1));
+        ctx.strokeStyle = `rgba(255,170,40,${0.85 * (1 - k/n)})`;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+    }
+
+    // HUD
+    const ev = D.events || {}, hs = ev.hitstop;
+    let label = '';
+    if (ev.impact === st.frame) label = 'IMPACT';
+    else if (ev.windup === st.frame) label = 'WINDUP';
+    if (hs && st.frame >= hs[0] && st.frame <= hs[1]) label = (label ? label + ' · ' : '') + 'HITSTOP';
+    ctx.font = `600 ${14*dpr}px system-ui, sans-serif`; ctx.textBaseline = 'top';
+    if (label) { const w = ctx.measureText(label).width + 20*dpr; ctx.fillStyle = css('--warn'); ctx.fillRect(12*dpr, 12*dpr, w, 26*dpr); ctx.fillStyle = '#000'; ctx.fillText(label, 22*dpr, 17*dpr); }
+    $('readout').innerHTML = `image <b>${st.frame}</b> / ${D.nFrames - 1} · ${(st.frame / D.fps * 1000).toFixed(0)} ms`;
+    $('scrub').value = st.frame;
+  }
+
+  // ---- ticks on the timeline
+  function buildTicks() {
+    const el = $('ticks'); el.innerHTML = ''; const max = D.nFrames - 1, ev = D.events || {};
+    const add = (f, txt) => { const d = document.createElement('div'); d.className = 'tick'; d.style.left = (f / max * 100) + '%'; d.textContent = txt; el.appendChild(d); };
+    if (ev.windup != null) add(ev.windup, 'armé');
+    if (ev.impact != null) add(ev.impact, 'impact');
+    if (ev.hitstop) { const b = document.createElement('div'); b.className = 'hitband'; b.style.left = (ev.hitstop[0]/max*100) + '%'; b.style.width = ((ev.hitstop[1]-ev.hitstop[0])/max*100) + '%'; el.appendChild(b); }
+  }
+
+  function buildFindings() {
+    const host = $('findings'); host.innerHTML = '';
+    for (const ch of D.characters) {
+      const d = document.createElement('details'); const s = document.createElement('summary');
+      const n = ch.findings.length; s.textContent = `Analyse (linter) — ${ch.name} : ${n ? n + ' remarque(s)' : 'rien à signaler'}`;
+      d.appendChild(s);
+      if (n) { const ul = document.createElement('ul'); ul.className = 'f';
+        for (const f of ch.findings) { const li = document.createElement('li');
+          li.innerHTML = `<span class="sev-${f.severity}">${f.severity}</span> ${f.code} <em>(${f.confidence})</em>${f.frames ? ' [images ' + f.frames[0] + '–' + f.frames[1] + ']' : ''} — `;
+          li.appendChild(document.createTextNode(f.message)); ul.appendChild(li); }
+        d.appendChild(ul); }
+      host.appendChild(d);
+    }
+  }
+
+  // ---- interaction
+  function setPlaying(v) { st.playing = v; $('play').textContent = v ? 'Pause' : 'Lecture'; st.last = 0; }
+  $('play').onclick = () => setPlaying(!st.playing);
+  $('speed').onchange = (e) => { st.speed = +e.target.value; };
+  $('cam').onchange = (e) => { cam = { ...PRESETS[e.target.value] }; draw(); };
+  $('trail').onchange = draw;
+  $('scrub').max = D.nFrames - 1;
+  $('scrub').oninput = (e) => { setPlaying(false); st.frame = +e.target.value; draw(); };
+  window.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'SELECT') return;
+    if (e.code === 'Space') { e.preventDefault(); setPlaying(!st.playing); }
+    if (e.code === 'ArrowRight') { setPlaying(false); st.frame = Math.min(D.nFrames - 1, st.frame + 1); draw(); }
+    if (e.code === 'ArrowLeft') { setPlaying(false); st.frame = Math.max(0, st.frame - 1); draw(); }
+  });
+  let drag = null;
+  cv.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, yaw: cam.yaw, pitch: cam.pitch }; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', (e) => { if (!drag) return; cam.yaw = drag.yaw - (e.clientX - drag.x) * 0.4; cam.pitch = Math.max(-5, Math.min(88, drag.pitch + (e.clientY - drag.y) * 0.3)); draw(); });
+  cv.addEventListener('pointerup', () => { drag = null; });
+  cv.addEventListener('wheel', (e) => { e.preventDefault(); cam.dist = Math.max(5, Math.min(40, cam.dist * (e.deltaY > 0 ? 1.08 : 0.92))); draw(); }, { passive: false });
+  window.addEventListener('resize', () => { resize(); draw(); });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+
+  function loop(ts) {
+    if (st.playing) {
+      if (st.last) { st.acc += (ts - st.last) / 1000 * D.fps * st.speed; const adv = Math.floor(st.acc); if (adv > 0) { st.acc -= adv; st.frame = (st.frame + adv) % D.nFrames; draw(); } }
+      st.last = ts;
+    }
+    requestAnimationFrame(loop);
+  }
+
+  resize(); buildTicks(); buildFindings(); setPlaying(st.playing); draw();
+  window.__ready = true; requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

@@ -16,6 +16,9 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 PARTS = ("Torso", "Head", "Right Arm", "Left Arm", "Right Leg", "Left Leg")
+# Optional whole-body track (knockback, jumps). Pose.pos/rot are relative to the character's
+# base placement in the scene, in the character's own frame (it always faces local -Z).
+ROOT = "Root"
 
 
 @dataclass(frozen=True)
@@ -54,14 +57,14 @@ class Key:
 class Animation:
     name: str
     fps: int = 60
-    archetype: str = "light"  # "light" | "heavy" | "power" (see linter thresholds)
+    archetype: str = "light"  # "light" | "heavy" | "power" | "reaction" (see linter)
     striker: str = "Right Arm"
     # name -> frame, or name -> [start, end] (e.g. "hitstop")
     events: dict[str, object] = field(default_factory=dict)
     tracks: dict[str, list[Key]] = field(default_factory=dict)
 
     def set_key(self, part: str, frame: int, pose: Pose, easing: str = "linear") -> None:
-        if part not in PARTS:
+        if part not in PARTS and part != ROOT:
             raise ValueError(f"unknown R6 part: {part!r}")
         if easing not in EASINGS:
             raise ValueError(f"unknown easing: {easing!r}")
@@ -91,6 +94,9 @@ class Animation:
 
     def sample(self, frame: float) -> dict[str, Pose]:
         return {p: self.sample_part(p, frame) for p in PARTS}
+
+    def sample_root(self, frame: float) -> Pose:
+        return self.sample_part(ROOT, frame)
 
     def event_frame(self, name: str) -> int | None:
         value = self.events.get(name)
