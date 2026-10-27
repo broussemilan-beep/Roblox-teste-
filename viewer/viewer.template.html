@@ -121,6 +121,7 @@ const DATA = /*__DATA__*/null;
     cubic_out: (t) => 1 - Math.pow(1-t, 3), expo_out: (t) => t >= 1 ? 1 : 1 - Math.pow(2, -10*t),
     sine_inout: (t) => -(Math.cos(Math.PI*t) - 1) / 2,
   };
+  const lerp3 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
   const ease = (n, u) => (EASE[n] || EASE.linear)(clamp(u, 0, 1));
   function hex(c) { const n = parseInt(c.slice(1), 16); return [(n>>16)&255, (n>>8)&255, n&255]; }
   const rgba = (rgb, a) => `rgba(${rgb[0]|0},${rgb[1]|0},${rgb[2]|0},${clamp(a, 0, 1).toFixed(3)})`;
@@ -287,7 +288,7 @@ const DATA = /*__DATA__*/null;
       const clipped = clipPoly(cc); if (clipped.length < 3) continue;
       const pts = clipped.map(p => scr(B, p));
       const k = (0.5 + 0.5 * Math.max(0, dot(nW, LIGHT))) * light;
-      polys.push({ pts, fill: `rgb(${Math.round(rgb[0]*k)},${Math.round(rgb[1]*k)},${Math.round(rgb[2]*k)})`, z: toCam(B, cW)[2], face: extra && fc.name === 'front' });
+      polys.push({ pts, fill: `rgb(${Math.round(rgb[0]*k)},${Math.round(rgb[1]*k)},${Math.round(rgb[2]*k)})`, z: toCam(B, cW)[2], face: extra && fc.name === 'front' ? extra : false });
     }
   }
 
@@ -343,7 +344,8 @@ const DATA = /*__DATA__*/null;
     // solids: characters, props, debris
     const polys = [];
     for (const ch of D.characters) {
-      PARTS.forEach((part, i) => boxFaces(polys, B, ch.frames[f][i], SZ[part], hex(ch.colors[part]), bright, part === 'Head'));
+      PARTS.forEach((part, i) => boxFaces(polys, B, ch.frames[f][i], SZ[part], hex(ch.colors[part]), bright, part === 'Head' ? (ch.face || 'std') : false));
+      for (const ex of (ch.extras || [])) boxFaces(polys, B, ex.frames[f], ex.size, hex(ex.color), bright, false);
     }
     if (CINE) {
       for (const p of CINE.props) {
@@ -363,10 +365,17 @@ const DATA = /*__DATA__*/null;
       ctx.fillStyle = p.fill; ctx.fill(); ctx.stroke();
       if (p.face && p.pts.length === 4) {
         const [c0, c1, , c3] = p.pts, P = (u, v) => [c0.x + u*(c1.x-c0.x) + v*(c3.x-c0.x), c0.y + u*(c1.y-c0.y) + v*(c3.y-c0.y)];
-        ctx.fillStyle = 'rgba(20,20,20,0.85)';
-        for (const [u, v] of [[0.3, 0.38], [0.7, 0.38]]) { const [x, y] = P(u, v); ctx.beginPath(); ctx.arc(x, y, Math.max(1.5, 2.2*dpr), 0, 7); ctx.fill(); }
-        ctx.strokeStyle = 'rgba(20,20,20,0.85)'; ctx.beginPath(); const m0 = P(0.35, 0.72), m1 = P(0.65, 0.72); ctx.moveTo(m0[0], m0[1]); ctx.lineTo(m1[0], m1[1]); ctx.stroke();
-        ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillStyle = 'rgba(20,20,20,0.85)'; ctx.strokeStyle = 'rgba(20,20,20,0.9)'; ctx.lineWidth = Math.max(1, 1.6 * dpr);
+        if (p.face === 'smirk') {   // calm half-closed eyes behind round glasses, one-sided smile
+          for (const [u, v] of [[0.3, 0.38], [0.7, 0.38]]) { const [x, y] = P(u, v), r = Math.hypot(c1.x - c0.x, c1.y - c0.y) * 0.13;
+            ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(x, y + r * 0.1, r * 0.55, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke(); }
+          const [m0x, m0y] = P(0.34, 0.74), [m1x, m1y] = P(0.7, 0.68), [mcx, mcy] = P(0.52, 0.84);
+          ctx.beginPath(); ctx.moveTo(m0x, m0y); ctx.quadraticCurveTo(mcx, mcy, m1x, m1y); ctx.stroke();
+        } else {
+          for (const [u, v] of [[0.3, 0.38], [0.7, 0.38]]) { const [x, y] = P(u, v); ctx.beginPath(); ctx.arc(x, y, Math.max(1.5, 2.2*dpr), 0, 7); ctx.fill(); }
+          ctx.beginPath(); const m0 = P(0.35, 0.72), m1 = P(0.65, 0.72); ctx.moveTo(m0[0], m0[1]); ctx.lineTo(m1[0], m1[1]); ctx.stroke();
+        }
+        ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = Math.max(1, dpr);
       }
     }
 
@@ -515,6 +524,62 @@ const DATA = /*__DATA__*/null;
         const cc = toCam(B, e.c); if (cc[2] < NEAR) continue; const s = scr(B, cc);
         const size = lerp(e.size0, e.size1, ease('expo_out', Math.min(1, u * 1.6))) * B.focal / cc[2], frame = Math.min(sh.frames - 1, Math.floor(u * sh.frames * e.speed)), al = e.alpha * (u > 0.85 ? (1 - u) / 0.15 : 1);
         items.push({ z: cc[2] - 0.35, add: e.add, fn: () => drawSheet(e.sheet, frame, s.x, s.y, size, e.rot * Math.PI / 180, al) });
+      } else if (e.type === 'ink') {
+        let src = [], al = e.a;   // src: [{p, s}] with s = 0 (tail) .. 1 (head)
+        const rndb = mulberry32(e.seed * 7 + (f >> 1) * 131);
+        if (e.mode === 'trail') {
+          if (f < e.t0 || f > e.t1 + e.len) continue;
+          const ch = D.characters[e.char], pi = PARTS.indexOf(e.part);
+          for (let k = e.len; k >= 0; k--) { const fr = f - k; if (fr < e.t0 || fr > e.t1) continue; src.push({ p: apply(ch.frames[clamp(fr, 0, D.nFrames - 1)][pi], e.tip), s: 1 - k / e.len }); }
+          if (f > e.t1) al *= clamp(1 - (f - e.t1) / e.len, 0, 1);
+        } else {
+          const u = (f - e.t0) / e.dur; if (u < 0 || u > 1) continue;
+          const head = Math.min(1, (f - e.t0) / Math.max(1, e.grow)), tail = u > 0.5 ? clamp((u - 0.5) / 0.5, 0, 1) * 0.9 : 0, n = e.pts.length - 1;
+          const at = (t) => { const x = clamp(t, 0, 1) * n, i = Math.min(n - 1, Math.floor(x)), q = x - i; return lerp3(e.pts[i], e.pts[i + 1], q); };
+          const steps = 18; for (let i = 0; i <= steps; i++) { const t = lerp(tail, head, i / steps); src.push({ p: at(t), s: i / steps }); }
+          if (u > 0.7) al *= (1 - u) / 0.3;
+        }
+        if (src.length < 2) continue;
+        const pr = src.map(q => { const cc = toCam(B, q.p); return cc[2] < NEAR ? null : { x: scr(B, cc).x, y: scr(B, cc).y, z: cc[2], s: q.s }; });
+        const okp = pr.filter(Boolean); if (okp.length < 2) continue;
+        const rgb = col(e.color), glow = e.glow ? col(e.glow) : null;
+        const wpx = (q) => Math.max(0.8, (e.mode === 'trail' ? lerp(e.w1, e.w0, Math.pow(q.s, 1.2)) * (q.s < 0.05 ? q.s / 0.05 : 1) : e.w0 * Math.pow(Math.sin(Math.PI * clamp(q.s, 0.02, 0.98)), 0.6)) * B.focal / q.z);
+        const L = [], R = [];
+        okp.forEach((q, i) => {
+          const a = okp[Math.max(0, i - 1)], b = okp[Math.min(okp.length - 1, i + 1)]; let tx = b.x - a.x, ty = b.y - a.y; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+          const w = wpx(q) / 2, j1 = 1 + (rndb() - 0.5) * 2 * e.rag, j2 = 1 + (rndb() - 0.5) * 2 * e.rag;
+          L.push([q.x - ty * w * j1 + tx * (rndb() - 0.5) * w * e.rag, q.y + tx * w * j1]); R.push([q.x + ty * w * j2, q.y - tx * w * j2]);
+        });
+        const zc = okp[okp.length - 1].z;
+        if (glow) items.push({ z: zc - 0.4, add: true, fn: () => { ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = rgba(glow, al * 0.4); ctx.lineWidth = Math.max(2, wpx(okp[Math.floor(okp.length / 2)]) * 2.4);
+          ctx.beginPath(); okp.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke(); } });
+        items.push({ z: zc - 0.35, add: false, fn: () => {
+          ctx.fillStyle = rgba(rgb, al); ctx.beginPath(); L.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); R.slice().reverse().forEach(q => ctx.lineTo(q[0], q[1])); ctx.closePath(); ctx.fill();
+          ctx.lineCap = 'round'; ctx.strokeStyle = rgba(rgb, al * 0.7);   // dry-brush bristles trailing past the stroke
+          for (let k = 0; k < 3; k++) {
+            ctx.lineWidth = Math.max(1, dpr); ctx.beginPath(); let first = true;
+            for (let i = 0; i < okp.length; i++) {
+              const q = okp[i], a2 = okp[Math.max(0, i - 1)], b2 = okp[Math.min(okp.length - 1, i + 1)]; let tx = b2.x - a2.x, ty = b2.y - a2.y; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+              const w = wpx(q) * (k - 1) * 0.35, ext = (k + 1) * 6 * dpr * (1 - q.s), x = q.x - ty * w - tx * ext, y = q.y + tx * w - ty * ext;
+              if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+          } } });
+      } else if (e.type === 'streaks') {
+        const u = (f - e.t0) / e.dur; if (u < 0 || u > 1) continue;
+        const rnd = mulberry32(e.seed + (f >> 1) * 13), dir = norm(sub(e.b, e.a)), px = norm(cross(dir, [0, 1, 0.2])), py = cross(dir, px), rgb = col(e.color), lines = [];
+        for (let i = 0; i < e.n; i++) {
+          const ra = e.r0 * (rnd() - 0.5) * 2, rb = e.r0 * (rnd() - 0.5) * 2, rc = e.r1 * (rnd() - 0.5) * 2, rd = e.r1 * (rnd() - 0.5) * 2;
+          lines.push([add(e.a, add(mul(px, ra), mul(py, rb))), add(e.b, add(mul(px, rc), mul(py, rd))), 0.4 + rnd() * 0.6]);
+        }
+        const mid = toCam(B, mul(add(e.a, e.b), 0.5))[2], fa = 1 - u * 0.6;
+        items.push({ z: mid - 0.3, add: false, fn: () => { ctx.lineCap = 'round';
+          for (const [a, b, w] of lines) { const sg = segScreen(B, a, b); if (!sg) continue; const g = ctx.createLinearGradient(sg[0].x, sg[0].y, sg[1].x, sg[1].y);
+            g.addColorStop(0, rgba(rgb, 0)); g.addColorStop(0.35, rgba(rgb, fa * w)); g.addColorStop(1, rgba(rgb, fa * w)); ctx.strokeStyle = g; ctx.lineWidth = Math.max(1, e.w * w * B.focal / Math.max(NEAR, mid)); ctx.beginPath(); ctx.moveTo(sg[0].x, sg[0].y); ctx.lineTo(sg[1].x, sg[1].y); ctx.stroke(); } } });
+      } else if (e.type === 'slices') {
+        const u = (f - e.t0) / e.dur; if (u < 0 || u > 1) continue; const cc = toCam(B, e.c); if (cc[2] < NEAR) continue; const s = scr(B, cc), rnd = mulberry32(e.seed + (f >> 1)), rgb = col(e.color), k = B.focal / cc[2];
+        items.push({ z: cc[2] - 0.5, add: false, fn: () => { for (let i = 0; i < e.n; i++) { const ox = (i - (e.n - 1) / 2) * e.spread * k + (rnd() - 0.5) * 4 * dpr, ry = e.h / 2 * k * (0.75 + 0.5 * rnd());
+          ctx.fillStyle = rgba(rgb, 0.96 - u * 0.4); ctx.beginPath(); ctx.ellipse(s.x + ox, s.y, Math.max(1.5, e.w / 2 * k), ry, 0, 0, 7); ctx.fill(); } } });
       } else if (e.type === 'glow') {
         if (f < e.t0 || f > e.t1) continue;
         const u = (f - e.t0) / Math.max(1, e.t1 - e.t0), pos = e.attach ? attachPos(e.attach, f) : e.c, cc = toCam(B, pos); if (cc[2] < NEAR) continue;
@@ -596,7 +661,48 @@ const DATA = /*__DATA__*/null;
     ctx.restore();
   }
 
+
+  function jagged(cx, cy, n, rIn, rOut, rnd, fill) {   // spiky comic burst polygon
+    ctx.fillStyle = fill; ctx.beginPath();
+    for (let i = 0; i < n * 2; i++) { const a = i / (n * 2) * Math.PI * 2 + rnd() * 0.12, r = i % 2 ? rIn * (0.6 + rnd() * 0.8) : rOut * (0.5 + rnd() * 0.6); ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); }
+    ctx.closePath(); ctx.fill();
+  }
+  function screenFx(sf, u, f) {
+    const cx = (sf.focus ? sf.focus[0] : 0.5) * W, cy = (sf.focus ? sf.focus[1] : 0.5) * H, rnd = mulberry32((sf.seed || 1) * 97 + f * 17);
+    if (sf.kind === 'black') { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); return; }
+    if (sf.kind === 'white') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); return; }
+    if (sf.kind === 'glint') {
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); const R = H * (0.12 + 0.55 * ease('expo_out', u)) * (1 - 0.3 * u);
+      ctx.beginPath(); ctx.moveTo(cx, cy - R); ctx.quadraticCurveTo(cx, cy, cx + R * 1.4, cy); ctx.quadraticCurveTo(cx, cy, cx, cy + R); ctx.quadraticCurveTo(cx, cy, cx - R * 1.4, cy); ctx.quadraticCurveTo(cx, cy, cx, cy - R); ctx.closePath();
+      ctx.shadowColor = sf.edge || '#7ff0ff'; ctx.shadowBlur = 18 * dpr; ctx.fillStyle = '#fff'; ctx.fill(); ctx.shadowBlur = 0; return;
+    }
+    if (sf.kind === 'bubble') {   // speech bubble with three dots (acting beat)
+      const bw = H * 0.17, bh = H * 0.2, pop = Math.min(1, u * 6), k = 0.6 + 0.4 * ease('expo_out', pop);
+      ctx.save(); ctx.translate(cx, cy); ctx.scale(k, k); ctx.lineWidth = 3 * dpr; ctx.strokeStyle = '#000'; ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(0, 0, bw, bh, 0, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-bw * 0.35, bh * 0.82); ctx.lineTo(-bw * 0.7, bh * 1.45); ctx.lineTo(bw * 0.05, bh * 0.98); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#000'; for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.ellipse(0, i * bh * 0.42, bw * 0.17, bw * 0.19, 0, 0, 7); ctx.fill(); }
+      ctx.restore(); return;
+    }
+    if (sf.kind === 'burst') {   // white comic spikes over the live frame
+      for (let k = 0; k < 2; k++) jagged(cx, cy, 14, H * 0.5, H * 1.0, rnd, k ? '#fff' : 'rgba(255,255,255,0.9)'); return;
+    }
+    if (sf.kind === 'bw') {      // manga impact frame: hard threshold of the live frame + black shards (+ coloured hatching)
+      if (!window.__tmp) window.__tmp = document.createElement('canvas');
+      const tmp = window.__tmp; tmp.width = W; tmp.height = H; tmp.getContext('2d').drawImage(cv, 0, 0);
+      ctx.save(); ctx.fillStyle = sf.dark ? '#000' : '#fff'; ctx.fillRect(0, 0, W, H); ctx.filter = `grayscale(1) contrast(${sf.contrast || 14}) brightness(${sf.bright || 1.25})`; ctx.globalAlpha = sf.keep == null ? 1 : sf.keep; ctx.drawImage(tmp, 0, 0); ctx.restore();
+      const shard = sf.dark ? '#fff' : '#000';
+      for (let i = 0; i < (sf.shards || 16); i++) { const a = rnd() * Math.PI * 2, r0 = H * (0.18 + rnd() * 0.5), len = H * (0.25 + rnd() * 0.8), wd = H * (0.02 + rnd() * 0.07);
+        ctx.fillStyle = shard; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); ctx.lineTo(cx + Math.cos(a + wd / r0) * (r0 + len * 0.4), cy + Math.sin(a + wd / r0) * (r0 + len * 0.4));
+        ctx.lineTo(cx + Math.cos(a) * (r0 + len), cy + Math.sin(a) * (r0 + len)); ctx.lineTo(cx + Math.cos(a - wd / r0) * (r0 + len * 0.3), cy + Math.sin(a - wd / r0) * (r0 + len * 0.3)); ctx.closePath(); ctx.fill(); }
+      if (sf.accent) { ctx.lineCap = 'round'; for (let i = 0; i < 70; i++) { const a = rnd() * Math.PI * 2, r0 = H * (0.05 + rnd() * 0.18), r1 = r0 + H * (0.05 + rnd() * 0.18);
+        ctx.strokeStyle = ['#ff2a1a', '#ff8a1a', '#ffd21a'][i % 3]; ctx.lineWidth = (1 + rnd() * 2.5) * dpr; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0 * 0.8); ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1 * 0.8); ctx.stroke(); } }
+      return;
+    }
+  }
+
   function drawScreen(S, f) {
+    for (const sf of (S.fx || [])) { const u = (f - sf.t0) / sf.dur; if (u >= 0 && u < 1) screenFx(sf, u, f); }
     const vg = S.vignette[f], tint = S.tint[f], bars = S.bars[f], speed = S.speed[f];
     if (tint > 0.001) { ctx.fillStyle = rgba(hex(S.tintColor), tint); ctx.fillRect(0, 0, W, H); }
     if (speed > 0.01) {

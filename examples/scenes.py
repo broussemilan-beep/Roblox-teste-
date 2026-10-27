@@ -118,4 +118,10 @@ def _ultimate() -> Scene:
     return build()
 
 
-SCENES = {"heavy_punch_hit": heavy_punch_hit, "berserker_ultimate": _ultimate}
+def _short() -> Scene:
+    from .short import build
+
+    return build()
+
+
+SCENES = {"heavy_punch_hit": heavy_punch_hit, "berserker_ultimate": _ultimate, "duel_short": _short}

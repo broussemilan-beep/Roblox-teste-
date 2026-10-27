@@ -109,7 +109,7 @@ def tracking(
     offset: Vec,
     look_dy: float = 0.0,
     fov: float | tuple[float, float] = 50.0,
-    roll: float = 0.0,
+    roll: float | tuple[float, float] = 0.0,
     offset_end: Vec | None = None,
 ) -> Callable[[float, float], CamState]:
     """Camera glued to a moving point (``target_at(frame)``) with a (changing) offset."""
@@ -118,7 +118,8 @@ def tracking(
         t = target_at(f)
         off = offset if offset_end is None else lerp3(offset, offset_end, u)
         fv = fov if isinstance(fov, (int, float)) else lerp(fov[0], fov[1], u)
-        return (t[0] + off[0], t[1] + off[1], t[2] + off[2]), (t[0], t[1] + look_dy, t[2]), fv, roll
+        rl = roll if isinstance(roll, (int, float)) else lerp(roll[0], roll[1], u)
+        return (t[0] + off[0], t[1] + off[1], t[2] + off[2]), (t[0], t[1] + look_dy, t[2]), fv, rl
 
     return fn
 
@@ -131,6 +132,8 @@ class Cinematic:
     shots: list[tuple[int, int, Callable[[float, float], CamState]]] = field(default_factory=list)
     shakes: list[tuple[int, int, float]] = field(default_factory=list)
     kicks: list[tuple[int, int, float]] = field(default_factory=list)
+    hand: Track = field(default_factory=lambda: Track(0.0))  # handheld camera amplitude over time
+    screenfx: list[dict] = field(default_factory=list)
     props: list[dict] = field(default_factory=list)
     debris: list[dict] = field(default_factory=list)
     fx: list[dict] = field(default_factory=list)
@@ -170,6 +173,11 @@ class Cinematic:
                 dy += k * (math.sin(f * 2.9 + 0.4) + 0.6 * math.sin(f * 4.3 + 2))
                 dz += k * 0.5 * math.sin(f * 3.7)
                 droll += k * 2.0 * math.sin(f * 3.1)
+        ha = self.hand.at(f)
+        if ha > 0:
+            dx += ha * (math.sin(f * 0.37 + 1.3) + 0.5 * math.sin(f * 0.91))
+            dy += ha * (math.sin(f * 0.43 + 0.2) + 0.5 * math.sin(f * 1.07 + 2.0))
+            droll += ha * 4.0 * math.sin(f * 0.29 + 0.7)
         for k0, kd, ka in self.kicks:
             if k0 <= f < k0 + kd:
                 fov *= 1.0 - ka * (1 - (f - k0) / kd) ** 2
@@ -336,6 +344,56 @@ class Cinematic:
         """Quick field-of-view kick (the camera pushes in and settles) - the camera-side half of an impact."""
         self.kicks.append((f0, dur, amount))
 
+    # --- brush-stroke / comic primitives (the reference's ink smears)
+    def ink_trail(self, t0: int, t1: int, char: int, part: str, tip: Vec, length: int, w_head: float, w_tail: float = 0.0,
+                  color: str = "#0b0b0f", glow: str | None = None, rag: float = 0.35, seed: int = 1, alpha: float = 0.95) -> None:
+        """Thick tapered brush stroke following a limb tip over its last ``length`` frames (ragged edge, optional glow)."""
+        self.fx.append({"type": "ink", "mode": "trail", "t0": t0, "t1": t1, "char": char, "part": part, "tip": list(tip), "len": length,
+                        "w0": w_head, "w1": w_tail, "color": color, "glow": glow, "rag": rag, "seed": self.seed * 100 + seed, "a": alpha})
+
+    def ink_path(self, t0: int, dur: int, points: list[Vec], w: float, color: str = "#0b0b0f", glow: str | None = None,
+                 rag: float = 0.35, seed: int = 1, grow: int = 5, alpha: float = 0.95) -> None:
+        """A brush stroke along a fixed 3D polyline: it is drawn in ``grow`` frames, then fades; thick in the middle, pointed ends."""
+        self.fx.append({"type": "ink", "mode": "path", "t0": t0, "dur": dur, "pts": [list(p) for p in points], "w0": w, "w1": 0.0,
+                        "color": color, "glow": glow, "rag": rag, "seed": self.seed * 100 + seed, "grow": grow, "a": alpha})
+
+    def ink_arc(self, t0: int, dur: int, c: Vec, n: Vec, r: float, a0: float, a1: float, w: float, color: str = "#0b0b0f",
+                glow: str | None = None, rag: float = 0.35, seed: int = 1, grow: int = 5, steps: int = 18, alpha: float = 0.95) -> None:
+        """Brush stroke along a circular arc (centre ``c``, plane normal ``n``, angles in degrees)."""
+        nx, ny, nz = n
+        ln = math.sqrt(nx * nx + ny * ny + nz * nz) or 1.0
+        n = (nx / ln, ny / ln, nz / ln)
+        ref = (0.0, 1.0, 0.0) if abs(n[1]) < 0.9 else (1.0, 0.0, 0.0)
+        t1 = (n[1] * ref[2] - n[2] * ref[1], n[2] * ref[0] - n[0] * ref[2], n[0] * ref[1] - n[1] * ref[0])
+        l1 = math.sqrt(sum(x * x for x in t1)) or 1.0
+        t1 = tuple(x / l1 for x in t1)
+        t2 = (n[1] * t1[2] - n[2] * t1[1], n[2] * t1[0] - n[0] * t1[2], n[0] * t1[1] - n[1] * t1[0])
+        pts = []
+        for i in range(steps + 1):
+            a = math.radians(a0 + (a1 - a0) * i / steps)
+            ca, sa = math.cos(a) * r, math.sin(a) * r
+            pts.append((c[0] + t1[0] * ca + t2[0] * sa, c[1] + t1[1] * ca + t2[1] * sa, c[2] + t1[2] * ca + t2[2] * sa))
+        self.ink_path(t0, dur, pts, w, color, glow, rag, seed, grow, alpha)
+
+    def streaks(self, t0: int, dur: int, a: Vec, b: Vec, n: int = 14, r0: float = 0.2, r1: float = 1.8, w: float = 0.05,
+                color: str = "#ffffff", seed: int = 1) -> None:
+        """Fan of thin speed lines running from around ``a`` to around ``b`` (re-rolled every 2 frames)."""
+        self.fx.append({"type": "streaks", "t0": t0, "dur": dur, "a": list(a), "b": list(b), "n": n, "r0": r0, "r1": r1, "w": w,
+                        "color": color, "seed": self.seed * 100 + seed})
+
+    def slices(self, t0: int, dur: int, c: Vec, n: int = 3, h: float = 3.6, w: float = 0.2, color: str = "#08080a",
+               spread: float = 0.5, seed: int = 1) -> None:
+        """Tall thin ink ellipses stacked on a point (the reference's dash 'multiples')."""
+        self.fx.append({"type": "slices", "t0": t0, "dur": dur, "c": list(c), "n": n, "h": h, "w": w, "color": color, "spread": spread,
+                        "seed": self.seed * 100 + seed})
+
+    def screen_fx(self, kind: str, t0: int, dur: int, **kw) -> None:
+        """Full-frame punctuation: ``bw`` (manga impact frame), ``black``, ``white``, ``glint`` (4-point star on black).
+
+        ``bw`` options: ``accent`` colour of hatch lines, ``focus`` (x, y) in 0..1 screen coords for the shard burst.
+        """
+        self.screenfx.append({"kind": kind, "t0": t0, "dur": dur, **kw})
+
     # --- screen effects
     def flash(self, t0: int, dur: int, color: str = "#ffffff", peak: float = 1.0) -> None:
         self.flashes.append({"t0": t0, "dur": dur, "color": color, "peak": peak})
@@ -355,7 +413,7 @@ class Cinematic:
                 "bars": [round(self.bars.at(f), 3) for f in rng],
                 "speed": [round(self.speed.at(f), 3) for f in rng],
                 "tint": [round(self.tint.at(f), 3) for f in rng],
-                "tintColor": self.tint_color, "flashes": self.flashes,
+                "tintColor": self.tint_color, "flashes": self.flashes, "fx": self.screenfx,
             },
             "floorColor": self.floor_color, "skyColor": self.sky_color, "sheets": self.sheets,
         }

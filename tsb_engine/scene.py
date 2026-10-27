@@ -9,6 +9,7 @@ from .cinematic import Cinematic
 from .linter import lint
 from .mathutil import Transform, Vec, rot_y, translate
 from .model import PARTS, Animation
+from .secondary import Outfit
 
 DEFAULT_COLORS = {
     "Torso": "#2f6fdd",
@@ -27,6 +28,8 @@ class Character:
     base_pos: Vec = (0.0, 0.0, 0.0)  # world position of the point under the root (ground level)
     base_yaw: float = 0.0  # degrees; 0 = faces world -Z
     colors: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_COLORS))
+    outfit: Outfit | None = None  # secondary-motion extras (hair, coat tails, hat), preview only
+    face: str = "std"  # "std" (dots + line) or "smirk" (round glasses, one-sided smile)
 
     def base_transform(self) -> Transform:
         return (rot_y(self.base_yaw), self.base_pos)
@@ -52,6 +55,7 @@ class Scene:
     markers: list[dict] = field(default_factory=list)  # {"f": 12, "label": "...", "act": bool, "hold": n}
     bands: list[dict] = field(default_factory=list)  # {"f0": a, "f1": b, "label": "...", "show": bool}
     cine: Cinematic | None = None
+    hold: int = 1  # animate on a slower clock: characters (and extras) update every `hold` frames (2 = twos)
 
     @property
     def n_frames(self) -> int:
@@ -66,7 +70,7 @@ def export_viewer_data(scene: Scene) -> dict:
     for c in scene.characters:
         frames = []
         for f in range(scene.n_frames):
-            tf = c.world_parts(f)
+            tf = c.world_parts(f - f % scene.hold)
             frames.append(
                 [
                     [round(v, 4) for row in tf[p][0] for v in row] + [round(v, 4) for v in tf[p][1]]
@@ -74,7 +78,12 @@ def export_viewer_data(scene: Scene) -> dict:
                 ]
             )
         findings = [fd.to_dict() for fd in lint(c.anim)]
-        chars.append({"name": c.name, "colors": c.colors, "frames": frames, "findings": findings})
+        extras = []
+        if c.outfit is not None:
+            for tr in c.outfit.simulate(c, scene.n_frames, scene.hold, scene.fps):
+                extras.append({"name": tr.name, "size": [round(v, 3) for v in tr.size], "color": tr.color,
+                               "frames": [[round(v, 4) for row in t[0] for v in row] + [round(v, 4) for v in t[1]] for t in tr.frames]})
+        chars.append({"name": c.name, "face": c.face, "colors": c.colors, "frames": frames, "findings": findings, "extras": extras})
     markers = list(scene.markers)
     bands = list(scene.bands)
     ev = scene.events

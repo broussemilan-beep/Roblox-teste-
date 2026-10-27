@@ -54,6 +54,25 @@ render the `film` camera on key frames, build a contact sheet, **look**, fix, re
 - The viewer only imitates Roblox primitives (parts, ParticleEmitter, Beam, Trail, PointLight,
   ColorCorrection). No custom shaders, no global hitstop, no impact frames: do not rely on them.
 
+### Matching a reference: the "basic models, high-level animation" lesson
+
+When the user shows a reference clip, study it first (`docs/research/reference-analysis.md` is the worked example:
+30 fps clock, shot lengths, per-hit layers, impact/black frames) and reproduce the **craft**, not the choreography.
+Plain Roblox blocks are enough; the level comes from pace, camera, graphic fx and secondary motion.
+
+- `examples/short.py` (`duel_short`, 11 s at a 30 fps look) is the reference implementation: crouch anticipation,
+  dash hidden behind `slices` + an empty-stage blink, cut straight to the contact pose, 4 layers per hit
+  (`burst`, `ink_trail` on the limb path, `streaks`, thin white `ink_arc`), pose-cycle juggle, smirk close-up with
+  a `bubble`, slash storm (`ink_path` strokes with a cyan `glow`), macro hold.
+- Graphic primitives (`Cinematic`): `ink_trail` / `ink_path` / `ink_arc` (brush strokes), `streaks`, `slices`,
+  `screen_fx("bw" | "black" | "white" | "glint" | "burst" | "bubble")`, handheld camera, `Scene(hold=2)` to animate
+  characters on twos.
+- Secondary motion (`tsb_engine/secondary.py`): `coat_and_hair()` gives hat, belt, cuffs, coat tails and hair
+  locks simulated as verlet ropes. They are **preview only**: not part of the exported KeyframeSequence.
+- `bw` impact frames and black frames exist in the reference, but the in-game constraint (no impact frame, no
+  global hitstop) still holds: treat them as optional punctuation for cinematic cuts.
+- Always run `keep_above_ground` on every character of a short (the linter's TSB001 catches sunken legs).
+
 ## Rules of engagement
 
 - Tag every number you introduce: `[physical]` follows from the rig, `[heuristic]` a starting
@@ -83,7 +102,9 @@ C0/C1 — verify when writing an exporter).
 ## Files
 
 - `tsb_engine/` – model, forward kinematics, `moves.py`/`footwork.py` (planted feet, steps, gaits), `authoring.py`, `cinematic.py`, `linter.py`, CLI.
-- `examples/builders.py` – a worked heavy punch plus two deliberately bad animations; `examples/ultimate.py` – the 13 s berserker ultimate.
+- `examples/builders.py` – a worked heavy punch plus two deliberately bad animations; `examples/ultimate.py` – the 13 s berserker ultimate; `examples/short.py` – the reference-level 11 s short.
+- `tsb_engine/secondary.py` – hair, coat and hat secondary motion (preview only).
+- `docs/research/reference-analysis.md` – frame-level study of a user-supplied reference clip.
 - `examples/scenes.py` + `viewer/` + `tools/` – attacker/victim scene, HTML viewer, frame rendering.
 - `references/principles.md` – craft rules by archetype, with confidence tags.
 - `references/roblox-facts.md` – verified facts and known traps.
