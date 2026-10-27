@@ -124,6 +124,59 @@ def tracking(
     return fn
 
 
+def autoframe(
+    points_at: Callable[[int], list[Vec]],
+    f0: int,
+    f1: int,
+    azimuth: float = 35.0,
+    elevation: float = 8.0,
+    fov: float = 36.0,
+    fill: float = 0.62,
+    min_radius: float = 2.6,
+    follow: float = 0.35,
+    roll: float | tuple[float, float] = 0.0,
+    lift: float = 0.0,
+    azimuth_end: float | None = None,
+    pad: float = 0.5,
+) -> Callable[[float, float], CamState]:
+    """Camera that keeps a moving set of world points framed at a fixed fill, like a hand-operated combat camera.
+
+    ``points_at(frame)`` returns the points to keep in shot (torsos, striking tips...). The shot looks at their centre
+    from ``azimuth`` degrees around the world Y axis (0 = from +Z looking toward -Z, 90 = from +X) and ``elevation``;
+    the distance makes their bounding sphere fill ``fill`` of the frame height. ``follow`` (0..1 per frame) smooths the
+    motion: the camera lags a little and eases in, never snaps. Everything is precomputed so a shot is deterministic.
+    """
+    cs: list[Vec] = []
+    rs: list[float] = []
+    c = None
+    r = min_radius
+    for f in range(f0, f1 + 1):
+        pts = points_at(f)
+        n = len(pts)
+        ctr = (sum(p[0] for p in pts) / n, sum(p[1] for p in pts) / n + lift, sum(p[2] for p in pts) / n)
+        rad = max(min_radius, max(math.dist(p, ctr) for p in pts) + pad)
+        if c is None:
+            c, r = ctr, rad
+        else:
+            k = follow
+            c = lerp3(c, ctr, k)
+            r = r + (rad - r) * (0.6 if rad > r else 0.12)  # open quickly, close slowly
+        cs.append(c)
+        rs.append(r)
+
+    def fn(u: float, f: float) -> CamState:
+        i = max(0, min(len(cs) - 1, int(round(f)) - f0))
+        ctr, rad = cs[i], rs[i]
+        az = math.radians(azimuth if azimuth_end is None else azimuth + (azimuth_end - azimuth) * u)
+        el = math.radians(elevation)
+        dist = rad / (math.tan(math.radians(fov) / 2) * fill)
+        pos = (ctr[0] + dist * math.sin(az) * math.cos(el), ctr[1] + dist * math.sin(el), ctr[2] + dist * math.cos(az) * math.cos(el))
+        rl = roll if isinstance(roll, (int, float)) else lerp(roll[0], roll[1], u)
+        return pos, ctr, fov, rl
+
+    return fn
+
+
 # ---------------------------------------------------------------- the cinematic
 @dataclass
 class Cinematic:

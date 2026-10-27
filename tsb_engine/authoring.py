@@ -114,3 +114,16 @@ def keep_above_ground(char: Character, frames, clearance: float = 0.0) -> None:
         if low < clearance:
             root = char.anim.sample_root(f)
             char.anim.set_key(ROOT, f, Pose((root.pos[0], root.pos[1] + clearance - low, root.pos[2]), root.rot), "linear")
+
+
+def char_points(frame: int, *chars: Character, tips: bool = True) -> list:
+    """World points describing where characters are (torso centres, heads and limb tips) - input for ``autoframe``."""
+    pts = []
+    for ch in chars:
+        wp = ch.world_parts(frame)
+        pts.append(wp["Torso"][1])
+        pts.append(wp["Head"][1])
+        if tips:
+            for part in ("Right Arm", "Left Arm", "Right Leg", "Left Leg"):
+                pts.append(apply(wp[part], (0.0, -1.0, 0.0)))
+    return pts

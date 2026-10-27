@@ -73,6 +73,22 @@ Plain Roblox blocks are enough; the level comes from pace, camera, graphic fx an
   global hitstop) still holds: treat them as optional punctuation for cinematic cuts.
 - Always run `keep_above_ground` on every character of a short (the linter's TSB001 catches sunken legs).
 
+### The loop that produced `examples/short.py` (v2): solve, frame, measure, look
+
+Guessing joint angles and filming from a fixed far camera gave unreadable poses (see `docs/analysis/method-comparison.md`).
+Work like this instead:
+
+1. **Solve contacts** with `tsb_engine/solver.py`: `reach_root(char, frame, part, target, hint)` puts a limb tip on a
+   world point (it slides the Root if out of reach). Key the extreme pose, solve the striking limb, *then* shape around it.
+2. **Shape the motion**: anticipation that keeps moving (`moving_hold`), kinetic chain with late head/arms (`chain`),
+   a 2-frame `dislocate` of the striking limb block at the hit, an overshoot, a victim that folds first at the hit
+   (`react` in the short) and lags the head by 2 frames.
+3. **Frame with `autoframe`** (3/4 angles; the fight axis must not point at the camera) so bodies stay 40-80 % of the
+   frame height; macro whip-ins use `tracking`.
+4. **Measure** with `python tools/check_poses.py <scene> 62,104,...` (screen height, hidden limbs, cut by frame) and look at
+   contact sheets with **two views** (3/4 + profile) plus a 2-frame stride strip to judge the motion.
+5. Lint (`TSB001/007` must be clean), then show it. Your eye, not the metric, decides.
+
 ## Rules of engagement
 
 - Tag every number you introduce: `[physical]` follows from the rig, `[heuristic]` a starting
@@ -104,6 +120,7 @@ C0/C1 — verify when writing an exporter).
 - `tsb_engine/` – model, forward kinematics, `moves.py`/`footwork.py` (planted feet, steps, gaits), `authoring.py`, `cinematic.py`, `linter.py`, CLI.
 - `examples/builders.py` – a worked heavy punch plus two deliberately bad animations; `examples/ultimate.py` – the 13 s berserker ultimate; `examples/short.py` – the reference-level 11 s short.
 - `tsb_engine/secondary.py` – hair, coat and hat secondary motion (preview only).
+- `tsb_engine/solver.py` – limb aiming/contact solving, dislocation, moving hold, kinetic chain; `tsb_engine/readability.py` + `tools/check_poses.py` – picture-space pose checks.
 - `docs/research/reference-analysis.md` – frame-level study of a user-supplied reference clip.
 - `examples/scenes.py` + `viewer/` + `tools/` – attacker/victim scene, HTML viewer, frame rendering.
 - `references/principles.md` – craft rules by archetype, with confidence tags.
