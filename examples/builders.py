@@ -10,7 +10,8 @@ leans/nods forward; ry < 0 on the torso winds the right shoulder back (towards +
 from __future__ import annotations
 
 from tsb_engine.model import Animation, Pose
-from tsb_engine.moves import bake_planted_legs, torso_pose
+from tsb_engine.footwork import Step, bake_footwork
+from tsb_engine.moves import torso_pose
 
 
 def _key(anim: Animation, part: str, frame: int, rot=(0, 0, 0), pos=(0, 0, 0), easing="linear"):
@@ -23,15 +24,15 @@ def heavy_punch() -> Animation:
 
     # Torso: guard stance -> coil (keeps compressing: moving hold) -> 2-frame snap -> follow-through
     t = a.set_key
-    t("Torso", 0, torso_pose(drop=0.30, pitch=-4, yaw=-10), "quad_out")
-    t("Torso", 12, torso_pose(drop=0.45, pitch=-10, yaw=-55), "linear")
-    t("Torso", 14, torso_pose(drop=0.52, pitch=-12, yaw=-62), "linear")  # windup (still compressing)
-    t("Torso", 15, torso_pose(drop=0.40, pitch=-16, yaw=-10), "linear")
-    t("Torso", 16, torso_pose(drop=0.35, pitch=-18, yaw=42), "linear")  # impact
-    t("Torso", 22, torso_pose(drop=0.35, pitch=-18, yaw=45), "cubic_out")  # hitstop drift
-    t("Torso", 28, torso_pose(drop=0.33, pitch=-14, yaw=52), "sine_inout")  # overshoot
-    t("Torso", 40, torso_pose(drop=0.30, pitch=-6, yaw=18), "sine_inout")
-    t("Torso", 55, torso_pose(drop=0.30, pitch=-4, yaw=-10), "linear")
+    t("Torso", 0, torso_pose(drop=0.12, pitch=-4, yaw=-10), "quad_out")
+    t("Torso", 12, torso_pose(drop=0.26, pitch=-10, yaw=-55), "linear")
+    t("Torso", 14, torso_pose(drop=0.30, pitch=-12, yaw=-62), "linear")  # windup (still compressing)
+    t("Torso", 15, torso_pose(drop=0.26, pitch=-16, yaw=-10), "linear")
+    t("Torso", 16, torso_pose(drop=0.24, pitch=-18, yaw=42), "linear")  # impact
+    t("Torso", 22, torso_pose(drop=0.24, pitch=-18, yaw=45), "cubic_out")  # hitstop drift
+    t("Torso", 28, torso_pose(drop=0.22, pitch=-14, yaw=52), "sine_inout")  # overshoot
+    t("Torso", 40, torso_pose(drop=0.16, pitch=-6, yaw=18), "sine_inout")
+    t("Torso", 55, torso_pose(drop=0.12, pitch=-4, yaw=-10), "linear")
 
     # Striking arm: cocked back, then snaps 90 deg forward with a brief dislocation
     _key(a, "Right Arm", 0, rot=(15, 0, -5), easing="quad_out")
@@ -64,17 +65,21 @@ def heavy_punch() -> Animation:
     _key(a, "Head", 40, rot=(0, -14, 0), easing="sine_inout")
     _key(a, "Head", 55, rot=(0, 8, 0))
 
-    # Lunge: the whole body steps into the punch (root +Z is backwards)
+    # Lunge: the whole body steps into the punch over ~8 frames (root +Z is backwards).
+    # Faster than ~0.35 stud/frame is more than rigid R6 legs can follow without teleporting.
     _key(a, "Root", 0, pos=(0, 0, 1.6), easing="linear")
-    _key(a, "Root", 12, pos=(0, 0, 1.6))
-    _key(a, "Root", 14, pos=(0, 0, 1.5))
-    _key(a, "Root", 15, pos=(0, 0, 0.55))
+    _key(a, "Root", 8, pos=(0, 0, 1.6), easing="quad_in")
     _key(a, "Root", 16, pos=(0, 0, 0.0), easing="cubic_out")
-    _key(a, "Root", 24, pos=(0, 0, -0.15), easing="sine_inout")
+    _key(a, "Root", 26, pos=(0, 0, -0.15), easing="sine_inout")
     _key(a, "Root", 55, pos=(0, 0, -0.15))
 
-    # Legs: asymmetric guard stance, feet held in world space for the whole move
-    bake_planted_legs(a, 0, 55, lateral=0.5, front_leg="Left Leg", stance_yaw=0)
+    # Footwork: guard stance, front foot steps into the lunge, rear foot pushes off and catches up
+    initial = {"Left Leg": (-0.8, 0.7), "Right Leg": (1.1, 2.5)}
+    steps = [
+        Step("Left Leg", 8, 15, (-0.9, -1.2), lift=0.5),  # front foot lands just before the fist
+        Step("Right Leg", 11, 22, (1.1, 1.0), lift=0.35),  # rear foot pushes off, drags through, plants
+    ]
+    bake_footwork(a, initial, steps, 0, 55)
     return a
 
 
