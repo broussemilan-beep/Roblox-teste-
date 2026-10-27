@@ -77,20 +77,23 @@ def attach(
 
 
 def lying_root_rot(char: Character, head_dir_world, face_down: bool = True) -> tuple[float, float, float]:
-    """Root rotation that lays the body flat with its head pointing along ``head_dir_world`` = (x, z)."""
-    from .mathutil import compose, translate
-    from .kinematics import ROOT_REST_Y, pose_transform
+    """Root rotation that lays the body flat with its head pointing along ``head_dir_world`` = (x, z).
 
-    rx = -90.0 if face_down else 90.0
-    best, best_err = (rx, 0.0, 0.0), 1e9
-    for ry in range(0, 360, 5):
-        root = compose(char.base_transform(), compose(translate((0.0, ROOT_REST_Y, 0.0)), pose_transform(Pose((0, 0, 0), (rx, float(ry), 0.0)))))
-        tf = part_transforms({}, root=root)
-        dx, dz = tf["Head"][1][0] - tf["Torso"][1][0], tf["Head"][1][2] - tf["Torso"][1][2]
-        n = math.hypot(dx, dz) or 1.0
-        err = math.hypot(dx / n - head_dir_world[0], dz / n - head_dir_world[1])
-        if err < best_err:
-            best, best_err = (rx, float(ry), 0.0), err
+    Solved on a scratch copy of the character so it uses exactly the transforms the viewer will use.
+    """
+    tmp = Character(char.name, Animation("tmp", archetype="cinematic"), base_pos=char.base_pos, base_yaw=char.base_yaw)
+    best, best_err = (-90.0, 0.0, 0.0), 1e9
+    for rx in (-90.0, 90.0):
+        for ry in range(0, 360, 5):
+            tmp.anim.set_key(ROOT, 0, Pose((0.0, 0.0, 0.0), (rx, float(ry), 0.0)), "linear")
+            tf = tmp.world_parts(0)
+            head, torso = tf["Head"][1], tf["Torso"][1]
+            dx, dz = head[0] - torso[0], head[2] - torso[2]
+            n = math.hypot(dx, dz) or 1.0
+            front_y = -tf["Torso"][0][1][2]  # world y of the torso's front (local -z): -1 = face straight down
+            err = math.hypot(dx / n - head_dir_world[0], dz / n - head_dir_world[1]) + (1 + front_y if face_down else 1 - front_y)
+            if err < best_err:
+                best, best_err = (rx, float(ry), 0.0), err
     return best
 
 

@@ -156,6 +156,19 @@ def bake_footwork(
         for leg in LEGS:
             target, planted = foot_target(leg, frame, settled, steps)
             anim.set_key(leg, frame, solve_leg(anim, leg, frame, target, planted), "linear")
+    despike_legs(anim, start, end)
+
+
+def despike_legs(anim: Animation, start: int, end: int, jump: float = 0.8) -> None:
+    """Replace one-frame foot flicks (hips whipped past the reach of a rigid leg) by the neighbours' average."""
+    for leg in LEGS:
+        for f in range(start + 1, end):
+            prev, cur, nxt = (sole_positions(anim, g)[leg] for g in (f - 1, f, f + 1))
+            mid = tuple((a + b) / 2 for a, b in zip(prev, nxt))
+            gap = math.dist(cur, mid)
+            if gap > jump and math.dist(prev, nxt) < gap * 0.6:
+                a, b = anim.sample_part(leg, f - 1), anim.sample_part(leg, f + 1)
+                anim.set_key(leg, f, Pose(rot=tuple((x + y) / 2 for x, y in zip(a.rot, b.rot))), "linear")
 
 
 def sole_positions(anim: Animation, frame: int) -> dict[str, Vec]:

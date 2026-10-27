@@ -253,7 +253,7 @@ const DATA = /*__DATA__*/null;
             if (e.converge > 0) { const off = mul(ru, e.converge); p = add(org, off); v = mul(off, -1 / life); }
             else if (e.radius > 0) p = add(org, mul(ru, e.radius * rnd()));
             const sv = 1 + (rnd() - 0.5) * 2 * e.sizeVar;
-            particles.push({ t0: f, life, p, v, g: e.grav, k: e.drag, s0: e.size[0] * sv, s1: e.size[1] * sv, a0: e.alpha[0], a1: e.alpha[1], c0, c1, add: e.add, stretch: e.stretch });
+            particles.push({ id: particles.length, shape: e.shape || 'soft', t0: f, life, p, v, g: e.grav, k: e.drag, s0: e.size[0] * sv, s1: e.size[1] * sv, a0: e.alpha[0], a1: e.alpha[1], c0, c1, add: e.add, stretch: e.stretch });
           }
         }
       } else if (e.type === 'cracks') {
@@ -299,7 +299,8 @@ const DATA = /*__DATA__*/null;
     ctx.save();
     ctx.clearRect(0, 0, W, H);
     // sky + ground (the ground is a big quad so the horizon is right)
-    ctx.fillStyle = rgba(mul(sky, bright), 1); ctx.fillRect(0, 0, W, H);
+    const hzc = toCam(B, add(cs.pos, [B.f[0] * 2000, -0.0001, B.f[2] * 2000])), hy = hzc[2] < NEAR ? (B.f[1] > 0 ? H * 2 : -H) : clamp(scr(B, hzc).y, -H, H * 2);
+    { const g = ctx.createLinearGradient(0, 0, 0, Math.max(hy, 1)); g.addColorStop(0, rgba(mul(sky, bright * 0.7), 1)); g.addColorStop(1, rgba(mul(sky, bright), 1)); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
     const gc = [cs.pos[0], 0, cs.pos[2]], R = 400;
     const gq = polyScreen(B, [[gc[0]-R, 0, gc[2]-R], [gc[0]+R, 0, gc[2]-R], [gc[0]+R, 0, gc[2]+R], [gc[0]-R, 0, gc[2]+R]]);
     if (gq) { ctx.fillStyle = rgba(mul(floor, bright), 1); ctx.beginPath(); gq.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.fill(); }
@@ -312,6 +313,17 @@ const DATA = /*__DATA__*/null;
       }
     }
     ctx.stroke();
+    { const g = ctx.createLinearGradient(0, hy - H * 0.05, 0, hy + H * 0.32); const fogc = mul(sky, bright); g.addColorStop(0, rgba(fogc, 0.95)); g.addColorStop(1, rgba(fogc, 0)); ctx.fillStyle = g; ctx.fillRect(0, hy - H * 0.05, W, H * 0.4); }
+
+    // fx are split around the characters: ground decals and anything farther than them paint first
+    let frontItems = [];
+    if (CINE) {
+      const all = buildFx(B, f), zs = D.characters.map(ch => toCam(B, apply(ch.frames[f][PARTS.indexOf('Torso')], [0, 0, 0]))[2]);
+      const focusZ = zs.reduce((a, b) => a + b, 0) / zs.length;
+      const back = all.filter(it => it.ground || it.z > focusZ + 0.4);
+      frontItems = all.filter(it => !(it.ground || it.z > focusZ + 0.4));
+      paintItems(back);
+    }
 
     // shadows (one union path)
     ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.beginPath();
@@ -358,7 +370,7 @@ const DATA = /*__DATA__*/null;
       }
     }
 
-    if (CINE) drawFx(B, f);
+    paintItems(frontItems);
 
     // fist trail (viewer helper for the punch scene)
     if (D.striker && !CINE && $('trail').checked) {
@@ -375,7 +387,67 @@ const DATA = /*__DATA__*/null;
     hud(f);
   }
 
-  function drawFx(B, f) {
+
+  // ------------------------------------------------------------------ vfx sprites
+  function SOFT(x, y, r, rgb, al, core) {   // soft round glow (radial gradient), the building block of most fx
+    if (r < 0.5 || al <= 0.002) return;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    const c = core == null ? 0.35 : core;
+    g.addColorStop(0, rgba(rgb, al)); g.addColorStop(c, rgba(rgb, al * 0.6)); g.addColorStop(1, rgba(rgb, 0));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+  }
+  function ppos(p, a) { const kk = p.k > 0 ? (1 - Math.exp(-p.k * a)) / p.k : a; return [p.p[0] + p.v[0] * kk, p.p[1] + p.v[1] * kk - 0.5 * p.g * a * a, p.p[2] + p.v[2] * kk]; }
+  function particleItem(p, B, f, items) {
+    const a = f - p.t0; if (a < 0 || a >= p.life) return;
+    const u = a / p.life, pos = ppos(p, a), cc = toCam(B, pos); if (cc[2] < NEAR) return;
+    const s = scr(B, cc), size = Math.max(0.6, lerp(p.s0, p.s1, u) * B.focal / cc[2]), al = lerp(p.a0, p.a1, u);
+    if (al <= 0.003) return;
+    const rgb = [lerp(p.c0[0], p.c1[0], u), lerp(p.c0[1], p.c1[1], u), lerp(p.c0[2], p.c1[2], u)], z = cc[2], shape = p.shape;
+    if (shape === 'disc') { items.push({ z, add: p.add, fn: () => { ctx.fillStyle = rgba(rgb, al); ctx.beginPath(); ctx.arc(s.x, s.y, size, 0, 7); ctx.fill(); } }); return; }
+    if (shape === 'spark') {
+      const pc = toCam(B, ppos(p, Math.max(0, a - 1))); if (pc[2] < NEAR) return; const q = scr(B, pc);
+      let dx = s.x - q.x, dy = s.y - q.y; const len = Math.hypot(dx, dy); if (len < 0.01) { dx = 0; dy = 1; } else { dx /= len; dy /= len; }
+      const L = Math.max(4 * dpr, len * (p.stretch || 3.5));
+      items.push({ z, add: true, fn: () => {
+        const g = ctx.createLinearGradient(s.x, s.y, s.x - dx * L, s.y - dy * L); g.addColorStop(0, rgba(rgb, al)); g.addColorStop(1, rgba(rgb, 0));
+        ctx.strokeStyle = g; ctx.lineWidth = Math.max(1, size * 0.8); ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - dx * L, s.y - dy * L); ctx.stroke();
+        SOFT(s.x, s.y, size * 1.8, [255, 245, 220], al * 0.7, 0.2); } });
+      return;
+    }
+    if (shape === 'flame') {
+      const up = scr(B, toCam(B, [pos[0], pos[1] + 1, pos[2]]));
+      let ux = up.x - s.x, uy = up.y - s.y; const n = Math.hypot(ux, uy) || 1; ux /= n; uy /= n;
+      const hgt = size * 2.8, px = -uy, py = ux, wob = Math.sin(a * 0.7 + p.id) * size * 0.35;
+      const tx = s.x + ux * hgt + px * wob, ty = s.y + uy * hgt + py * wob;
+      items.push({ z, add: false, fn: () => {
+        const g = ctx.createRadialGradient(s.x + ux * size * 0.3, s.y + uy * size * 0.3, 0, s.x + ux * size * 0.8, s.y + uy * size * 0.8, hgt);
+        g.addColorStop(0, rgba(p.c0.map(x => Math.min(255, x * 1.15)), al)); g.addColorStop(0.5, rgba(rgb, al * 0.8)); g.addColorStop(1, rgba(p.c1, 0));
+        ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(tx, ty);
+        ctx.bezierCurveTo(s.x + px * size * 1.3 + ux * hgt * 0.5, s.y + py * size * 1.3 + uy * hgt * 0.5, s.x + px * size * 1.1, s.y + py * size * 1.1, s.x - ux * size * 0.5, s.y - uy * size * 0.5);
+        ctx.bezierCurveTo(s.x - px * size * 1.1, s.y - py * size * 1.1, s.x - px * size * 1.3 + ux * hgt * 0.5, s.y - py * size * 1.3 + uy * hgt * 0.5, tx, ty); ctx.fill(); } });
+      return;
+    }
+    if (shape === 'smoke') {
+      items.push({ z, add: false, fn: () => {
+        for (let k = 0; k < 4; k++) { const ang = p.id * 2.3 + k * 1.7 + a * 0.02, off = size * (0.28 + 0.2 * ((p.id + k) % 3) / 2), sh = 0.82 + 0.1 * k;
+          SOFT(s.x + Math.cos(ang) * off, s.y + Math.sin(ang) * off * 0.8, size * (0.62 + 0.1 * ((k + p.id) % 3)), [rgb[0] * sh, rgb[1] * sh, rgb[2] * sh], al * 0.55, 0.1); } } });
+      return;
+    }
+    if (shape === 'shard') {
+      const ang = p.id * 1.7 + a * 0.35;
+      items.push({ z, add: false, fn: () => { ctx.fillStyle = rgba(rgb, al); ctx.beginPath();
+        for (let k = 0; k < 3; k++) { const aa = ang + k * 2.1, rr = size * (k === 0 ? 1.4 : 0.8); ctx.lineTo(s.x + Math.cos(aa) * rr, s.y + Math.sin(aa) * rr); } ctx.closePath(); ctx.fill(); } });
+      return;
+    }
+    items.push({ z, add: p.add, fn: () => SOFT(s.x, s.y, size, rgb, al, p.add ? 0.25 : 0.5) });
+  }
+  function starPath(x, y, R, rIn, n, rot, rndv) {
+    ctx.beginPath();
+    for (let i = 0; i < n * 2; i++) { const a = rot + i * Math.PI / n, r = i % 2 === 0 ? R * rndv[(i / 2) | 0] : rIn; ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); }
+    ctx.closePath();
+  }
+
+  function buildFx(B, f) {
     const items = [];
     const col = (hx) => hex(hx);
     for (const e of CINE.fx) {
@@ -388,7 +460,10 @@ const DATA = /*__DATA__*/null;
           for (let i = 0; i < N; i++) { const a = i / N * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
             const d = add(mul(t1, c), mul(t2, s)); outer.push(add(e.c, mul(d, r + w / 2))); inner.push(add(e.c, mul(d, Math.max(0.01, r - w / 2)))); }
           const po = polyScreen(B, outer), pi = polyScreen(B, inner); if (!po) continue;
-          items.push({ z: toCam(B, e.c)[2], add: e.add, fn: () => { ctx.fillStyle = rgba(rgb, al); ctx.beginPath(); po.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); if (pi) { pi.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); } ctx.fill('evenodd'); } });
+          const ringPoly = (rr, ww) => { const o = [], inn = []; for (let i = 0; i < N; i++) { const a = i / N * Math.PI * 2, d = add(mul(t1, Math.cos(a)), mul(t2, Math.sin(a))); o.push(add(e.c, mul(d, rr + ww / 2))); inn.push(add(e.c, mul(d, Math.max(0.01, rr - ww / 2)))); } return [polyScreen(B, o), polyScreen(B, inn)]; };
+          const fillRing = (a, b, c, aa) => { if (!a) return; ctx.fillStyle = rgba(c, aa); ctx.beginPath(); a.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); if (b) { b.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); } ctx.fill('evenodd'); };
+          const [go, gi] = ringPoly(r, w * 3.2), [co, ci] = ringPoly(r, w * 0.35);
+          items.push({ z: toCam(B, e.c)[2], ground: Math.abs(e.n[1]) > 0.9, add: e.add, fn: () => { fillRing(go, gi, rgb, al * 0.22); fillRing(po, pi, rgb, al); fillRing(co, ci, [255, 255, 255], al * 0.7); } });
         } else if (e.type === 'dome') {
           const r = lerp(e.r0, e.r1, k), cc = toCam(B, e.c); if (cc[2] < NEAR) continue;
           const s = scr(B, cc), pr = Math.max(1, r * B.focal / cc[2]);
@@ -396,8 +471,58 @@ const DATA = /*__DATA__*/null;
         } else {
           const sg = segScreen(B, e.a, e.b); if (!sg) continue;
           const mid = toCam(B, mul(add(e.a, e.b), 0.5)), w = Math.max(1, lerp(e.w0, e.w1, k) * B.focal / Math.max(NEAR, mid[2]));
-          items.push({ z: mid[2], add: e.add, fn: () => { ctx.strokeStyle = rgba(rgb, al); ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(sg[0].x, sg[0].y); ctx.lineTo(sg[1].x, sg[1].y); ctx.stroke(); } });
+          items.push({ z: mid[2], add: e.add, fn: () => { ctx.lineCap = 'round'; for (const [wm, c, aa] of [[3.2, rgb, 0.2], [1, rgb, 1], [0.35, [255, 255, 255], 0.85]]) { ctx.strokeStyle = rgba(c, al * aa); ctx.lineWidth = Math.max(1, w * wm); ctx.beginPath(); ctx.moveTo(sg[0].x, sg[0].y); ctx.lineTo(sg[1].x, sg[1].y); ctx.stroke(); } } });
         }
+      } else if (e.type === 'burst') {
+        const u = (f - e.t0) / e.dur; if (u < 0 || u > 1) continue;
+        const cc = toCam(B, e.c); if (cc[2] < NEAR) continue; const s = scr(B, cc);
+        const R = lerp(e.r0, e.r1, ease('expo_out', Math.min(1, u * 1.7))) * B.focal / cc[2], al = u < 0.25 ? 1 : Math.max(0, 1 - (u - 0.25) / 0.75);
+        const rnd = mulberry32(e.seed + Math.floor(f / 2)), rv = []; for (let i = 0; i < e.n; i++) rv.push(0.55 + rnd() * 0.5);
+        const rot = e.rot * Math.PI / 180, outer = col(e.color), core = col(e.core);
+        const streaks = []; for (let i = 0; i < e.streaks; i++) streaks.push([rnd() * Math.PI * 2, 0.6 + rnd() * 0.5, 1.2 + rnd() * 1.6]);
+        items.push({ z: cc[2] - 0.3, add: false, fn: () => {
+          ctx.fillStyle = rgba(outer, al * 0.95); starPath(s.x, s.y, R, R * 0.22, e.n, rot, rv); ctx.fill();
+          ctx.fillStyle = rgba(core, al); starPath(s.x, s.y, R * 0.62, R * 0.15, e.n, rot + 0.15, rv.map(x => x * 0.95)); ctx.fill(); } });
+        items.push({ z: cc[2] - 0.31, add: true, fn: () => {
+          SOFT(s.x, s.y, R * 1.25, outer, al * 0.55, 0.25); SOFT(s.x, s.y, R * 0.5, core, al, 0.3);
+          ctx.lineCap = 'round';
+          for (const [ang, a0, a1] of streaks) { ctx.strokeStyle = rgba(core, al * 0.8); ctx.lineWidth = Math.max(1, R * 0.03); ctx.beginPath();
+            ctx.moveTo(s.x + Math.cos(ang) * R * a0, s.y + Math.sin(ang) * R * a0); ctx.lineTo(s.x + Math.cos(ang) * R * a1 * 1.15, s.y + Math.sin(ang) * R * a1 * 1.15); ctx.stroke(); } } });
+      } else if (e.type === 'glow') {
+        if (f < e.t0 || f > e.t1) continue;
+        const u = (f - e.t0) / Math.max(1, e.t1 - e.t0), pos = e.attach ? attachPos(e.attach, f) : e.c, cc = toCam(B, pos); if (cc[2] < NEAR) continue;
+        const s = scr(B, cc), rr = lerp(e.r0, e.r1, u) * (1 + e.pulse * Math.sin(f * 0.8)) * B.focal / cc[2], al = lerp(e.a0, e.a1, u), rgb = col(e.color);
+        items.push({ z: cc[2] - 0.2, add: true, fn: () => {
+          SOFT(s.x, s.y, rr * 1.8, rgb, al * 0.45, 0.2); SOFT(s.x, s.y, rr, [255, 250, 235], al, 0.3);
+          if (e.flare > 0) { ctx.save(); ctx.translate(s.x, s.y); ctx.scale(1, 0.07); SOFT(0, 0, rr * 5 * e.flare, rgb, al * 0.8, 0.1); ctx.restore(); } } });
+      } else if (e.type === 'bolt') {
+        if (f < e.t0 || f > e.t1) continue;
+        const rnd = mulberry32(e.seed + Math.floor(f / 2) * 131), a0 = e.attachA ? attachPos(e.attachA, f) : e.a, b0 = e.attachB ? attachPos(e.attachB, f) : e.b;
+        const d = sub(b0, a0), L = Math.hypot(d[0], d[1], d[2]) || 1, dir = norm(d), sx = norm(cross(dir, [0.3, 1, 0.2])), sy = cross(dir, sx);
+        const mk = (p0, p1) => { const pts = [p0]; const n = e.segs;
+          for (let i = 1; i < n; i++) { const t = i / n, amp = e.jitter * Math.sin(Math.PI * t) * (0.4 + rnd());
+            pts.push(add(add([lerp(p0[0], p1[0], t), lerp(p0[1], p1[1], t), lerp(p0[2], p1[2], t)], mul(sx, (rnd() - 0.5) * 2 * amp)), mul(sy, (rnd() - 0.5) * 2 * amp))); }
+          pts.push(p1); return pts; };
+        const main = mk(a0, b0), branches = [];
+        for (let i = 2; i < main.length - 2; i++) if (rnd() < e.branch) { const end = add(main[i], add(mul(dir, L * (0.1 + rnd() * 0.2)), add(mul(sx, (rnd() - 0.5) * L * 0.35), mul(sy, (rnd() - 0.5) * L * 0.35)))); branches.push(mk(main[i], end)); }
+        const rgb = col(e.color), cr = col(e.core), fl = e.flicker ? (0.6 + 0.4 * rnd()) : 1;
+        items.push({ z: toCam(B, mul(add(a0, b0), 0.5))[2] - 0.2, add: true, fn: () => {
+          ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+          for (const [wm, c, al] of [[4.2, rgb, 0.22], [1.8, rgb, 0.75], [0.7, cr, 1.0]]) for (const path of [main].concat(branches)) {
+            ctx.strokeStyle = rgba(c, al * fl * (path === main ? 1 : 0.7));
+            for (let i = 0; i < path.length - 1; i++) { const sg = segScreen(B, path[i], path[i + 1]); if (!sg) continue;
+              ctx.lineWidth = Math.max(1, e.w * wm * B.focal / Math.max(NEAR, toCam(B, path[i])[2])); ctx.beginPath(); ctx.moveTo(sg[0].x, sg[0].y); ctx.lineTo(sg[1].x, sg[1].y); ctx.stroke(); } } } });
+      } else if (e.type === 'slash') {
+        const u = (f - e.t0) / e.dur; if (u < 0 || u > 1) continue;
+        const [t1, t2] = planeBasis(e.n), head = lerp(e.a0, e.a1, ease('quad_out', Math.min(1, u * 1.35))), tail = lerp(e.a0, e.a1, ease('quad_in', clamp((u - 0.12) / 0.88, 0, 1)));
+        const al = Math.min(1, (1 - u) * 1.8), N = 26, rgb = col(e.color), cr = col(e.core);
+        const poly = (wscale) => { const o = [], inn = [];
+          for (let i = 0; i <= N; i++) { const q = i / N, ang = lerp(tail, head, q) * Math.PI / 180, prof = Math.pow(Math.sin(Math.PI * Math.min(1, 0.06 + q * 0.94)), 0.7) * e.w * wscale;
+            const dv = add(mul(t1, Math.cos(ang)), mul(t2, Math.sin(ang))); o.push(add(e.c, mul(dv, e.r + prof / 2))); inn.push(add(e.c, mul(dv, Math.max(0.01, e.r - prof / 2)))); }
+          return polyScreen(B, o.concat(inn.reverse())); };
+        const pg = poly(1.9), pm = poly(1.0), pc = poly(0.42); if (!pm) continue; const z = toCam(B, e.c)[2];
+        const fill = (pp, c, a) => { if (!pp) return; ctx.fillStyle = rgba(c, a); ctx.beginPath(); pp.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.fill(); };
+        items.push({ z: z - 0.2, add: true, fn: () => { fill(pg, rgb, al * 0.28); fill(pm, rgb, al * 0.8); fill(pc, cr, al); } });
       } else if (e.type === 'trail') {
         if (f < e.t0 || f > e.t1 + e.len) continue;
         const ch = D.characters[e.char], pi = PARTS.indexOf(e.part), pts = [];
@@ -406,7 +531,7 @@ const DATA = /*__DATA__*/null;
         items.push({ z: 1e9 - 1, add: true, fn: () => {
           ctx.lineCap = 'round';
           for (let k = 0; k < e.len; k++) { if (!pts[k] || !pts[k + 1]) continue; const sg = segScreen(B, pts[k], pts[k + 1]); if (!sg) continue; const u = k / e.len, cz = toCam(B, pts[k])[2];
-            ctx.strokeStyle = rgba(rgb, e.a * (1 - u)); ctx.lineWidth = Math.max(1, lerp(e.w0, e.w1, u) * B.focal / Math.max(NEAR, cz)); ctx.beginPath(); ctx.moveTo(sg[0].x, sg[0].y); ctx.lineTo(sg[1].x, sg[1].y); ctx.stroke(); } } });
+            const wp = Math.max(1, lerp(e.w0, e.w1, u) * B.focal / Math.max(NEAR, cz)); for (const [wm, c, aa] of [[2.4, rgb, 0.18], [1, rgb, 0.8], [0.38, [255, 255, 255], 0.9]]) { ctx.strokeStyle = rgba(c, e.a * (1 - u) * aa); ctx.lineWidth = wp * wm; ctx.beginPath(); ctx.moveTo(sg[0].x, sg[0].y); ctx.lineTo(sg[1].x, sg[1].y); ctx.stroke(); } } } });
       } else if (e.type === 'strip') {
         const u = (f - e.t0) / e.dur; if (f < e.t0) continue;
         const g = ease(e.ease, Math.min(1, u)); let fa = 1;
@@ -415,7 +540,7 @@ const DATA = /*__DATA__*/null;
         for (const [w, c, al] of e.layers) {
           const quad = [add(a, mul(pp, w / 2)), add(b, mul(pp, w / 2)), add(b, mul(pp, -w / 2)), add(a, mul(pp, -w / 2))].map(p => [p[0], 0.03, p[2]]);
           const ps = polyScreen(B, quad); if (!ps) continue; const rgb = col(c);
-          items.push({ z: toCam(B, mul(add(a, b), 0.5))[2] + 0.01, add: e.add, fn: () => { ctx.fillStyle = rgba(rgb, al * fa); ctx.beginPath(); ps.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.fill(); } });
+          items.push({ z: toCam(B, mul(add(a, b), 0.5))[2] + 0.01, ground: true, add: e.add, fn: () => { ctx.fillStyle = rgba(rgb, al * fa); ctx.beginPath(); ps.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.fill(); } });
         }
       }
     }
@@ -427,20 +552,16 @@ const DATA = /*__DATA__*/null;
       const segs = [];
       for (const ln of cs.lines) { const n = Math.max(1, Math.floor((ln.length - 1) * g)); for (let i = 0; i < n && i < ln.length - 1; i++) { const sg = segScreen(B, toW(ln[i]), toW(ln[i + 1])); if (sg) segs.push(sg); } }
       if (!segs.length) continue; const cz = toCam(B, e.c)[2];
-      items.push({ z: cz + 0.02, add: false, fn: () => {
-        ctx.lineCap = 'round'; ctx.lineWidth = clamp(e.w * B.focal / Math.max(NEAR, cz), 1, W * 0.02);
-        if (e.glow) { ctx.save(); ctx.strokeStyle = rgba(col(e.glow), 0.55 * fa); ctx.lineWidth *= 2.2; ctx.beginPath(); for (const s of segs) { ctx.moveTo(s[0].x, s[0].y); ctx.lineTo(s[1].x, s[1].y); } ctx.stroke(); ctx.restore(); ctx.lineWidth /= 2.2; }
-        ctx.strokeStyle = rgba(col(e.color), 0.95 * fa); ctx.beginPath(); for (const s of segs) { ctx.moveTo(s[0].x, s[0].y); ctx.lineTo(s[1].x, s[1].y); } ctx.stroke(); } });
+      items.push({ z: cz + 0.02, ground: Math.abs(e.n[1]) > 0.9, add: false, fn: () => {
+        const lw = clamp(e.w * B.focal / Math.max(NEAR, cz), 1, W * 0.012), stroke = (c, w, al) => { ctx.strokeStyle = rgba(c, al); ctx.lineWidth = w; ctx.beginPath(); for (const sg of segs) { ctx.moveTo(sg[0].x, sg[0].y); ctx.lineTo(sg[1].x, sg[1].y); } ctx.stroke(); };
+        ctx.lineCap = 'round';
+        stroke(col(e.color), lw * 1.5, 0.85 * fa);
+        if (e.glow) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; stroke(col(e.glow), lw * 0.9, 0.75 * fa); stroke([255, 235, 190], lw * 0.35, 0.8 * fa); ctx.restore(); } } });
     }
-    for (const p of particles) {
-      const a = f - p.t0; if (a < 0 || a >= p.life) continue;
-      const u = a / p.life, kk = p.k > 0 ? (1 - Math.exp(-p.k * a)) / p.k : a;
-      const pos = [p.p[0] + p.v[0] * kk, p.p[1] + p.v[1] * kk - 0.5 * p.g * a * a, p.p[2] + p.v[2] * kk];
-      const cc = toCam(B, pos); if (cc[2] < NEAR) continue;
-      const s = scr(B, cc), size = Math.max(0.6, lerp(p.s0, p.s1, u) * B.focal / cc[2]), al = lerp(p.a0, p.a1, u);
-      const rgb = [lerp(p.c0[0], p.c1[0], u), lerp(p.c0[1], p.c1[1], u), lerp(p.c0[2], p.c1[2], u)];
-      items.push({ z: cc[2], add: p.add, fn: () => { ctx.fillStyle = rgba(rgb, al); ctx.beginPath(); ctx.arc(s.x, s.y, size, 0, 7); ctx.fill(); } });
-    }
+    for (const p of particles) particleItem(p, B, f, items);
+    return items;
+  }
+  function paintItems(items) {
     items.sort((a, b) => b.z - a.z);
     for (const it of items) if (!it.add) it.fn();
     ctx.save(); ctx.globalCompositeOperation = 'lighter';

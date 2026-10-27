@@ -130,6 +130,7 @@ class Cinematic:
     fps: int = 60
     shots: list[tuple[int, int, Callable[[float, float], CamState]]] = field(default_factory=list)
     shakes: list[tuple[int, int, float]] = field(default_factory=list)
+    kicks: list[tuple[int, int, float]] = field(default_factory=list)
     props: list[dict] = field(default_factory=list)
     debris: list[dict] = field(default_factory=list)
     fx: list[dict] = field(default_factory=list)
@@ -168,6 +169,9 @@ class Cinematic:
                 dy += k * (math.sin(f * 2.9 + 0.4) + 0.6 * math.sin(f * 4.3 + 2))
                 dz += k * 0.5 * math.sin(f * 3.7)
                 droll += k * 2.0 * math.sin(f * 3.1)
+        for k0, kd, ka in self.kicks:
+            if k0 <= f < k0 + kd:
+                fov *= 1.0 - ka * (1 - (f - k0) / kd) ** 2
         pos = (pos[0] + dx, pos[1] + dy, pos[2] + dz)
         tgt = (tgt[0] + dx, tgt[1] + dy, tgt[2] + dz)
         return pos, tgt, fov, roll + droll
@@ -252,14 +256,17 @@ class Cinematic:
              burst: int = 0, vel: tuple[float, float] = (0.05, 0.25), dir: Vec = (0, 1, 0), spread: float = 0.6,
              grav: float = 0.0, drag: float = 0.0, life: tuple[int, int] = (20, 40), size: tuple[float, float] = (0.3, 0.1),
              size_var: float = 0.3, color: tuple[str, str] = ("#ffd27a", "#ff4d00"), alpha: tuple[float, float] = (0.9, 0.0),
-             add: bool = True, seed: int = 1, radius: float = 0.0, converge: float = 0.0, stretch: float = 0.0) -> None:
+             add: bool = True, seed: int = 1, radius: float = 0.0, converge: float = 0.0, stretch: float = 0.0,
+             shape: str = "soft") -> None:
         """Particles. ``attach={"char": i, "part": "Right Arm", "off": [0,-1,0]}`` follows a body part.
-        ``converge`` > 0 spawns on a sphere of that radius moving inwards (charge-up)."""
+        ``converge`` > 0 spawns on a sphere of that radius moving inwards (charge-up).
+        ``shape``: soft (default glow), spark (velocity-stretched streak, ``stretch`` = length in frames of travel),
+        flame (teardrop that rises), smoke (lumpy puff, use add=False), shard (flat flying chip), disc (hard dot)."""
         self.fx.append({"type": "emit", "t0": t0, "t1": t1, "origin": list(origin) if origin else None, "attach": attach,
                         "rate": rate, "burst": burst, "vel": list(vel), "dir": list(dir), "spread": spread, "grav": grav,
                         "drag": drag, "life": list(life), "size": list(size), "sizeVar": size_var, "color": list(color),
                         "alpha": list(alpha), "add": add, "seed": self.seed * 100 + seed, "radius": radius,
-                        "converge": converge, "stretch": stretch})
+                        "converge": converge, "stretch": stretch, "shape": shape})
 
     def trail(self, t0: int, t1: int, char: int, part: str, tip: Vec, length: int, w0: float, w1: float,
               color: str, alpha: float = 0.9) -> None:
@@ -282,6 +289,36 @@ class Cinematic:
         """Ground strip growing from a to b; layers = [(width, color, alpha), ...] drawn wide to narrow."""
         self.fx.append({"type": "strip", "t0": t0, "dur": dur, "a": list(a), "b": list(b),
                         "layers": [list(l) for l in layers], "ease": easing, "fade": list(fade) if fade else None, "add": add})
+
+    def burst(self, t0: int, dur: int, c: Vec, r0: float, r1: float, color: str = "#ffb43a", core: str = "#ffffff",
+              spikes: int = 11, streaks: int = 9, rot: float = 0.0, seed: int = 1) -> None:
+        """Camera-facing hit sprite: jagged star + hot core + radial streaks (a flipbook-style impact burst)."""
+        self.fx.append({"type": "burst", "t0": t0, "dur": dur, "c": list(c), "r0": r0, "r1": r1, "color": color, "core": core,
+                        "n": spikes, "streaks": streaks, "rot": rot, "seed": self.seed * 100 + seed})
+
+    def glow(self, t0: int, t1: int, c: Vec | None = None, attach: dict | None = None, r0: float = 1.0, r1: float = 1.0,
+             color: str = "#ffb43a", a0: float = 0.9, a1: float = 0.9, flare: float = 0.0, pulse: float = 0.0) -> None:
+        """Soft light blob (optionally with an anamorphic flare) at a point or following a body part."""
+        self.fx.append({"type": "glow", "t0": t0, "t1": t1, "c": list(c) if c else None, "attach": attach, "r0": r0, "r1": r1,
+                        "color": color, "a0": a0, "a1": a1, "flare": flare, "pulse": pulse})
+
+    def bolt(self, t0: int, t1: int, a: Vec | None = None, b: Vec | None = None, attach_a: dict | None = None,
+             attach_b: dict | None = None, width: float = 0.12, color: str = "#8fd0ff", core: str = "#ffffff",
+             segs: int = 9, jitter: float = 0.9, branch: float = 0.25, flicker: bool = True, seed: int = 1) -> None:
+        """Jagged lightning (a Beam with a lightning texture in Roblox); re-rolled every 2 frames."""
+        self.fx.append({"type": "bolt", "t0": t0, "t1": t1, "a": list(a) if a else None, "b": list(b) if b else None,
+                        "attachA": attach_a, "attachB": attach_b, "w": width, "color": color, "core": core, "segs": segs,
+                        "jitter": jitter, "branch": branch, "flicker": flicker, "seed": self.seed * 100 + seed})
+
+    def slash(self, t0: int, dur: int, c: Vec, n: Vec, r: float, a0: float, a1: float, w: float = 0.7,
+              color: str = "#ffb43a", core: str = "#ffffff") -> None:
+        """Crescent smear that sweeps from angle a0 to a1 (degrees) in the plane with normal n (a thick tapered Trail)."""
+        self.fx.append({"type": "slash", "t0": t0, "dur": dur, "c": list(c), "n": list(n), "r": r, "a0": a0, "a1": a1,
+                        "w": w, "color": color, "core": core})
+
+    def punch_in(self, f0: int, amount: float = 0.12, dur: int = 8) -> None:
+        """Quick field-of-view kick (the camera pushes in and settles) - the camera-side half of an impact."""
+        self.kicks.append((f0, dur, amount))
 
     # --- screen effects
     def flash(self, t0: int, dur: int, color: str = "#ffffff", peak: float = 1.0) -> None:

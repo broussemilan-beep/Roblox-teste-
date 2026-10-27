@@ -49,6 +49,21 @@ class FootworkTest(unittest.TestCase):
 
 
 class CinematicTest(unittest.TestCase):
+    def test_new_fx_are_exported_and_kick_changes_fov(self):
+        c = Cinematic(30)
+        c.shot(0, 29, dolly((0, 0, 5), (0, 0, 5), (0, 0, 0), (0, 0, 0), fov=50))
+        c.burst(5, 8, (0, 1, 0), 0.3, 2.0)
+        c.bolt(5, 9, a=(0, 0, 0), b=(0, 5, 0))
+        c.slash(5, 8, (0, 1, 0), (1, 0, 0), 2.0, 0, 90)
+        c.glow(0, 10, c=(0, 1, 0))
+        c.emit(0, 5, origin=(0, 0, 0), shape="spark")
+        c.punch_in(10, 0.2, 8)
+        kinds = {e["type"] for e in c.to_dict()["fx"]}
+        self.assertTrue({"burst", "bolt", "slash", "glow", "emit"} <= kinds)
+        self.assertLess(c.camera_state(10)[2], 50.0)
+        self.assertEqual(c.camera_state(25)[2], 50.0)
+
+
     def test_track_holds_and_eases(self):
         t = Track(1.0).key(10, 0.0).key(20, 1.0, "linear")
         self.assertEqual(t.at(0), 0.0)
@@ -73,6 +88,19 @@ class CinematicTest(unittest.TestCase):
 
 
 class AuthoringTest(unittest.TestCase):
+    def test_lying_root_rot_is_face_down_head_first(self):
+        from tsb_engine.authoring import lying_root_rot
+
+        v = Character("v", Animation("v", archetype="cinematic"), base_pos=(0, 0, -6), base_yaw=180.0)
+        for face_down in (True, False):
+            rot = lying_root_rot(v, (0.0, -1.0), face_down)
+            v.anim.set_key("Root", 0, P(rot), "linear")
+            tf = v.world_parts(0)
+            head, torso = tf["Head"][1], tf["Torso"][1]
+            self.assertLess(head[2] - torso[2], -1.0)  # head points to world -Z
+            front_y = -tf["Torso"][0][1][2]
+            self.assertTrue((front_y < -0.9) if face_down else (front_y > 0.9))
+
     def test_attach_puts_head_on_hand(self):
         atk = Character("a", Animation("a", archetype="cinematic"))
         vic = Character("v", Animation("v", archetype="cinematic"), base_pos=(0, 0, -6), base_yaw=180.0)

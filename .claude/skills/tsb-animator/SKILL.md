@@ -44,6 +44,13 @@ render the `film` camera on key frames, build a contact sheet, **look**, fix, re
 - Camera traps seen while building the demo: a camera inside rubble/dust fills the frame with one polygon
   (raise it or pull back); additive glows wash out on a bright floor (cap alpha); particle clusters on the
   character hide the pose (keep the silhouette readable).
+- **Work like an animator, with your eyes.** For every shot: (1) render it *without fx* (strip `cine.fx` and debris)
+  and judge pose, silhouette and camera first; (2) only then add fx and re-render. A pose that does not read from its
+  camera (arms pointing at the lens, a body hidden by its own arm) is fixed by the pose or the camera, never by fx.
+- VFX vocabulary (`Cinematic`): `burst` hit star, `emit(shape=spark|flame|smoke|shard)`, `slash` crescent smear,
+  `bolt` lightning, `glow` (+flare), `ring`, `strip`, `cracks` (dark fissure + molten core), `punch_in` fov kick,
+  `shake`. In the viewer fx are split around the characters (ground decals and far fx behind, near fx in front),
+  so auras wrap the body instead of hiding it. Additive glows need a darker ground: this demo uses a dusk palette.
 - The viewer only imitates Roblox primitives (parts, ParticleEmitter, Beam, Trail, PointLight,
   ColorCorrection). No custom shaders, no global hitstop, no impact frames: do not rely on them.
 
