@@ -39,6 +39,9 @@ class Thresholds:
     foot_plant_height: float = 0.1
     foot_drift_max_per_frame: float = 0.15
     pos_weight: float = 20.0  # 1 stud of motion counts as this many degrees of speed
+    sync_min_tracks: int = 3  # this many tracks keyed on exactly the same frames reads as robotic
+    density_max_keys: int = 32  # a hand-keyed track with more keys than this is probably baked noise
+    eased_out: tuple[str, ...] = ("sine_inout", "quad_out", "cubic_out", "expo_out")
 
 
 @dataclass
@@ -305,6 +308,55 @@ def check_foot_slide(anim: Animation, t: Thresholds) -> list[Finding]:
     return []
 
 
+def check_ease_into_impact(anim: Animation, w: int, i: int) -> list[Finding]:
+    """A sharp impact wants abrupt spacing at contact: do not decelerate into the striker's contact key.
+
+    Source: Cadence-Animator's combat notes ("a sharp impact wants abrupt spacing at the contact, not an
+    ease into it"); video-derived and unvalidated, so heuristic.
+    """
+    track = anim.tracks.get(anim.striker, [])
+    prev = [k for k in track if k.frame < i]
+    if not prev or not any(k.frame == i for k in track):
+        return []
+    last = prev[-1]
+    if last.easing in Thresholds().eased_out and i - last.frame > 1:
+        return [Finding(
+            "TSB013", "warning",
+            f"The segment into the impact frame ({last.frame} -> {i}) uses '{last.easing}', which slows down before contact. "
+            "Use 'linear' or 'quad_in' there (easing belongs to the segment that STARTS at a key).",
+            (last.frame, i), "heuristic",
+        )]
+    return []
+
+
+def check_sync_timing(anim: Animation, t: Thresholds) -> list[Finding]:
+    """Three or more tracks keyed on exactly the same frames (and more than two keys) look mechanical."""
+    sets: dict[tuple[int, ...], list[str]] = {}
+    for part, track in anim.tracks.items():
+        if part == "Root" or len(track) < 3:
+            continue
+        sets.setdefault(tuple(k.frame for k in track), []).append(part)
+    out = []
+    for frames, parts in sets.items():
+        if len(parts) >= t.sync_min_tracks and len(frames) < 20:
+            out.append(Finding(
+                "TSB012", "info",
+                f"{', '.join(parts)} are keyed on identical frames {list(frames)}: offset the distal limbs by 1-2 frames (overlap) "
+                "so it does not read as robotic. (Idea from motion-tools' 'synchronized-timing' check.)",
+                (frames[0], frames[-1]), "heuristic",
+            ))
+    return out
+
+
+def check_density(anim: Animation, t: Thresholds) -> list[Finding]:
+    return [
+        Finding("TSB014", "info", f"'{part}' has {len(track)} keys (> {t.density_max_keys}): baked or noisy? Hand-keyed motion usually needs fewer, stronger poses.",
+                (track[0].frame, track[-1].frame), "heuristic")
+        for part, track in anim.tracks.items()
+        if len(track) > t.density_max_keys and sum(b.frame - a.frame == 1 for a, b in zip(track, track[1:])) < 0.8 * len(track)  # keyed every frame = baked on purpose
+    ]
+
+
 def lint(anim: Animation, thresholds: Thresholds | None = None) -> list[Finding]:
     t = thresholds or Thresholds()
     findings: list[Finding] = []
@@ -320,6 +372,10 @@ def lint(anim: Animation, thresholds: Thresholds | None = None) -> list[Finding]
         findings += check_symmetry(anim, w, i, t)
         findings += check_overlap(anim, w, i, t)
         findings += check_dislocation(anim, w, i, t)
+        findings += check_ease_into_impact(anim, w, i)
+    if anim.archetype != "cinematic":
+        findings += check_sync_timing(anim, t)
+        findings += check_density(anim, t)
     findings += check_statue(anim, t)
     findings += check_foot_slide(anim, t)
     order = {"error": 0, "warning": 1, "info": 2}

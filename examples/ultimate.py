@@ -243,13 +243,13 @@ def act2(atk: Character, vic: Character, cine: Cinematic) -> None:
         p = point_world(atk, arm, (0, -1.0, 0), t)
         face = i % 2 == 0
         tgt = (p[0], p[1] + (0.2 if face else -0.1), p[2] - 0.3)
-        cine.burst(t, 9, tgt, 0.3, 1.7 + 0.12 * i, "#ffb43a" if face else "#ff8a3d", "#ffffff", spikes=11, streaks=8, rot=37 * i, seed=30 + i)
-        cine.emit(t, t, origin=tgt, rate=0, burst=22, vel=(0.2, 0.62), dir=(side * 0.25, 0.25, -1), spread=1.0, grav=0.012, life=(10, 22),
+        cine.burst(t + 1, 9, tgt, 0.3, 1.7 + 0.12 * i, "#ffb43a" if face else "#ff8a3d", "#ffffff", spikes=11, streaks=8, rot=37 * i, seed=30 + i)
+        cine.emit(t + 2, t + 2, origin=tgt, rate=0, burst=22, vel=(0.2, 0.62), dir=(side * 0.25, 0.25, -1), spread=1.0, grav=0.012, life=(10, 22),
                   size=(0.15, 0.03), color=("#ffffff", "#ff8a1a"), alpha=(1, 0), shape="spark", stretch=3.5, seed=40 + i)
-        cine.ring(t, 9, tgt, 0.3, 2.3, 0.4, 0.04, "#ffe9c4", 0.8, 0.0, n=(0, 0, 1))
+        cine.ring(t + 2, 9, tgt, 0.3, 2.3, 0.4, 0.04, "#ffe9c4", 0.8, 0.0, n=(0, 0, 1))
         cine.glow(t - 2, t + 3, attach={"char": 0, "part": arm, "off": [0, -1.0, 0]}, r0=0.5, r1=0.9, color="#ffb43a", a0=0.6, a1=0.0, flare=0.6)
         cine.trail(t - 5, t + 3, 0, arm, (0, -1.0, 0), 7, 0.8, 0.05, "#ffc766", 0.9)
-        cine.emit(t, t, origin=(0, 0.15, p[2] - 3.2), rate=0, burst=7, vel=(0.05, 0.14), dir=(0, 1, 0.3), spread=0.9, life=(18, 30), size=(0.8, 1.6),
+        cine.emit(t + 2, t + 2, origin=(0, 0.15, p[2] - 3.2), rate=0, burst=7, vel=(0.05, 0.14), dir=(0, 1, 0.3), spread=0.9, life=(18, 30), size=(0.8, 1.6),
                   color=("#8a7e72", "#4b4540"), alpha=(0.45, 0.0), add=False, shape="smoke", radius=0.7, seed=60 + i)
         cine.punch_in(t, 0.06, 7)
         cine.shake(t, 6, 0.09 if i % 2 else 0.13)
@@ -655,3 +655,28 @@ def build(n_frames: int = N_FRAMES) -> Scene:
         {"f": CHARGE0, "label": "acte IV · comète", "act": True}, {"f": HIT, "label": "impact"},
     ]
     return scene
+
+
+def roblox_markers() -> dict[str, list[tuple[int, str]]]:
+    """KeyframeMarkers per character (phases follow motion-tools' taxonomy: anticipation / hit / follow-through / recovery)."""
+    atk = [(t - 4, "Windup") for t in PUNCH_T[:1]] + [(t, "Hit") for t in PUNCH_T] + [(UPPERCUT - 6, "Windup"), (UPPERCUT, "Uppercut"), (GRAB, "Grab"),
+           (SLAM, "Slam"), (THROW1, "Throw"), (CHARGE0, "ChargeStart"), (COMET0, "CometStart"), (HIT, "FinalHit"), (HIT + 30, "Recovery")]
+    vic = [(t, "Hit") for t in PUNCH_T] + [(UPPERCUT, "Launch"), (THROW1, "WallImpact"), (HIT, "BreakThrough")]
+    return {"berserker": sorted(atk), "victim": sorted(vic)}
+
+
+def hit_events(scene) -> list[dict]:
+    """Every hit of the ultimate as game data (trauma / FOV punch / optional hit-stop / VFX seed)."""
+    from tsb_engine.roblox_cues import hit_event
+
+    atk, vic = scene.characters
+    pos = lambda f: point_world(vic, "Torso", (0, 0, 0), f)
+    ev = [hit_event(t, "light" if i < 8 else "heavy", f"punch{i + 1}", 100 + i, pos(t), "berserker", "victim") for i, t in enumerate(PUNCH_T)]
+    ev.append(hit_event(UPPERCUT, "heavy", "uppercut", 120, pos(UPPERCUT), "berserker", "victim"))
+    ev.append(hit_event(SLAM, "slam", "slam", 121, pos(SLAM), "berserker", "victim"))
+    for k, (px, pz) in enumerate(PILLARS):
+        f = next(f for f in range(DRAG0, DRAG1) if point_world(atk, "Right Arm", (0, -1.0, 0), f)[2] < pz + 2.6)
+        ev.append(hit_event(f, "heavy", f"pillar{k + 1}", 130 + k, (px, 2.0, pz), "berserker", "pillar"))
+    ev.append(hit_event(THROW1, "slam", "wall_impact", 140, pos(THROW1), "berserker", "wall"))
+    ev.append(hit_event(HIT, "ultimate", "final_hit", 150, pos(HIT), "berserker", "victim"))
+    return sorted(ev, key=lambda e: e["frame"])

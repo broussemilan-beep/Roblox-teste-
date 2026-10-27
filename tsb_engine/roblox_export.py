@@ -162,12 +162,13 @@ def to_rbxmx(
     return "\n".join(lines) + "\n"
 
 
-def to_luau(anim: Animation, name: str | None = None, fps: int | None = None, priority: str = "Action", step: int = 1) -> str:
+def to_luau(anim: Animation, name: str | None = None, fps: int | None = None, priority: str = "Action", step: int = 1,
+            extra_markers: list[tuple[int, str]] | None = None) -> str:
     """Luau script to paste in Studio's command bar: builds the KeyframeSequence in ServerStorage."""
     fps = fps or anim.fps
     frames = keyframe_times(anim, step)
     marker_at: dict[int, list[str]] = {}
-    for f, label in markers_for(anim, fps):
+    for f, label in markers_for(anim, fps) + list(extra_markers or []):
         marker_at.setdefault(min(frames, key=lambda k: abs(k - f)), []).append(label)
 
     def cf(t: Transform) -> str:

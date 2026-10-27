@@ -13,7 +13,7 @@ Work in progress toward a skill + toolkit for TSB-style **R6 combat animation**.
   `docs/research/` – research on TSB's animators.
 
 ```bash
-python -m unittest discover -s tests          # 43 tests, no dependencies (~30 s)
+python -m unittest discover -s tests          # 47 tests, no dependencies (~30 s)
 python tools/build_viewer.py berserker_ultimate   # then open viewer/output/berserker_ultimate.html
 python -m tsb_engine lint examples/heavy_punch.json
 python -m tsb_engine lint examples/robotic_punch.json --json

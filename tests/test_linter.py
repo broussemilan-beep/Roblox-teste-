@@ -127,3 +127,32 @@ class SerializationAndCliTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SurveyRulesTest(unittest.TestCase):
+    def _punch(self, easing_into_impact: str):
+        from tsb_engine.model import Animation, Pose
+
+        a = Animation("p", archetype="heavy")
+        a.events.update({"windup": 0, "impact": 8})
+        a.set_key("Right Arm", 0, Pose(rot=(-40, 0, 0)), easing_into_impact)
+        a.set_key("Right Arm", 8, Pose(rot=(110, 0, 0)), "linear")
+        a.set_key("Torso", 0, Pose(), "linear")
+        a.set_key("Torso", 8, Pose(rot=(0, -90, 0)), "linear")
+        return a
+
+    def test_ease_into_impact_is_flagged_only_when_decelerating(self):
+        from tsb_engine import lint
+
+        self.assertIn("TSB013", [f.code for f in lint(self._punch("cubic_out"))])
+        self.assertNotIn("TSB013", [f.code for f in lint(self._punch("quad_in"))])
+
+    def test_synchronized_tracks_are_flagged(self):
+        from tsb_engine import lint
+        from tsb_engine.model import Animation, Pose
+
+        a = Animation("sync", archetype="light")
+        for part in ("Torso", "Head", "Right Arm", "Left Arm"):
+            for f in (0, 5, 10):
+                a.set_key(part, f, Pose(rot=(f, 0, 0)))
+        self.assertIn("TSB012", [x.code for x in lint(a)])

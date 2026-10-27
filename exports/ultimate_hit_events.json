@@ -1,0 +1,351 @@
+{
+ "camera_shaker": {
+  "maxAnglesDeg": [
+   2.2,
+   2.2,
+   3.5
+  ],
+  "maxOffsetStuds": [
+   0.25,
+   0.25,
+   0.1
+  ],
+  "frequencyHz": 16,
+  "traumaDecayPerS": 1.3,
+  "exponent": 2,
+  "applyAt": "RenderPriority.Camera + 1",
+  "undoAt": "RenderPriority.Camera - 1"
+ },
+ "hits": [
+  {
+   "frame": 186,
+   "time_s": 3.1,
+   "name": "punch1",
+   "class": "light",
+   "attacker": "berserker",
+   "victim": "victim",
+   "pos": [
+    0.0,
+    2.9,
+    -10.75
+   ],
+   "seed": 100,
+   "camera": {
+    "trauma": 0.1,
+    "fov_punch_deg": 3.0
+   },
+   "screen_flash": null,
+   "hitstop_s": 0.05,
+   "marker": "Hit"
+  },
+  {
+   "frame": 194,
+   "time_s": 3.2333,
+   "name": "punch2",
+   "class": "light",
+   "attacker": "berserker",
+   "victim": "victim",
+   "pos": [
+    0.0,
+    2.75,
+    -11.1
+   ],
+   "seed": 101,
+   "camera": {
+    "trauma": 0.1,
+    "fov_punch_deg": 3.0
+   },
+   "screen_flash": null,
+   "hitstop_s": 0.05,
+   "marker": "Hit"
+  },
+  {
+   "frame": 202,
+   "time_s": 3.3667,
+   "name": "punch3",
+   "class": "light",
+   "attacker": "berserker",
+   "victim": "victim",
+   "pos": [
+    0.0,
+    2.9,
+    -11.45
+   ],
+   "seed": 102,
+   "camera": {
+    "trauma": 0.1,
+    "fov_punch_deg": 3.0
+   },
+   "screen_flash": null,
+   "hitstop_s": 0.05,
+   "marker": "Hit"
+  },
+  {
+   "frame": 210,
+   "time_s": 3.5,
+   "name": "punch4",
+   "class": "light",
+   "attacker": "berserker",
+   "victim": "victim",
+   "pos": [
+    0.0,
+    2.75,
+    -11.8
+   ],
+   "seed": 103,
+   "camera": {
+    "trauma": 0.1,
+    "fov_punch_deg": 3.0
+   },
+   "screen_flash": null,
+   "hitstop_s": 0.05,
+   "marker": "Hit"
+  },
+  {
+   "frame": 218,
+   "time_s": 3.6333,
+   "name": "punch5",
+   "class": "light",
+   "attacker": "berserker",
+   "victim": "victim",
+   "pos": [
+    0.0,
+    2.9,
+    -12.15
+   ],
+   "seed": 104,
+   "camera": {
+    "trauma": 0.1,
+    "fov_punch_deg": 3.0
+   },
+   "screen_flash": null,
+   "hitstop_s": 0.05,
+   "marker": "Hit"
+  },
+  {
+   "frame": 226,
+   "time_s": 3.7667,
+   "name": "punch6",
+   "class": "light",
+   "attacker": "berserker",
+   "victim": "victim",
+   "pos": [
+    0.0,
+    2.75,
+    -12.5
+   ],
+   "seed": 105,
+   "camera": {
+    "trauma": 0.1,
+    "fov_punch_deg": 3.0
+   },
+   "screen_flash": null,
+   "hitstop_s": 0.05,
+   "marker": "Hit"
+  },
+  {
+   "frame": 234,
+   "time_s": 3.9,
+   "name": "punch7",
+   "class": "light",
+   "attacker": "berserker",
+   "victim": "victim",
+   "pos": [
+    0.0,
+    2.9,
+    -12.85
+   ],
+   "seed": 106,
+   "camera": {
+    "trauma": 0.1,
+    "fov_punch_deg": 3.0
+   },
+   "screen_flash": null,
+   "hitstop_s": 0.05,
+   "marker": "Hit"
+  },
+  {
+   "frame": 242,
+   "time_s": 4.0333,
+   "name": "punch8",
+   "class": "light",
+   "attacker": "berserker",
+   "victim": "victim",
+   "pos": [
+    0.0,
+    2.75,
+    -13.2
+   ],
+   "seed": 107,
+   "camera": {
+    "trauma": 0.1,
+    "fov_punch_deg": 3.0
+   },
+   "screen_flash": null,
+   "hitstop_s": 0.05,
+   "marker": "Hit"
+  },
+  {
+   "frame": 250,
+   "time_s": 4.1667,
+   "name": "punch9",
+   "class": "heavy",
+   "attacker": "berserker",
+   "victim": "victim",
+   "pos": [
+    0.0,
+    2.9,
+    -13.55
+   ],
+   "seed": 108,
+   "camera": {
+    "trauma": 0.3,
+    "fov_punch_deg": 5.0
+   },
+   "screen_flash": null,
+   "hitstop_s": 0.1,
+   "marker": "Hit"
+  },
+  {
+   "frame": 262,
+   "time_s": 4.3667,
+   "name": "uppercut",
+   "class": "heavy",
+   "attacker": "berserker",
+   "victim": "victim",
+   "pos": [
+    0.0,
+    3.0,
+    -13.85
+   ],
+   "seed": 120,
+   "camera": {
+    "trauma": 0.3,
+    "fov_punch_deg": 5.0
+   },
+   "screen_flash": null,
+   "hitstop_s": 0.1,
+   "marker": "Hit"
+  },
+  {
+   "frame": 334,
+   "time_s": 5.5667,
+   "name": "slam",
+   "class": "slam",
+   "attacker": "berserker",
+   "victim": "victim",
+   "pos": [
+    0.5,
+    1.097,
+    -12.998
+   ],
+   "seed": 121,
+   "camera": {
+    "trauma": 0.5,
+    "fov_punch_deg": 6.0
+   },
+   "screen_flash": {
+    "duration": 0.18,
+    "contrast": 0.2,
+    "bloom": 1.2,
+    "blur": 6
+   },
+   "hitstop_s": 0.12,
+   "marker": "Hit"
+  },
+  {
+   "frame": 396,
+   "time_s": 6.6,
+   "name": "pillar1",
+   "class": "heavy",
+   "attacker": "berserker",
+   "victim": "pillar",
+   "pos": [
+    -0.3,
+    2.0,
+    -27.0
+   ],
+   "seed": 130,
+   "camera": {
+    "trauma": 0.3,
+    "fov_punch_deg": 5.0
+   },
+   "screen_flash": null,
+   "hitstop_s": 0.1,
+   "marker": "Hit"
+  },
+  {
+   "frame": 431,
+   "time_s": 7.1833,
+   "name": "pillar2",
+   "class": "heavy",
+   "attacker": "berserker",
+   "victim": "pillar",
+   "pos": [
+    -0.3,
+    2.0,
+    -41.0
+   ],
+   "seed": 131,
+   "camera": {
+    "trauma": 0.3,
+    "fov_punch_deg": 5.0
+   },
+   "screen_flash": null,
+   "hitstop_s": 0.1,
+   "marker": "Hit"
+  },
+  {
+   "frame": 478,
+   "time_s": 7.9667,
+   "name": "wall_impact",
+   "class": "slam",
+   "attacker": "berserker",
+   "victim": "wall",
+   "pos": [
+    0.0,
+    5.8,
+    -87.45
+   ],
+   "seed": 140,
+   "camera": {
+    "trauma": 0.5,
+    "fov_punch_deg": 6.0
+   },
+   "screen_flash": {
+    "duration": 0.18,
+    "contrast": 0.2,
+    "bloom": 1.2,
+    "blur": 6
+   },
+   "hitstop_s": 0.12,
+   "marker": "Hit"
+  },
+  {
+   "frame": 564,
+   "time_s": 9.4,
+   "name": "final_hit",
+   "class": "ultimate",
+   "attacker": "berserker",
+   "victim": "victim",
+   "pos": [
+    0.0,
+    5.4,
+    -87.45
+   ],
+   "seed": 150,
+   "camera": {
+    "trauma": 0.8,
+    "fov_punch_deg": 7.0
+   },
+   "screen_flash": {
+    "duration": 0.18,
+    "contrast": 0.2,
+    "bloom": 1.2,
+    "blur": 6
+   },
+   "hitstop_s": 0.14,
+   "marker": "Hit"
+  }
+ ]
+}

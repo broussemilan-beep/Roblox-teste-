@@ -13,6 +13,7 @@ displacement, smoke = fBm + domain warp + dissolve threshold, flipbook packing =
 
 from __future__ import annotations
 
+import json
 import math
 import os
 import random
@@ -374,14 +375,59 @@ RECIPES = {
 }
 
 
+def edge_window(frames: Frames, frac: float = 0.06) -> Frames:
+    """Fade alpha to 0 over the outer ``frac`` of each frame so nothing is cut by the cell border."""
+    n = frames[0].shape[0]
+    ramp = np.clip(np.minimum(np.arange(n), np.arange(n)[::-1]) / max(1.0, frac * n), 0, 1).astype(np.float32)
+    win = (ramp[:, None] * ramp[None, :]) ** 1.5
+    out = []
+    for f in frames:
+        g = f.copy()
+        g[..., 3] *= win
+        out.append(g)
+    return out
+
+
+def check_frames(frames: Frames, grid: int, fps: int = 24, loop: bool = False) -> dict:
+    """Sanity report for a flipbook (idea from roclicks' ``vfxtex check``): empty frames, content touching the cell
+    edge (it gets cut / bleeds into the neighbour), unreadable first frame, where the drawing peaks."""
+    cov = [float((f[..., 3] > 0.05).mean()) for f in frames]
+    n = frames[0].shape[0]
+    m = max(2, n // 64)
+    edge = []
+    for i, f in enumerate(frames):
+        a = f[..., 3] > 0.05
+        if a[:m].any() or a[-m:].any() or a[:, :m].any() or a[:, -m:].any():
+            edge.append(i)
+    peak = int(np.argmax(cov))
+    warnings = []
+    if edge:
+        warnings.append(f"content touches the cell edge in frames {edge[:8]}{'...' if len(edge) > 8 else ''}")
+    if not loop and cov[0] < 0.002 and len(frames) > 1 and cov[1] < 0.002:
+        warnings.append("first frames are empty: low-memory devices that drop flipbooks would show nothing (make frame 0 readable)")
+    if not loop and cov[-1] > 0.01:
+        warnings.append("last frame is not empty: a one-shot will pop out instead of fading")
+    return {"grid": grid, "frames": len(frames), "fps": fps, "loop": loop, "cell_px": 1024 // grid,
+            "peak_frame": peak, "peak_at": round(peak / max(1, len(frames) - 1), 2), "coverage": [round(c, 3) for c in cov], "warnings": warnings}
+
+
 def bake_all(out_dir: str, names: list[str] | None = None) -> list[str]:
     os.makedirs(out_dir, exist_ok=True)
     written = []
     for name in names or list(RECIPES):
         gen, kw, grid, fps = RECIPES[name]
-        sheet = pack_flipbook(gen(**kw), grid)
+        frames = edge_window(gen(**kw))
+        if name == "lightning":  # a bolt flickers out instead of popping
+            frames[-1][..., 3] *= 0.0
+            frames[-2][..., 3] *= 0.45
+        sheet = pack_flipbook(frames, grid)
         path = os.path.join(out_dir, f"{name}_{grid}x{grid}_{fps}fps.png")
         sheet.save(path)
+        report = check_frames(frames, grid, fps, loop=(name == "fire"))
+        with open(os.path.join(out_dir, f"{name}.flipbook.json"), "w", encoding="utf-8") as fh:
+            json.dump(report, fh, indent=1)
+        for w in report["warnings"]:
+            print(f"  [{name}] {w}")
         preview(sheet).save(os.path.join(out_dir, f"{name}_preview.png"))
         written.append(path)
     for g in (4, 8):

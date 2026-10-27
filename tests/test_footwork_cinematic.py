@@ -194,3 +194,32 @@ class TexturesAndCuesTest(unittest.TestCase):
         self.assertIn("Speed 30-60", sheet)  # 0.5-1.0 studs/frame at 60 fps
         self.assertIn("Lifetime 0.50-1.00s", sheet)
         self.assertIn("shockwave ring", sheet)
+
+
+class HitEventsAndChecksTest(unittest.TestCase):
+    def test_hit_event_record(self):
+        from tsb_engine.roblox_cues import TRAUMA, hit_event
+
+        e = hit_event(120, "slam", "x", 70000, (1, 2, 3))
+        self.assertEqual(e["time_s"], 2.0)
+        self.assertEqual(e["camera"]["trauma"], TRAUMA["slam"])
+        self.assertLess(e["seed"], 65536)
+        self.assertIsNotNone(e["screen_flash"])
+        self.assertIsNone(hit_event(5, "light", "y", 1, (0, 0, 0))["screen_flash"])
+
+    def test_check_frames_flags_edge_content_and_unreadable_first_frame(self):
+        import numpy as np
+
+        from tsb_engine import textures
+
+        full = np.zeros((64, 64, 4), np.float32)
+        full[..., 3] = 1.0
+        empty = np.zeros((64, 64, 4), np.float32)
+        report = textures.check_frames([empty, empty, full], 4)
+        text = " ".join(report["warnings"])
+        self.assertIn("cell edge", text)
+        self.assertIn("first frames are empty", text)
+        self.assertIn("last frame is not empty", text)
+        windowed = textures.edge_window([full])[0]
+        self.assertLess(windowed[0, 0, 3], 0.01)
+        self.assertGreater(windowed[32, 32, 3], 0.99)

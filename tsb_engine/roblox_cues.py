@@ -95,3 +95,28 @@ def cue_sheet(cine: Cinematic, fps: int = FPS) -> str:
     for f, name, text in rows:
         out.append(f"| {f / fps:.2f}s | {f} | {name} | {text} |")
     return "\n".join(out) + "\n"
+
+
+# ---------------------------------------------------------------- hit events
+# Starting values for the Roblox runtime, from MIT sources (see docs/research/github-survey.md):
+#   Willikk/Roblox (CameraShaker, Hitstop, ScreenFlash) and zriptic/roclicks-skills (vfx-camera-world).
+TRAUMA = {"light": 0.10, "heavy": 0.30, "slam": 0.50, "ultimate": 0.80}  # jab 0.08-0.12, heavy 0.25-0.35, slam 0.4-0.6, ultimate 0.8
+FOV_PUNCH_DEG = {"light": 3.0, "heavy": 5.0, "slam": 6.0, "ultimate": 7.0}  # hit punch 5-7 deg over 4 frames, Back Out
+HITSTOP_S = {"light": 0.05, "heavy": 0.10, "slam": 0.12, "ultimate": 0.14}  # per-fighter AnimationTrack speed freeze; OPTIONAL
+SCREEN_FLASH = {"duration": 0.18, "contrast": 0.2, "bloom": 1.2, "blur": 6}  # ScreenFlash.impact defaults
+CAMERA_SHAKER = {  # Willikk CameraShaker.settings
+    "maxAnglesDeg": (2.2, 2.2, 3.5), "maxOffsetStuds": (0.25, 0.25, 0.1), "frequencyHz": 16, "traumaDecayPerS": 1.3, "exponent": 2,
+    "applyAt": "RenderPriority.Camera + 1", "undoAt": "RenderPriority.Camera - 1",
+}
+
+
+def hit_event(frame: int, kind: str, name: str, seed: int, pos, attacker: str = "attacker", victim: str = "victim", fps: int = FPS) -> dict:
+    """One hit as game data: what the runtime needs to react (camera, VFX seed, optional per-fighter hit-stop)."""
+    return {
+        "frame": frame, "time_s": round(frame / fps, 4), "name": name, "class": kind, "attacker": attacker, "victim": victim,
+        "pos": [round(float(x), 3) for x in pos], "seed": seed % 65536,
+        "camera": {"trauma": TRAUMA[kind], "fov_punch_deg": FOV_PUNCH_DEG[kind]},
+        "screen_flash": SCREEN_FLASH if kind in ("slam", "ultimate") else None,
+        "hitstop_s": HITSTOP_S[kind],  # null it if your game has no hit-stop (this project excludes a GLOBAL one)
+        "marker": "Hit",
+    }

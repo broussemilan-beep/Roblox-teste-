@@ -1,0 +1,22 @@
+{
+ "grid": 4,
+ "frames": 8,
+ "fps": 20,
+ "loop": false,
+ "cell_px": 256,
+ "peak_frame": 1,
+ "peak_at": 0.14,
+ "coverage": [
+  0.139,
+  0.155,
+  0.152,
+  0.126,
+  0.142,
+  0.137,
+  0.12,
+  0.0
+ ],
+ "warnings": [
+  "content touches the cell edge in frames [0, 3, 4]"
+ ]
+}

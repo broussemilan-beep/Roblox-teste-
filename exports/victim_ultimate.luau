@@ -2256,6 +2256,9 @@ do
 	pose(torso, "Left Arm", CFrame.new(0,0,0,-0.374607,0.750107,0.544985,-0.927184,-0.303063,-0.220188,0,-0.587785,0.809017), 1)
 	pose(torso, "Right Leg", CFrame.new(0,0,0,0.812471,0.471629,0.342719,-0.583001,0.657263,0.477614,0,-0.587853,0.808967), 1)
 	pose(torso, "Left Leg", CFrame.new(0,0,0,0.999748,0.020832,-0.008398,-0.022461,0.927236,-0.373804,0,0.373898,0.92747), 1)
+	local m = Instance.new("KeyframeMarker")
+	m.Name = "Hit"
+	m.Parent = k
 end
 do
 	local k = Instance.new("Keyframe")
@@ -2352,6 +2355,9 @@ do
 	pose(torso, "Left Arm", CFrame.new(0,0,0,0.615661,0.547398,0.566847,-0.788011,0.427674,0.44287,0,-0.71934,0.694658), 1)
 	pose(torso, "Right Leg", CFrame.new(0,0,0,0.93793,-0.243187,-0.24728,0.346825,0.657659,0.668728,0,-0.712983,0.701182), 1)
 	pose(torso, "Left Leg", CFrame.new(0,0,0,0.822362,0.566009,-0.05792,-0.568965,0.81809,-0.083715,0,0.101798,0.994805), 1)
+	local m = Instance.new("KeyframeMarker")
+	m.Name = "Hit"
+	m.Parent = k
 end
 do
 	local k = Instance.new("Keyframe")
@@ -2448,6 +2454,9 @@ do
 	pose(torso, "Left Arm", CFrame.new(0,0,0,-0.374607,0.750107,0.544985,-0.927184,-0.303063,-0.220188,0,-0.587785,0.809017), 1)
 	pose(torso, "Right Leg", CFrame.new(0,0,0,0.593014,0.801883,-0.072918,-0.805192,0.590577,-0.053703,0,0.09056,0.995891), 1)
 	pose(torso, "Left Leg", CFrame.new(0,0,0,0.820145,-0.568293,0.066372,0.572156,0.814608,-0.095139,0,0.116003,0.993249), 1)
+	local m = Instance.new("KeyframeMarker")
+	m.Name = "Hit"
+	m.Parent = k
 end
 do
 	local k = Instance.new("Keyframe")
@@ -2544,6 +2553,9 @@ do
 	pose(torso, "Left Arm", CFrame.new(0,0,0,0.615661,0.547398,0.566847,-0.788011,0.427674,0.44287,0,-0.71934,0.694658), 1)
 	pose(torso, "Right Leg", CFrame.new(0,0,0,0.750442,-0.654508,0.091949,0.660936,0.743145,-0.104402,0,0.13912,0.990276), 1)
 	pose(torso, "Left Leg", CFrame.new(0,0,0,0.414645,0.908751,0.047351,-0.909983,0.414083,0.021576,0,-0.052035,0.998645), 1)
+	local m = Instance.new("KeyframeMarker")
+	m.Name = "Hit"
+	m.Parent = k
 end
 do
 	local k = Instance.new("Keyframe")
@@ -2640,6 +2652,9 @@ do
 	pose(torso, "Left Arm", CFrame.new(0,0,0,-0.374607,0.750107,0.544985,-0.927184,-0.303063,-0.220188,0,-0.587785,0.809017), 1)
 	pose(torso, "Right Leg", CFrame.new(0,0,0,0.887462,0.449529,-0.101662,-0.460881,0.865602,-0.195758,0,0.220582,0.975368), 1)
 	pose(torso, "Left Leg", CFrame.new(0,0,0,0.556147,-0.814591,-0.164748,0.831084,0.54511,0.110246,0,-0.198233,0.980155), 1)
+	local m = Instance.new("KeyframeMarker")
+	m.Name = "Hit"
+	m.Parent = k
 end
 do
 	local k = Instance.new("Keyframe")
@@ -2736,6 +2751,9 @@ do
 	pose(torso, "Left Arm", CFrame.new(0,0,0,0.615661,0.547398,0.566847,-0.788011,0.427674,0.44287,0,-0.71934,0.694658), 1)
 	pose(torso, "Right Leg", CFrame.new(0,0,0,0.750442,-0.654508,0.091949,0.660936,0.743145,-0.104402,0,0.13912,0.990276), 1)
 	pose(torso, "Left Leg", CFrame.new(0,0,0,0.752964,0.655901,-0.053288,-0.658062,0.750491,-0.060973,0,0.080977,0.996716), 1)
+	local m = Instance.new("KeyframeMarker")
+	m.Name = "Hit"
+	m.Parent = k
 end
 do
 	local k = Instance.new("Keyframe")
@@ -2832,6 +2850,9 @@ do
 	pose(torso, "Left Arm", CFrame.new(0,0,0,-0.374607,0.750107,0.544985,-0.927184,-0.303063,-0.220188,0,-0.587785,0.809017), 1)
 	pose(torso, "Right Leg", CFrame.new(0,0,0,0.86718,0.491335,-0.081168,-0.497994,0.855584,-0.141342,0,0.16299,0.986628), 1)
 	pose(torso, "Left Leg", CFrame.new(0,0,0,0.953795,-0.297489,0.042122,0.300457,0.944376,-0.133715,0,0.140193,0.990124), 1)
+	local m = Instance.new("KeyframeMarker")
+	m.Name = "Hit"
+	m.Parent = k
 end
 do
 	local k = Instance.new("Keyframe")
@@ -2928,6 +2949,9 @@ do
 	pose(torso, "Left Arm", CFrame.new(0,0,0,0.615661,0.547398,0.566847,-0.788011,0.427674,0.44287,0,-0.71934,0.694658), 1)
 	pose(torso, "Right Leg", CFrame.new(0,0,0,0.750442,-0.654508,0.091949,0.660936,0.743145,-0.104402,0,0.13912,0.990276), 1)
 	pose(torso, "Left Leg", CFrame.new(0,0,0,0.19863,0.978465,-0.056144,-0.980075,0.198303,-0.011379,0,0.057285,0.998358), 1)
+	local m = Instance.new("KeyframeMarker")
+	m.Name = "Hit"
+	m.Parent = k
 end
 do
 	local k = Instance.new("Keyframe")
@@ -3024,6 +3048,9 @@ do
 	pose(torso, "Left Arm", CFrame.new(0,0,0,-0.374607,0.750107,0.544985,-0.927184,-0.303063,-0.220188,0,-0.587785,0.809017), 1)
 	pose(torso, "Right Leg", CFrame.new(0,0,0,0.960077,0.263583,-0.093677,-0.279735,0.904644,-0.321508,0,0.334878,0.942262), 1)
 	pose(torso, "Left Leg", CFrame.new(0,0,0,0.683184,-0.722506,-0.106041,0.730246,0.675942,0.099207,0,-0.145213,0.9894), 1)
+	local m = Instance.new("KeyframeMarker")
+	m.Name = "Hit"
+	m.Parent = k
 end
 do
 	local k = Instance.new("Keyframe")
@@ -3168,6 +3195,9 @@ do
 	pose(torso, "Left Arm", CFrame.new(0,0,0,-0.927184,0.310563,0.209477,-0.374607,-0.76867,-0.518475,0,-0.559193,0.829038), 1)
 	pose(torso, "Right Leg", CFrame.new(0,0,0,0.898794,0.43597,0.045822,-0.438371,0.89387,0.09395,0,-0.104528,0.994522), 1)
 	pose(torso, "Left Leg", CFrame.new(0,0,0,0.788011,-0.60967,-0.085684,0.615661,0.780342,0.10967,0,-0.139173,0.990268), 1)
+	local m = Instance.new("KeyframeMarker")
+	m.Name = "Launch"
+	m.Parent = k
 end
 do
 	local k = Instance.new("Keyframe")
@@ -5760,6 +5790,9 @@ do
 	pose(torso, "Left Arm", CFrame.new(0,0,0,-0.939693,0.17101,0.296198,-0.34202,-0.469846,-0.813798,0,-0.866025,0.5), 1)
 	pose(torso, "Right Leg", CFrame.new(0,0,0,0.927184,0.34222,0.152366,-0.374607,0.847025,0.37712,0,-0.406737,0.913545), 1)
 	pose(torso, "Left Leg", CFrame.new(0,0,0,0.927184,-0.34222,-0.152366,0.374607,0.847025,0.37712,0,-0.406737,0.913545), 1)
+	local m = Instance.new("KeyframeMarker")
+	m.Name = "WallImpact"
+	m.Parent = k
 end
 do
 	local k = Instance.new("Keyframe")
@@ -6792,6 +6825,9 @@ do
 	pose(torso, "Left Arm", CFrame.new(0,0,0,-0.984808,0.111619,0.133022,-0.173648,-0.633022,-0.754407,0,-0.766044,0.642788), 1)
 	pose(torso, "Right Leg", CFrame.new(0,0,0,0.766044,0.604023,0.219846,-0.642788,0.719846,0.262003,0,-0.34202,0.939693), 1)
 	pose(torso, "Left Leg", CFrame.new(0,0,0,0.766044,-0.604023,-0.219846,0.642788,0.719846,0.262003,0,-0.34202,0.939693), 1)
+	local m = Instance.new("KeyframeMarker")
+	m.Name = "BreakThrough"
+	m.Parent = k
 end
 do
 	local k = Instance.new("Keyframe")
