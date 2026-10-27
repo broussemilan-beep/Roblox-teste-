@@ -24,7 +24,7 @@ from tsb_engine.footwork import bake_footwork
 from tsb_engine.kinematics import apply
 from tsb_engine.model import ROOT, Animation, Pose
 from tsb_engine.scene import Character, Scene
-from tsb_engine.secondary import coat_and_hair
+from tsb_engine.secondary import reference_outfit
 from tsb_engine.solver import dislocate, moving_hold, reach_root
 
 N_FRAMES = 660
@@ -148,16 +148,19 @@ def hero_act1b(h: Character, d: Character) -> None:
 
 
 JUG_Z = -33.0
-CYC = [((0, 0, 0), 5.6, JUG_Z), ((-62, 0, 0), 5.0, JUG_Z - 0.8), ((-22, 0, 0), 5.4, JUG_Z - 0.3)]
+# the dummy's juggle poses around the hero's foot (rx = in-plane tilt for the profile camera): rot, torso height, z, fold, arms
+CYC = [((-38, 0, 0), 6.0, JUG_Z - 0.9, 4, 48), ((150, 0, 0), 6.6, JUG_Z - 0.4, -30, 20), ((-92, 0, 0), 5.0, JUG_Z - 1.2, 0, 10),
+       ((42, 0, 0), 6.2, JUG_Z - 0.2, 6, 60), ((-165, 0, 0), 6.8, JUG_Z - 0.8, -22, 30)]
+JUG_ORDER = [0, 3, 1, 2, 4, 0, 2, 1, 3, 4, 2, 0, 1, 4, 3, 2, 0, 3, 1, 4]
 
 
 def dummy_act2(a: Animation) -> None:
     # launched by C4, he is juggled in place: three poses cycle every 4 frames
     fly(a, 150, 172, (0, 9.5, -24.6), (0, 5.6, JUG_Z), 2.0, (-640, 0, 0), (-720, 0, 0))
     for i, f in enumerate(range(174, 256, 4)):
-        rot, hh, z = CYC[i % 3]
-        K(a, f, "linear", R=P(rot, droot(0, hh + 0.12 * math.sin(i * 0.9), z)))
-        board(a, f, arms=(40 + 9 * math.sin(i * 1.3), 40 + 9 * math.cos(i * 1.1)), tilt=6 + 3 * math.sin(i))
+        rot, hh, z, fold, arms = CYC[JUG_ORDER[i % len(JUG_ORDER)]]
+        K(a, f, "constant", R=P(rot, droot(0, hh + 0.1 * math.sin(i * 0.9), z)))
+        board(a, f, arms=(arms, arms * 0.6), tilt=fold)
     # finisher: he is driven down and slides across the ground
     fly(a, 258, 276, (0, 5.4, JUG_Z - 0.4), (0, 1.0, -46.0), 0.6, (0, 0, 0), (-90, 0, 0))
     fly(a, 278, 296, (0, 1.0, -46.0), (0, 0.8, -52.0), 0.0, (-90, 0, 0), (-90, 0, 0))
@@ -168,13 +171,13 @@ def dummy_act2(a: Animation) -> None:
 def hero_act2(h: Character, d: Character) -> None:
     a = h.anim
     K(a, 156, "linear", R=P((0, 0, 0), hroot(0, 3.0, -30.2)), T=tp(0.8, -32, 0), RA=P((30, 0, 10)), LA=P((30, 0, -10)), RL=P((30, 0, 4)), LL=P((30, 0, -4)))
-    # juggle: right and left kicks alternate every 4 frames, each solved onto the dummy's lower back, torso leaning back
-    for i, f in enumerate(range(176, 256, 4)):
-        part, other = ("Right Leg", "Left Leg") if i % 2 == 0 else ("Left Leg", "Right Leg")
-        side = -1 if i % 2 == 0 else 1
-        keys = dict(R=P((0, 0, 0), hroot(0, 3.5, -30.0 - 0.03 * (f - 176))), T=tp(0.3, 14, 0, 8 * side), H=P((-8, 0, 0)), RA=P((-50 * side, 0, 20)), LA=P((-50 * -side + 12, 0, -20)))
-        keys[SHORT[other]] = P((-14, 0, 4 * -side))
-        solve(h, f, part, dpoint(d, f, "Torso", (0.0, -0.5, -0.5)), (110, 0), **keys)
+    # juggle: the hero is HELD in one low kick pose (planted left leg, right leg driven out at the dummy) with a moving hold;
+    # only the dummy changes pose (reference: 30 frames of a held hero and a cycling victim)
+    solve(h, 176, "Right Leg", (0.0, 4.2, JUG_Z + 0.4), (95, 0), R=P((0, 0, 0), hroot(0, 2.7, -30.6)), T=tp(0.4, -18, 0, 0), H=P((8, 0, 0)),
+          RA=P((-72, 0, 20)), LA=P((78, 0, -10)), LL=P((-6, 0, -4)))
+    K(a, 212, "sine_inout", R=P((0, 0, 0), hroot(0, 2.75, -30.7)), T=tp(0.45, -20, 0, 2), H=P((12, 0, 0)), RA=P((-78, 0, 22)), LA=P((82, 0, -12)))
+    K(a, 236, "sine_inout", R=P((0, 0, 0), hroot(0, 2.7, -30.6)), T=tp(0.4, -17, 0, -2), H=P((6, 0, 0)), RA=P((-70, 0, 19)), LA=P((76, 0, -9)))
+    K(a, 255, "sine_inout", R=P((0, 0, 0), hroot(0, 2.72, -30.65)), T=tp(0.42, -19, 0, 1), H=P((10, 0, 0)), RA=P((-75, 0, 21)), LA=P((80, 0, -11)))
     # ---- finisher (262): flying kick, body flat, sends him sliding
     K(a, 256, "linear", R=P((-20, 0, 0), hroot(0, 3.4, -31.0)), T=tp(0.6, -28, 0), RL=P((60, 0, 4)), LL=P((-20, 0, -4)), RA=P((-40, 0, 20)), LA=P((60, 0, -20)))
     res = solve(h, 262, "Right Leg", dpoint(d, 262, "Torso", (0.0, 0.2, -0.5)), (150, 0), "cubic_out", R=P((-82, 0, 0), hroot(0, 5.2, -30.5)), T=tp(0.0, -6, 0), H=P((60, 0, 0)),
@@ -210,10 +213,9 @@ def hero_act3(h: Character, d: Character) -> None:
     # slow float, then the drop and a landing crouch
     K(a, 484, "cubic_in", R=P((0, 0, 0), hroot(0, 9.0, -50.6)), T=tp(0.2, 0, 0), RA=P((40, 0, 24)), LA=P((20, 0, -24)), RL=P((20, 0, 4)), LL=P((-20, 0, -4)))
     K(a, 490, "quad_out", R=P((0, 0, 0), hroot(0, 1.7, -50.0)), T=tp(1.1, -30, 0), H=P((30, 0, 0)), RA=P((-20, 0, 24)), LA=P((60, 0, -24)), RL=P((70, 0, 5)), LL=P((70, 0, -5)))
-    K(a, 512, "sine_inout", R=P((0, -60, 0), hroot(0, 3.0, -50.0)), T=tp(0.0, 4, 0), H=P((-8, 0, 0)), RA=P((152, 0, 46)), LA=P((6, 0, -8)), RL=P((0, 0, 4)), LL=P((0, 0, -4)))
-    K(a, 556, "sine_inout", R=P((0, -64, 0), hroot(0, 3.0, -50.0)), T=tp(0.0, 3, 0), H=P((-10, 4, 2)), RA=P((156, 0, 48)), LA=P((4, 0, -8)), RL=P((0, 0, 4)), LL=P((0, 0, -4)))
-    K(a, 590, "quad_out", T=tp(0.0, 2, 0), H=P((-22, 14, 3)), RA=P((132, 0, 40)), LA=P((6, 0, -8)))  # tips the brim up and looks at the lens
-    K(a, 659, "sine_inout", H=P((-26, 16, 3)), RA=P((126, 0, 36)), LA=P((8, 0, -10)))
+    K(a, 512, "sine_inout", R=P((0, -72, 0), hroot(0, 2.2, -50.0)), T=tp(1.0, -26, 0), H=P((40, 0, 0)), RA=P((60, 0, 12)), LA=P((64, 0, -14)), RL=P((78, 0, 5)), LL=P((70, 0, -5)))
+    K(a, 556, "sine_inout", R=P((0, -74, 0), hroot(0, 2.15, -50.0)), T=tp(1.02, -28, 0), H=P((44, 0, 0)), RA=P((64, 0, 14)), LA=P((66, 0, -14)))
+    K(a, 659, "sine_inout", R=P((0, -76, 0), hroot(0, 2.1, -50.0)), T=tp(1.04, -30, 0), H=P((48, 0, 0)), RA=P((66, 0, 16)), LA=P((68, 0, -16)))
     print("act3 res", round(res, 3))
 
 
@@ -248,7 +250,7 @@ def char_point(char: Character, part: str, off=(0.0, 0.0, 0.0)):
 
 
 def build(n_frames: int = N_FRAMES) -> Scene:
-    hero = Character("hero", Animation("hero", fps=60, archetype="cinematic"), base_pos=(0, 0, 0), colors=HERO_COLORS, outfit=coat_and_hair(), face="smirk")
+    hero = Character("hero", Animation("hero", fps=60, archetype="cinematic"), base_pos=(0, 0, 0), colors=HERO_COLORS, outfit=reference_outfit(), face="smirk")
     dummy = Character("dummy", Animation("dummy", fps=60, archetype="cinematic"), base_pos=(0, 0, DUMMY_Z), base_yaw=180.0, colors=DUMMY_COLORS)
     dummy_act1(dummy.anim)
     dummy_act2(dummy.anim)
@@ -269,46 +271,51 @@ def build(n_frames: int = N_FRAMES) -> Scene:
         return apply(hero.world_parts(f)[part], (0, -1.0, 0))
 
     # one contact = star on the victim, ink smear along the striking limb, speed streaks, thin wind arcs, a shake
-    def hit(t, part, star, k, torso=True, ground=False):
-        cine.ink_trail(t, t + 14, 0, part, (0, -1.0, 0), 12, 1.5, 0.0, INK, rag=0.4, seed=10 + k, alpha=0.9)
+    def hit(t, part, star, k, torso=True, dark=False):
+        cine.ink_trail(t, t + 16, 0, part, (0, -1.0, 0), 14, 2.6, 0.0, INK, rag=0.4, seed=10 + k, alpha=0.97)
         if torso:
-            cine.ink_trail(t, t + 12, 0, "Torso", (0, 0, 0), 10, 1.2, 0.0, INK, rag=0.45, seed=20 + k, alpha=0.5)
+            cine.ink_trail(t, t + 14, 0, "Torso", (0, 0, 0), 12, 2.4, 0.0, INK, rag=0.45, seed=20 + k, alpha=0.8)
         src = (star[0], star[1], star[2] + 4.5)
         cine.streaks(t, 12, src, (star[0], star[1], star[2] + 0.5), n=14, r0=0.4, r1=1.5, w=0.07, seed=30 + k)
-        cine.burst(t + 1, 10, star, 0.2, 1.8, "#f2f2f4", "#ffffff", spikes=11, streaks=5, seed=40 + k)
+        if dark:  # the reference's black spiky star with a white outline
+            cine.burst(t + 1, 12, star, 0.3, 2.4, INK, INK, spikes=12, streaks=0, seed=40 + k, outline="#ffffff", sprite=False)
+        else:
+            cine.burst(t + 1, 10, star, 0.2, 1.8, "#f2f2f4", "#ffffff", spikes=11, streaks=5, seed=40 + k)
         for j in range(2):
             cine.ink_arc(t + 1 + j, 10, star, (1, 0, 0.05), 2.2 + 1.0 * j, -60 + 70 * j, 130 + 60 * j, 0.13, "#ffffff", rag=0.1, seed=50 + k + j, grow=4, alpha=0.6)
         cine.shake(t, 8, 0.15)
         cine.punch_in(t, 0.06, 8)
 
     # ---------------- B1/B2 (0-61): crouch, ink slices, empty stage
-    cine.shot(0, 61, autoframe(lambda f: char_points(f, hero, tips=False), 0, 61, azimuth=-38, elevation=4, fov=36, fill=0.8, min_radius=2.4, follow=0.2, pad=1.2))
+    cine.shot(0, 61, dolly((17, 3.0, -3.2), (16.2, 3.0, -3.4), (0, 2.5, -3.2), (0, 2.5, -3.4), fov=26, easing="sine_inout"))
     cine.slices(46, 5, (0, 2.0, 0.0), 3, h=4.0, w=0.2, spread=0.55, seed=1)
     cine.ink_path(50, 8, [(0, 0.2, 0.4), (0, 2.6, 0.4), (0, 5.2, 0.4)], 0.18, INK, rag=0.2, seed=2, grow=2)
     # ---------------- B3/B4 (62-149): four contacts, each on its most extreme pose
-    cine.shot(62, 97, autoframe(both, 62, 97, azimuth=42, elevation=6, fill=0.95, follow=0.25))
-    cine.shot(98, 149, autoframe(both, 98, 149, azimuth=50, azimuth_end=82, elevation=6, fill=0.95, follow=0.25))
+    cine.shot(62, 97, autoframe(both, 62, 97, azimuth=86, elevation=5, fill=0.85, follow=0.25))
+    cine.shot(98, 149, autoframe(both, 98, 149, azimuth=88, azimuth_end=96, elevation=4, fill=0.85, follow=0.25))
     hit(62, "Right Leg", dpoint(dummy, 62, "Torso", (0, 0.3, -0.5)), 1)
     hit(104, "Right Leg", dpoint(dummy, 104, "Head", (0, 0, -0.5)), 2)
     hit(122, "Right Arm", dpoint(dummy, 122, "Torso", (0, 0, 0)), 3)
-    hit(138, "Right Leg", dpoint(dummy, 138, "Torso", (0, -0.8, -0.5)), 4)
+    hit(138, "Right Leg", dpoint(dummy, 138, "Torso", (0, -0.8, -0.5)), 4, dark=True)
     # ---------------- B5 (150-175): whip-in macro on the hero's head and hat, ragged white spikes for two frames
     cine.screen_fx("burst", 150, 3, seed=7)
     cine.shot(150, 175, tracking(char_point(hero, "Torso"), (4.2, 0.6, -1.6), look_dy=0.9, fov=(34, 30), offset_end=(3.6, 0.5, -1.4)))
     cine.hand.key(150, 0.0)
     # ---------------- B6 (176-255): juggle seen from low: stars + persistent ink swirls
-    cine.shot(176, 255, autoframe(both, 176, 255, azimuth=58, azimuth_end=88, elevation=-3, fill=0.95, follow=0.25, roll=(-3.0, 3.0)))
+    cine.shot(176, 255, autoframe(both, 176, 255, azimuth=90, azimuth_end=84, elevation=-2, fov=34, fill=0.85, follow=0.2, roll=(-1.5, 1.5)))
     rng = random.Random(9)
-    for i, f in enumerate(range(178, 254, 12)):
-        c = (0, 5.2, JUG_Z)
-        cine.burst(f, 7, c, 0.2, 1.5, "#f2f2f4", "#ffffff", spikes=10, streaks=5, seed=60 + i)
-        cine.ink_arc(f, 26, c, (1, 0.15, 0.1), 3.0 + 0.5 * (i % 2), rng.uniform(-90, 0), rng.uniform(150, 230), 0.45, INK, rag=0.5, seed=70 + i, grow=5, alpha=0.4)
-        cine.streaks(f, 6, (0, 3.5, JUG_Z + 2.5), c, n=8, r0=0.3, r1=1.0, w=0.06, seed=80 + i)
-        cine.shake(f, 6, 0.1)
+    for i, f in enumerate(range(178, 250, 7)):
+        c = (0, 4.9, JUG_Z + 0.3)
+        a0 = rng.uniform(-170, 40)
+        cine.ink_arc(f, 44, c, (1, 0.1, 0.1), 3.0 + 0.9 * (i % 3), a0, a0 + rng.uniform(80, 170), 0.9, INK, rag=0.5, seed=70 + i, grow=5, alpha=0.5)
+        if i % 2 == 0:
+            cine.shake(f, 5, 0.08)
+    for i, f in enumerate(range(177, 252, 12)):
+        cine.burst(f, 7, (0, 4.9, JUG_Z - 0.2), 0.2, 1.4, "#f2f2f4", "#ffffff", spikes=10, streaks=5, seed=60 + i)
     # ---------------- B7 (256-299): finisher: contact, a long ink streak along the ground, dust
-    cine.shot(256, 283, autoframe(both, 256, 283, azimuth=75, elevation=4, fill=0.95, follow=0.2))
+    cine.shot(256, 283, autoframe(both, 256, 283, azimuth=88, elevation=3, fill=0.85, follow=0.2))
     cine.shot(284, 299, autoframe(both, 284, 299, azimuth=78, elevation=3, fov=40, fill=0.9, min_radius=5.0, follow=0.15))
-    hit(262, "Right Leg", dpoint(dummy, 262, "Torso", (0, 0.2, -0.5)), 5, torso=False)
+    hit(262, "Right Leg", dpoint(dummy, 262, "Torso", (0, 0.2, -0.5)), 5, torso=False, dark=True)
     cine.ink_path(264, 40, [(0, 0.5, -35.0), (0, 0.5, -42.0), (0, 0.5, -52.0)], 1.0, INK, rag=0.5, seed=90, grow=6, alpha=0.95)
     cine.burst(270, 12, (0, 1.4, -46.0), 0.3, 3.2, "#f2f2f4", "#ffffff", spikes=12, streaks=6, seed=91)
     cine.emit(270, 270, origin=(0, 0.5, -46.0), rate=0, burst=26, vel=(0.08, 0.3), dir=(0, 0.5, -1), spread=1.0, grav=0.004, drag=0.05, life=(24, 60),
@@ -328,32 +335,8 @@ def build(n_frames: int = N_FRAMES) -> Scene:
     hit(392, "Right Leg", dpoint(dummy, 392, "Torso", (0, 0, 0)), 6, torso=False)
     cine.streaks(396, 16, (0, 2.0, -50.8), (0, 24.0, -52.0), n=12, r0=0.5, r1=1.4, w=0.07, seed=95)
     # ---------------- B11 (408-483): the slash storm around the two of them, high in the sky
-    cine.shot(408, 465, autoframe(both, 408, 465, azimuth=50, azimuth_end=95, elevation=-14, fov=40, fill=0.9, min_radius=3.4, follow=0.3))
-    rs = random.Random(21)
-    for f in range(412, 458, 2):
-        pos, tgt, _fov, _roll = cine.camera_state(f)
-        fwd = tuple(tgt[i] - pos[i] for i in range(3))
-        fl = math.sqrt(sum(x * x for x in fwd))
-        fwd = tuple(x / fl for x in fwd)
-        right = (-fwd[2], 0.0, fwd[0])
-        rl = math.sqrt(sum(x * x for x in right))
-        right = tuple(x / rl for x in right)
-        up = (right[1] * fwd[2] - right[2] * fwd[1], right[2] * fwd[0] - right[0] * fwd[2], right[0] * fwd[1] - right[1] * fwd[0])
-        plane = tuple(pos[i] + fwd[i] * 7.5 for i in range(3))
-        amount = 4 if f < 440 else max(0, 4 - (f - 440) // 5)
-        for k in range(amount):
-            th = rs.uniform(0, math.pi)
-            off = rs.uniform(-2.4, 2.4)
-            ln = rs.uniform(6.0, 9.0)
-            ca, sa = math.cos(th), math.sin(th)
-            mids = []
-            for j in range(5):
-                t = (j / 4 - 0.5) * 2 * ln
-                bend = 0.6 * math.sin(j / 4 * math.pi) * rs.uniform(-1, 1)
-                x = ca * t - sa * (off + bend)
-                y = sa * t + ca * (off + bend)
-                mids.append(tuple(plane[i] + right[i] * x + up[i] * y for i in range(3)))
-            cine.ink_path(f, 3, mids, rs.uniform(0.14, 0.3), "#ffffff", glow=CYAN, rag=0.3, seed=rs.randint(1, 9999), grow=1, alpha=0.97)
+    cine.shot(408, 465, autoframe(both, 408, 465, azimuth=70, azimuth_end=95, elevation=-14, fov=40, fill=0.6, min_radius=3.4, follow=0.3))
+    cine.screen_fx("strokes", 412, 44, n0=9, n1=2, w=0.16, glow=CYAN, seed=21, layouts=5)
     # ---------------- the cut (456-466): one clean cyan slash through the dummy, then the blocks burst apart
     pos, tgt, _fov, _roll = cine.camera_state(462)
     c0 = char_point(dummy, "Torso")(462)
@@ -378,7 +361,7 @@ def build(n_frames: int = N_FRAMES) -> Scene:
     cine.shot(504, 549, tracking(char_point(hero, "Head"), (3.0, 0.2, 1.0), look_dy=0.0, fov=(30, 26), offset_end=(2.6, 0.25, 0.9)))
     cine.screen_fx("black", 550, 6)
     cine.screen_fx("bw", 556, 6, seed=17, accent=True, focus=(0.55, 0.5), shards=14)
-    cine.shot(556, n_frames - 1, autoframe(lambda f: char_points(f, hero), 556, n_frames - 1, azimuth=32, azimuth_end=6, elevation=-7, fov=34, fill=0.95, min_radius=3.2, follow=0.08, pad=0.9, roll=(1.5, -1.0)))
+    cine.shot(556, n_frames - 1, tracking(char_point(hero, "Torso"), (3.6, 1.1, -2.6), look_dy=0.9, fov=(36, 32), offset_end=(3.2, 1.0, -2.3)))
     # the one accent colour comes back: slow cyan embers rise around him while he holds the pose
     cine.emit(556, 650, origin=(0, 0.6, -50.0), rate=0.5, vel=(0.01, 0.04), dir=(0, 1, 0), spread=1.2, grav=-0.0008, drag=0.02, life=(50, 110),
               size=(0.16, 0.02), color=(CYAN, "#ffffff"), alpha=(0.9, 0.0), add=True, shape="spark", radius=2.6, seed=97)

@@ -61,6 +61,7 @@ class ExtraTrack:
     size: Vec
     color: str
     frames: list[Transform]
+    shape: str = "box"  # "box" | "cyl" (round, axis Y) | "ell" (ellipsoid)
 
 
 @dataclass
@@ -84,12 +85,14 @@ class Strand:
     stiffness: float = 6.0  # 1/s, how fast the strand returns to its rest direction
     drag: float = 3.0  # 1/s
     taper: float = 0.85  # width multiplier per segment
+    shape: str = "box"
 
     def simulate(self, char, n_frames: int, hold: int = 1, fps: int = 60) -> list[ExtraTrack]:
         dt = hold / fps
         sub = 4
         h = dt / sub
-        tracks = [ExtraTrack(f"{self.name}{i}", (self.width * self.taper**i, self.seg_len, self.depth), self.color, []) for i in range(self.segments)]
+        ov = 1.7 if self.shape == "ell" else 1.0  # round segments overlap so a lock reads as one piece
+        tracks = [ExtraTrack(f"{self.name}{i}", (self.width * self.taper**i, self.seg_len * ov, self.depth), self.color, [], self.shape) for i in range(self.segments)]
         pts: list[Vec] | None = None
         prev: list[Vec] | None = None
         last_out: list[Transform] | None = None
@@ -147,6 +150,7 @@ class Rigid:
     size: Vec
     color: str
     tilt: tuple[float, float, float] = (0.0, 0.0, 0.0)  # degrees, Roblox CFrame.Angles order, in the parent's frame
+    shape: str = "box"
 
     def simulate(self, char, n_frames: int, hold: int = 1, fps: int = 60) -> list[ExtraTrack]:
         from .mathutil import compose, euler, translate
@@ -156,7 +160,7 @@ class Rigid:
         for f in range(n_frames):
             ff = f - f % hold
             out.append(compose(char.world_parts(ff)[self.parent], local))
-        return [ExtraTrack(self.name, self.size, self.color, out)]
+        return [ExtraTrack(self.name, self.size, self.color, out, self.shape)]
 
 
 @dataclass
@@ -185,8 +189,72 @@ def coat_and_hair(coat: str = "#101015", hair: str = "#e8edf2", hat: str = "#0b0
         Strand("coat_back", "Torso", (0.0, -0.95, 0.5), 4, 0.62, 1.7, 0.18, coat, rest_dir=(0.0, -1.0, 0.25), gravity=34, stiffness=5, drag=2.6, taper=0.9),
         Strand("coat_l", "Torso", (-0.8, -0.95, 0.45), 3, 0.6, 0.55, 0.16, coat, rest_dir=(-0.25, -1.0, 0.35), gravity=34, stiffness=5, drag=2.6),
         Strand("coat_r", "Torso", (0.8, -0.95, 0.45), 3, 0.6, 0.55, 0.16, coat, rest_dir=(0.25, -1.0, 0.35), gravity=34, stiffness=5, drag=2.6),
+        Strand("hair_a", "Head", (-0.55, 0.0, 0.5), 4, 0.5, 0.55, 0.4, hair, rest_dir=(-0.25, -1.0, 0.5), gravity=24, stiffness=3.0, drag=2.2, taper=0.84, shape="ell"),
+        Strand("hair_b", "Head", (0.0, 0.0, 0.8), 5, 0.52, 0.8, 0.42, hair, rest_dir=(0.0, -1.0, 0.6), gravity=24, stiffness=3.0, drag=2.2, taper=0.86, shape="ell"),
+        Strand("hair_c", "Head", (0.55, 0.0, 0.5), 4, 0.5, 0.55, 0.4, hair, rest_dir=(0.25, -1.0, 0.5), gravity=24, stiffness=3.0, drag=2.2, taper=0.84, shape="ell"),
+    ]
+    return Outfit(items)
+
+
+def reference_outfit(coat: str = "#0c0c10", hair: str = "#eef2f6", hat: str = "#08080b", band: str = "#26262d") -> Outfit:
+    """The signature silhouette of the study reference: a wide round-brim hat with a banded crown and a speech-bubble sticker,
+    a big shock of white hair (fringe over one eye + long locks), a flared long coat with broad tails, a striped belt.
+
+    Volumes use round primitives (``cyl`` / ``ell``) so the figure reads as one mass instead of stacked boxes.
+    """
+    sticker = "#f7f7f9"
+    items: list[object] = [
+        Rigid("hat_brim", "Head", (0.0, 0.58, 0.0), (3.2, 0.12, 3.2), hat, (6.0, 0.0, 3.0), "cyl"),
+        Rigid("hat_crown", "Head", (0.0, 0.98, 0.0), (1.7, 0.85, 1.7), hat, shape="cyl"),
+        Rigid("hat_band", "Head", (0.0, 0.7, 0.0), (1.78, 0.2, 1.78), band, shape="cyl"),
+        Rigid("sticker", "Head", (0.78, 0.92, -0.55), (0.55, 0.55, 0.1), sticker, (0.0, 40.0, 0.0), "ell"),
+        Rigid("hair_cap", "Head", (0.0, 0.16, 0.38), (1.6, 1.38, 1.0), hair, shape="ell"),
+        Rigid("fringe", "Head", (-0.22, 0.32, -0.52), (0.85, 0.46, 0.22), hair, (0.0, 0.0, -14.0), "ell"),
+        Rigid("belt", "Torso", (0.0, -0.78, 0.0), (2.06, 0.2, 1.06), "#d9dade"),
+        Rigid("cuff_r", "Right Arm", (0.0, -0.82, 0.0), (1.08, 0.16, 1.08), "#d9dade"),
+        Rigid("cuff_l", "Left Arm", (0.0, -0.82, 0.0), (1.08, 0.16, 1.08), "#d9dade"),
+        Rigid("boot_r", "Right Leg", (0.0, -0.8, 0.0), (1.06, 0.2, 1.06), "#d9dade"),
+        Rigid("boot_l", "Left Leg", (0.0, -0.8, 0.0), (1.06, 0.2, 1.06), "#d9dade"),
+        Rigid("hat_brim", "Head", (0.0, 0.62, 0.0), (1.9, 0.12, 1.9), hat, (4.0, 0.0, 0.0)),
+        Rigid("hat_crown", "Head", (0.0, 0.92, 0.0), (1.1, 0.55, 1.1), hat),
+        Strand("coat_back", "Torso", (0.0, -0.95, 0.5), 4, 0.62, 1.7, 0.18, coat, rest_dir=(0.0, -1.0, 0.25), gravity=34, stiffness=5, drag=2.6, taper=0.9),
+        Strand("coat_l", "Torso", (-0.8, -0.95, 0.45), 3, 0.6, 0.55, 0.16, coat, rest_dir=(-0.25, -1.0, 0.35), gravity=34, stiffness=5, drag=2.6),
+        Strand("coat_r", "Torso", (0.8, -0.95, 0.45), 3, 0.6, 0.55, 0.16, coat, rest_dir=(0.25, -1.0, 0.35), gravity=34, stiffness=5, drag=2.6),
         Strand("hair_a", "Head", (-0.35, 0.35, 0.5), 3, 0.42, 0.34, 0.12, hair, rest_dir=(-0.2, -1.0, 0.5), gravity=24, stiffness=3.2, drag=2.2),
         Strand("hair_b", "Head", (0.0, 0.35, 0.52), 3, 0.5, 0.4, 0.12, hair, rest_dir=(0.0, -1.0, 0.6), gravity=24, stiffness=3.2, drag=2.2),
         Strand("hair_c", "Head", (0.35, 0.35, 0.5), 3, 0.42, 0.34, 0.12, hair, rest_dir=(0.2, -1.0, 0.5), gravity=24, stiffness=3.2, drag=2.2),
+    ]
+    return Outfit(items)
+
+
+def reference_outfit(coat: str = "#0c0c10", hair: str = "#eef2f6", hat: str = "#08080b", band: str = "#26262d") -> Outfit:
+    """The signature silhouette of the study reference: a wide round-brim hat with a banded crown and a speech-bubble sticker,
+    a big shock of white hair (fringe over one eye + long locks), a flared long coat with broad tails, a striped belt.
+
+    Volumes use round primitives (``cyl`` / ``ell``) so the figure reads as one mass instead of stacked boxes.
+    """
+    sticker = "#f7f7f9"
+    items: list[object] = [
+        Rigid("hat_brim", "Head", (0.0, 0.58, 0.0), (3.2, 0.12, 3.2), hat, (6.0, 0.0, 3.0), "cyl"),
+        Rigid("hat_crown", "Head", (0.0, 0.98, 0.0), (1.7, 0.85, 1.7), hat, shape="cyl"),
+        Rigid("hat_band", "Head", (0.0, 0.7, 0.0), (1.78, 0.2, 1.78), band, shape="cyl"),
+        Rigid("sticker", "Head", (0.78, 0.92, -0.55), (0.55, 0.55, 0.1), sticker, (0.0, 40.0, 0.0), "ell"),
+        Rigid("hair_back", "Head", (0.0, 0.05, 0.42), (1.75, 1.45, 1.05), hair, shape="ell"),
+        Rigid("hair_l", "Head", (-0.62, 0.02, 0.02), (0.5, 1.15, 0.95), hair, shape="ell"),
+        Rigid("hair_r", "Head", (0.62, 0.02, 0.02), (0.5, 1.15, 0.95), hair, shape="ell"),
+        Rigid("fringe", "Head", (-0.22, 0.34, -0.5), (0.85, 0.5, 0.22), hair, (0.0, 0.0, -14.0), "ell"),
+        Rigid("belt", "Torso", (0.0, -0.78, 0.0), (2.1, 0.26, 1.1), "#d9dade"),
+        Rigid("belt_dark", "Torso", (0.0, -0.78, 0.0), (2.14, 0.1, 1.14), "#15151a"),
+        Rigid("waist", "Torso", (0.0, -1.0, 0.05), (2.5, 0.8, 1.65), coat, shape="ell"),
+        Rigid("cuff_r", "Right Arm", (0.0, -0.82, 0.0), (1.12, 0.22, 1.12), "#e6e6ea"),
+        Rigid("cuff_l", "Left Arm", (0.0, -0.82, 0.0), (1.12, 0.22, 1.12), "#e6e6ea"),
+        Rigid("boot_r", "Right Leg", (0.0, -0.8, 0.0), (1.1, 0.22, 1.1), "#d9dade"),
+        Rigid("boot_l", "Left Leg", (0.0, -0.8, 0.0), (1.1, 0.22, 1.1), "#d9dade"),
+        Strand("coat_back", "Torso", (0.0, -1.0, 0.55), 5, 0.6, 2.1, 0.2, coat, rest_dir=(0.0, -1.0, 0.3), gravity=34, stiffness=4.5, drag=2.4, taper=0.92),
+        Strand("coat_l", "Torso", (-0.95, -1.0, 0.35), 4, 0.58, 0.95, 0.2, coat, rest_dir=(-0.4, -1.0, 0.3), gravity=34, stiffness=4.5, drag=2.4, taper=0.9),
+        Strand("coat_r", "Torso", (0.95, -1.0, 0.35), 4, 0.58, 0.95, 0.2, coat, rest_dir=(0.4, -1.0, 0.3), gravity=34, stiffness=4.5, drag=2.4, taper=0.9),
+        Strand("hair_a", "Head", (-0.5, 0.2, 0.6), 4, 0.5, 0.5, 0.32, hair, rest_dir=(-0.2, -1.0, 0.5), gravity=24, stiffness=3.0, drag=2.2, taper=0.82, shape="ell"),
+        Strand("hair_b", "Head", (0.0, 0.2, 0.7), 5, 0.52, 0.62, 0.34, hair, rest_dir=(0.0, -1.0, 0.6), gravity=24, stiffness=3.0, drag=2.2, taper=0.84, shape="ell"),
+        Strand("hair_c", "Head", (0.5, 0.2, 0.6), 4, 0.5, 0.5, 0.32, hair, rest_dir=(0.2, -1.0, 0.5), gravity=24, stiffness=3.0, drag=2.2, taper=0.82, shape="ell"),
     ]
     return Outfit(items)

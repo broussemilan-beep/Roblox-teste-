@@ -78,3 +78,26 @@ class ShortSceneTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReferenceStyleTest(unittest.TestCase):
+    def test_reference_outfit_exports_round_volumes(self):
+        from tsb_engine.secondary import reference_outfit
+
+        a = Animation("t", fps=60, archetype="cinematic")
+        K(a, 0, T=tp(0.0, 0))
+        sc = Scene("x", [Character("h", a, outfit=reference_outfit())])
+        d = export_viewer_data(sc)
+        shapes = {e["shape"] for e in d["characters"][0]["extras"]}
+        self.assertTrue({"cyl", "ell", "box"} <= shapes)
+
+    def test_screen_strokes_and_outlined_burst_serialise(self):
+        cine = Cinematic(30)
+        cine.shot(0, 29, dolly((15, 3.4, -3.5), (15, 3.4, -3.5), (0, 1.9, -3.5), (0, 1.9, -3.5), fov=44))
+        cine.screen_fx("strokes", 4, 20, n0=9, n1=2, w=0.15, glow="#7ff0ff", seed=3)
+        cine.burst(5, 8, (0, 3, 0), 0.3, 2.0, "#0b0b0f", "#0b0b0f", outline="#ffffff", sprite=False)
+        d = cine.to_dict()
+        self.assertEqual(d["screen"]["fx"][0]["kind"], "strokes")
+        bursts = [f for f in d["fx"] if f["type"] == "burst"]
+        self.assertEqual(bursts[0]["outline"], "#ffffff")
+        self.assertFalse([f for f in d["fx"] if f["type"] == "sprite"])

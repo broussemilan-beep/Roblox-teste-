@@ -52,3 +52,21 @@ avec un membre sur deux masqué, est une tache. Aucun effet ne rattrape ça.
   « Linear sur le coup » vs « Linear fait robot » (1698-1708 / 1949-1952) ; clones écartés par toi (11688).
 * Dans le film, les poses de contact gardent encore un membre éloigné partiellement caché (limites d'un profil) : c'est
   mesuré par la colonne `limb` de `check_poses`, pas corrigé partout.
+
+## 4. Deuxième relecture : la vidéo de référence (ajout)
+
+Tu as signalé un problème de lecture de la vidéo. Relecture complète image par image (336 images à 30 fps, voir
+`docs/research/reference-analysis.md` v2). Ce que ma première lecture avait faux ou laissé de côté :
+
+| Ce que j'avais retenu | Ce que la vidéo montre vraiment |
+|---|---|
+| « Modélisation basique » = blocs R6 simples, donc un héros fin | Rig R6 simple **mais** silhouette riche : grand chapeau rond à ruban, grosse masse de cheveux blancs, manteau évasé, ceinture rayée, autocollant « … » sur le chapeau. La présence vient du volume |
+| Contacts filmés en 3/4 pour mieux séparer les corps | Combat **de profil**, caméra serrée (héros 35-50 % de la hauteur), puis **au ras du sol** pour le jonglage (60-75 %) ; les poses sont dessinées pour cette caméra |
+| Jonglage = le héros alterne deux coups | **Le héros est tenu dans une seule pose** ~30 images, seul le **mannequin change de pose toutes les 1-2 images**, avec de grands tourbillons d'encre sombre persistants |
+| Traînées d'encre fines et translucides | Croissants noirs **opaques et affûtés, aussi longs que le héros**, tourbillons de la moitié de sa taille, étoile **noire à contour blanc** |
+| Tempête de 33 images : traits 3D que j'amincissais pour garder la pose lisible | Les traits sont **énormes (15-25 % de la hauteur d'écran), blancs à bord cyan**, ils **ensevelissent** les corps entrevus entre les traits, relancés à chaque image (~5 mises en page) |
+| Fin : un plan large du héros debout | **Macro statique de 48 images** sur le héros voûté : dôme du chapeau, manchette blanche, bras du mannequin gris en haut à droite |
+
+Changements faits en conséquence : `reference_outfit()` (cylindres/ellipsoïdes dans le viewer), héros et mannequin en profil, héros
+tenu + mannequin en cycle de 5 poses pendant le jonglage, encre 2× plus large et opaque, `screen_fx("strokes")` pour la tempête,
+`burst(outline=...)` pour l'étoile noire, final en macro sur un héros accroupi, tête baissée.

@@ -367,10 +367,17 @@ class Cinematic:
                             "rot": rot, "alpha": alpha, "add": add, "speed": speed})
 
     def burst(self, t0: int, dur: int, c: Vec, r0: float, r1: float, color: str = "#ffb43a", core: str = "#ffffff",
-              spikes: int = 11, streaks: int = 9, rot: float = 0.0, seed: int = 1) -> None:
-        """Camera-facing hit sprite: jagged star + hot core + radial streaks (a flipbook-style impact burst)."""
+              spikes: int = 11, streaks: int = 9, rot: float = 0.0, seed: int = 1, outline: str | None = None, sprite: bool = True) -> None:
+        """Camera-facing hit sprite: jagged star + hot core + radial streaks (a flipbook-style impact burst).
+
+        ``outline`` strokes the star (the reference's black star has a white outline); ``sprite=False`` skips the flipbook underlay.
+        """
         self.fx.append({"type": "burst", "t0": t0, "dur": dur, "c": list(c), "r0": r0, "r1": r1, "color": color, "core": core,
-                        "n": spikes, "streaks": streaks, "rot": rot, "seed": self.seed * 100 + seed})
+                        "n": spikes, "streaks": streaks, "rot": rot, "seed": self.seed * 100 + seed, "outline": outline})
+        if sprite:
+            self._burst_sprite(t0, dur, c, r0, r1, rot)
+
+    def _burst_sprite(self, t0: int, dur: int, c: Vec, r0: float, r1: float, rot: float) -> None:
         self.sprite("impact_star", t0, dur + 3, c, r0 * 1.6, r1 * 2.1, rot=rot * 1.7, alpha=0.9 if r1 < 4.5 else 0.5, add=False)
 
     def glow(self, t0: int, t1: int, c: Vec | None = None, attach: dict | None = None, r0: float = 1.0, r1: float = 1.0,

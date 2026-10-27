@@ -214,6 +214,26 @@ const DATA = /*__DATA__*/null;
     { n: [0,1,0],  c: [[-1,1,1],[1,1,1],[1,1,-1],[-1,1,-1]], name: 'top' },
     { n: [0,-1,0], c: [[-1,-1,-1],[1,-1,-1],[1,-1,1],[-1,-1,1]], name: 'bottom' },
   ];
+  // extra volumes for accessories (hat, hair, coat): unit meshes scaled by the part size like boxes
+  function makeCyl(n) {
+    const out = [], P = (a, y) => [Math.cos(a), y, Math.sin(a)];
+    for (let i = 0; i < n; i++) { const a0 = i / n * Math.PI * 2, a1 = (i + 1) / n * Math.PI * 2, am = (a0 + a1) / 2;
+      out.push({ n: [Math.cos(am), 0, Math.sin(am)], m: [Math.cos(am), 0, Math.sin(am)], c: [P(a0, 1), P(a1, 1), P(a1, -1), P(a0, -1)] }); }
+    out.push({ n: [0, 1, 0], m: [0, 1, 0], c: Array.from({ length: n }, (_, i) => P(i / n * Math.PI * 2, 1)).reverse() });
+    out.push({ n: [0, -1, 0], m: [0, -1, 0], c: Array.from({ length: n }, (_, i) => P(i / n * Math.PI * 2, -1)) });
+    return out;
+  }
+  function makeEll(lon, lat) {
+    const out = [], P = (u, v) => [Math.cos(v) * Math.cos(u), Math.sin(v), Math.cos(v) * Math.sin(u)];
+    for (let j = 0; j < lat; j++) for (let i = 0; i < lon; i++) {
+      const u0 = i / lon * Math.PI * 2, u1 = (i + 1) / lon * Math.PI * 2, v0 = -Math.PI / 2 + j / lat * Math.PI, v1 = -Math.PI / 2 + (j + 1) / lat * Math.PI;
+      const c = [P(u0, v1), P(u1, v1), P(u1, v0), P(u0, v0)], m = [0, 1, 2].map(k => (c[0][k] + c[1][k] + c[2][k] + c[3][k]) / 4);
+      const nl = Math.hypot(m[0], m[1], m[2]) || 1;
+      out.push({ n: [m[0] / nl, m[1] / nl, m[2] / nl], m, c });
+    }
+    return out;
+  }
+  const MESH = { box: FACES, cyl: makeCyl(16), ell: makeEll(12, 6) };
   const LIGHT = norm([0.45, 0.85, 0.35]);
 
   // ------------------------------------------------------------------ cinematic precompute
@@ -280,15 +300,15 @@ const DATA = /*__DATA__*/null;
   }
 
   // ------------------------------------------------------------------ drawing
-  function boxFaces(polys, B, t, s, rgb, light, extra) {
-    for (const fc of FACES) {
-      const nW = rotv(t, fc.n), cW = apply(t, [fc.n[0]*s[0]/2, fc.n[1]*s[1]/2, fc.n[2]*s[2]/2]);
+  function boxFaces(polys, B, t, s, rgb, light, extra, shape) {
+    for (const fc of (MESH[shape || 'box'] || FACES)) {
+      const mm = fc.m || fc.n, nW = rotv(t, fc.n), cW = apply(t, [mm[0]*s[0]/2, mm[1]*s[1]/2, mm[2]*s[2]/2]);
       if (dot(nW, sub(B.pos, cW)) <= 0) continue;
       const cc = fc.c.map(c => toCam(B, apply(t, [c[0]*s[0]/2, c[1]*s[1]/2, c[2]*s[2]/2])));
       const clipped = clipPoly(cc); if (clipped.length < 3) continue;
       const pts = clipped.map(p => scr(B, p));
       const k = (0.5 + 0.5 * Math.max(0, dot(nW, LIGHT))) * light;
-      polys.push({ pts, fill: `rgb(${Math.round(rgb[0]*k)},${Math.round(rgb[1]*k)},${Math.round(rgb[2]*k)})`, z: toCam(B, cW)[2], face: extra && fc.name === 'front' ? extra : false });
+      polys.push({ pts, fill: `rgb(${Math.round(rgb[0]*k)},${Math.round(rgb[1]*k)},${Math.round(rgb[2]*k)})`, z: toCam(B, cW)[2], face: extra && fc.name === 'front' ? extra : false, smooth: !!shape && shape !== 'box' });
     }
   }
 
@@ -345,7 +365,7 @@ const DATA = /*__DATA__*/null;
     const polys = [];
     for (const ch of D.characters) {
       PARTS.forEach((part, i) => boxFaces(polys, B, ch.frames[f][i], SZ[part], hex(ch.colors[part]), bright, part === 'Head' ? (ch.face || 'std') : false));
-      for (const ex of (ch.extras || [])) boxFaces(polys, B, ex.frames[f], ex.size, hex(ex.color), bright, false);
+      for (const ex of (ch.extras || [])) boxFaces(polys, B, ex.frames[f], ex.size, hex(ex.color), bright, false, ex.shape);
     }
     if (CINE) {
       for (const p of CINE.props) {
@@ -362,7 +382,8 @@ const DATA = /*__DATA__*/null;
     ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(1, dpr); ctx.strokeStyle = 'rgba(0,0,0,0.55)';
     for (const p of polys) {
       ctx.beginPath(); p.pts.forEach((q2, i) => i ? ctx.lineTo(q2.x, q2.y) : ctx.moveTo(q2.x, q2.y)); ctx.closePath();
-      ctx.fillStyle = p.fill; ctx.fill(); ctx.stroke();
+      ctx.fillStyle = p.fill; ctx.fill();
+      if (p.smooth) { ctx.save(); ctx.strokeStyle = p.fill; ctx.lineWidth = Math.max(1.2, 1.4 * dpr); ctx.stroke(); ctx.restore(); } else ctx.stroke();
       if (p.face && p.pts.length === 4) {
         const [c0, c1, , c3] = p.pts, P = (u, v) => [c0.x + u*(c1.x-c0.x) + v*(c3.x-c0.x), c0.y + u*(c1.y-c0.y) + v*(c3.y-c0.y)];
         ctx.fillStyle = 'rgba(20,20,20,0.85)'; ctx.strokeStyle = 'rgba(20,20,20,0.9)'; ctx.lineWidth = Math.max(1, 1.6 * dpr);
@@ -512,7 +533,8 @@ const DATA = /*__DATA__*/null;
         items.push({ z: cc[2] - 0.3, add: false, fn: () => {
           ctx.fillStyle = rgba([12, 10, 22], al * 0.6); starPath(s.x, s.y, R * 1.16, R * 0.28, e.n, rot, rv); ctx.fill();
           ctx.fillStyle = rgba(outer, al * 0.95); starPath(s.x, s.y, R, R * 0.22, e.n, rot, rv); ctx.fill();
-          ctx.fillStyle = rgba(core, al); starPath(s.x, s.y, R * 0.62, R * 0.15, e.n, rot + 0.15, rv.map(x => x * 0.95)); ctx.fill(); } });
+          ctx.fillStyle = rgba(core, al); starPath(s.x, s.y, R * 0.62, R * 0.15, e.n, rot + 0.15, rv.map(x => x * 0.95)); ctx.fill();
+          if (e.outline) { ctx.strokeStyle = rgba(col(e.outline), al); ctx.lineWidth = Math.max(1.5, R * 0.05); starPath(s.x, s.y, R, R * 0.22, e.n, rot, rv); ctx.stroke(); } } });
         items.push({ z: cc[2] - 0.31, add: true, fn: () => {
           SOFT(s.x, s.y, R * 1.25, outer, al * 0.55, 0.25); SOFT(s.x, s.y, R * 0.5, core, al, 0.3);
           ctx.lineCap = 'round';
@@ -686,6 +708,28 @@ const DATA = /*__DATA__*/null;
     }
     if (sf.kind === 'burst') {   // white comic spikes over the live frame
       for (let k = 0; k < 2; k++) jagged(cx, cy, 14, H * 0.5, H * 1.0, rnd, k ? '#fff' : 'rgba(255,255,255,0.9)'); return;
+    }
+    if (sf.kind === 'strokes') {   // the slash storm: a wall of huge white brush strokes with a cyan glow, re-rolled every frame (few layouts)
+      const lay = Math.floor((f - sf.t0) / 2) % (sf.layouts || 5), r = mulberry32((sf.seed || 1) * 131 + lay * 7919);
+      const n = Math.max(0, Math.round((sf.n0 == null ? 8 : sf.n0) + ((sf.n1 == null ? 8 : sf.n1) - (sf.n0 == null ? 8 : sf.n0)) * u));
+      const glow = sf.glow || '#7ff0ff', wmax = H * (sf.w || 0.1);
+      const strokes = [];
+      for (let i = 0; i < n; i++) {
+        const a0 = r() * Math.PI * 2, c0 = [W / 2 + Math.cos(a0) * W * (0.55 + r() * 0.2), H / 2 + Math.sin(a0) * H * (0.9 + r() * 0.4)];
+        const a1 = a0 + Math.PI * (0.8 + r() * 0.4), c1 = [W / 2 + Math.cos(a1) * W * (0.55 + r() * 0.2), H / 2 + Math.sin(a1) * H * (0.9 + r() * 0.4)];
+        const mid = [(c0[0] + c1[0]) / 2 + (r() - 0.5) * W * 0.5, (c0[1] + c1[1]) / 2 + (r() - 0.5) * H * 0.9];
+        const pts = []; for (let k = 0; k <= 22; k++) { const t = k / 22, q = 1 - t; pts.push([q * q * c0[0] + 2 * q * t * mid[0] + t * t * c1[0], q * q * c0[1] + 2 * q * t * mid[1] + t * t * c1[1]]); }
+        strokes.push({ pts, w: wmax * (0.45 + r() * 0.7) });
+      }
+      const shape = (st, grow, jit) => { const L = [], Rr = [];
+        st.pts.forEach((p, k) => { const t = k / (st.pts.length - 1), q = st.pts[Math.min(k + 1, st.pts.length - 1)], o = st.pts[Math.max(k - 1, 0)], dx = q[0] - o[0], dy = q[1] - o[1], dl = Math.hypot(dx, dy) || 1;
+          const wd = (st.w * grow * Math.pow(Math.sin(Math.PI * Math.min(0.98, Math.max(0.02, t))), 0.55)) / 2 * (1 + (jit ? (r() - 0.5) * 0.16 : 0));
+          L.push([p[0] - dy / dl * wd, p[1] + dx / dl * wd]); Rr.push([p[0] + dy / dl * wd, p[1] - dx / dl * wd]); });
+        ctx.beginPath(); L.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); Rr.reverse().forEach(p => ctx.lineTo(p[0], p[1])); ctx.closePath(); };
+      ctx.save(); ctx.globalAlpha = sf.alpha == null ? 1 : sf.alpha;
+      ctx.shadowColor = glow; ctx.shadowBlur = 30 * dpr; ctx.fillStyle = glow; for (const st of strokes) { shape(st, 1.09, true); ctx.fill(); }
+      ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; for (const st of strokes) { shape(st, 0.9, true); ctx.fill(); }
+      ctx.restore(); return;
     }
     if (sf.kind === 'bw') {      // manga impact frame: hard threshold of the live frame + black shards (+ coloured hatching)
       if (!window.__tmp) window.__tmp = document.createElement('canvas');

@@ -72,6 +72,9 @@ Plain Roblox blocks are enough; the level comes from pace, camera, graphic fx an
 - `bw` impact frames and black frames exist in the reference, but the in-game constraint (no impact frame, no
   global hitstop) still holds: treat them as optional punctuation for cinematic cuts.
 - Always run `keep_above_ground` on every character of a short (the linter's TSB001 catches sunken legs).
+- **Read the reference before building** (all frames at 30 fps, 12 per sheet, not a sparse overview): the first reading of the study clip was wrong
+  on scale, staging and the avatar's design. `secondary.reference_outfit()` gives the round-brim hat, hair mass and flared coat;
+  `screen_fx("strokes")` is the storm wall; `burst(outline=...)` the black star; profile cameras, a *held* hero with a cycling victim for juggles.
 
 ### The loop that produced `examples/short.py` (v2): solve, frame, measure, look
 

@@ -81,7 +81,7 @@ def export_viewer_data(scene: Scene) -> dict:
         extras = []
         if c.outfit is not None:
             for tr in c.outfit.simulate(c, scene.n_frames, scene.hold, scene.fps):
-                extras.append({"name": tr.name, "size": [round(v, 3) for v in tr.size], "color": tr.color,
+                extras.append({"name": tr.name, "shape": tr.shape, "size": [round(v, 3) for v in tr.size], "color": tr.color,
                                "frames": [[round(v, 4) for row in t[0] for v in row] + [round(v, 4) for v in t[1]] for t in tr.frames]})
         chars.append({"name": c.name, "face": c.face, "colors": c.colors, "frames": frames, "findings": findings, "extras": extras})
     markers = list(scene.markers)
