@@ -97,6 +97,15 @@ Work like this instead:
    contact sheets with **two views** (3/4 + profile) plus a 2-frame stride strip to judge the motion.
 5. Lint (`TSB001/007` must be clean), then show it. Your eye, not the metric, decides.
 
+## Roblox integration facts (verified on the official docs, 2026-10-28; details in `docs/research/rnd-audit.md`)
+
+- Procedural offsets on `Motor6D.Transform` (fake limb, dislocation, tilt) must be written in `RunService.PreSimulation`; otherwise the Animator overwrites them next frame.
+- No Pause/Freeze on `AnimationTrack`: hitstop = `AdjustSpeed(0)` on every playing track, restore after, **per client** (Willikk's roblox-mesh-vfx does this within ~90 studs).
+- Animation priorities Idle 0 .. Action4 5, Core 1000 (same as `roblox_export.PRIORITY`). Markers are read with `GetMarkerReachedSignal(name)`.
+- NOT verified: whether an animation played from a LocalScript replicates to others, how `AnimationConstraint` relates to R6/Motor6D, whether a hand-written `.rbxmx` imports with its markers. Test in Studio before relying on them.
+- Before exporting with fewer keys than frames run `python tools/check_export.py <scene> <char> --optimize`: it re-reads the exported file, plays it with Roblox's interpolation and reports the error in studs (a 60-stud blink-cut turned into a slide at a coarse step; fixed by keeping authored keys, but fast spins still need dense keys).
+- Reusable code only from MIT sources (Willikk, RoClicks, Chrrxs/robloxstudio-mcp), with credit; RigBridge / Motion Tools have no licence, Staticaliza is GPL, Roqer is AGPL: ideas only.
+
 ## Rules of engagement
 
 - Tag every number you introduce: `[physical]` follows from the rig, `[heuristic]` a starting
@@ -128,6 +137,8 @@ C0/C1 — verify when writing an exporter).
 - `tsb_engine/` – model, forward kinematics, `moves.py`/`footwork.py` (planted feet, steps, gaits), `authoring.py`, `cinematic.py`, `linter.py`, CLI.
 - `examples/builders.py` – a worked heavy punch plus two deliberately bad animations; `examples/ultimate.py` – the 13 s berserker ultimate; `examples/short.py` – the reference-level 11 s short.
 - `tsb_engine/secondary.py` – hair, coat and hat secondary motion (preview only).
+- `tsb_engine/export_check.py` + `tools/check_export.py` – round-trip check of the `.rbxmx` export (Roblox interpolation + Motor6D FK vs the engine) and adaptive keyframe optimisation.
+- `docs/research/rnd-audit.md` – verified audit of the Roblox/Blender/VFX repos and docs (licences, what is verified, test plan for Studio).
 - `tsb_engine/solver.py` – limb aiming/contact solving, dislocation, moving hold, kinetic chain; `tsb_engine/readability.py` + `tools/check_poses.py` – picture-space pose checks.
 - `docs/research/reference-analysis.md` – frame-level study of a user-supplied reference clip.
 - `examples/scenes.py` + `viewer/` + `tools/` – attacker/victim scene, HTML viewer, frame rendering.

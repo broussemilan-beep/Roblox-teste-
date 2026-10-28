@@ -4,6 +4,7 @@
   python tools/eyes.py film SCENE OUTDIR                      render a scene's film camera at 30 fps (clean, no HUD)
   python tools/eyes.py analyze DIR OUTDIR [--mask-right 0.17] measurements + rhythm.png + report.json
   python tools/eyes.py compare REF_DIR MINE_DIR OUTDIR        side-by-side measurements, diagnosis, compare.png, beats.md
+  python tools/eyes.py hot DIR OUT.png [--top 6 --radius 3]   every frame around the strongest motion peaks (catches 2-frame smears)
   python tools/eyes.py trail DIR A B OUT.png                  where things moved between frames A..B (colour = time)
   python tools/eyes.py flow DIR I OUT.png                     optical flow of frame I (hue = direction, brightness = speed)
 
@@ -80,6 +81,14 @@ def cmd_compare(a):
     print(f"\nwrote {out}/compare.png, pairs.png, diagnosis.txt, beats.md, report.json")
 
 
+def cmd_hot(a):
+    clip = _load(a.dir, a.mask_right, a.last)
+    wins = eyes.hot_windows(clip, a.top, a.radius)
+    Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+    eyes.window_sheet(clip, wins, a.out)
+    print("windows (start, peak, end):", wins)
+
+
 def cmd_trail(a):
     fr = eyes.load_clip(a.dir, mask_right=a.mask_right)
     cv2.imwrite(a.out, cv2.resize(eyes.motion_trail(fr, a.a, a.b), None, fx=2, fy=2))
@@ -97,6 +106,7 @@ def main():
     s = sp.add_parser("film"); s.add_argument("scene"); s.add_argument("out"); s.add_argument("--fps", type=int, default=30); s.add_argument("--width", type=int, default=960); s.set_defaults(f=cmd_film)
     s = sp.add_parser("analyze"); s.add_argument("dir"); s.add_argument("out"); s.add_argument("--mask-right", type=float, default=0.0); s.add_argument("--last", type=int); s.set_defaults(f=cmd_analyze)
     s = sp.add_parser("compare"); s.add_argument("ref"); s.add_argument("mine"); s.add_argument("out"); s.add_argument("--ref-mask", type=float, default=UI_RIGHT); s.add_argument("--ref-last", type=int); s.add_argument("--min-shot", type=int, default=3); s.add_argument("--anchors", help="ref:mine,ref:mine,... frames (30 fps) that must line up"); s.set_defaults(f=cmd_compare)
+    s = sp.add_parser("hot"); s.add_argument("dir"); s.add_argument("out"); s.add_argument("--top", type=int, default=6); s.add_argument("--radius", type=int, default=3); s.add_argument("--mask-right", type=float, default=0.0); s.add_argument("--last", type=int); s.set_defaults(f=cmd_hot)
     s = sp.add_parser("trail"); s.add_argument("dir"); s.add_argument("a", type=int); s.add_argument("b", type=int); s.add_argument("out"); s.add_argument("--mask-right", type=float, default=0.0); s.set_defaults(f=cmd_trail)
     s = sp.add_parser("flow"); s.add_argument("dir"); s.add_argument("i", type=int); s.add_argument("out"); s.add_argument("--mask-right", type=float, default=0.0); s.set_defaults(f=cmd_flow)
     a = p.parse_args()

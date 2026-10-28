@@ -426,6 +426,41 @@ def flow_picture(frames: np.ndarray, i: int) -> np.ndarray:
     return cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
 
+def hot_windows(clip: Clip, k: int = 6, radius: int = 3, min_gap: int = 8) -> list[tuple[int, int, int]]:
+    """(start, peak, end) of the ``k`` strongest update-energy peaks, ``radius`` frames either side.
+
+    A 2-frame smear is invisible to a sampler that looks at a few frames per second: locate the action cheaply with the
+    energy curve, then look at *every* frame around each peak (``window_sheet``).
+    """
+    e = clip.m["diff"].copy()
+    out: list[tuple[int, int, int]] = []
+    for _ in range(k):
+        i = int(np.argmax(e))
+        if e[i] <= 0:
+            break
+        out.append((max(0, i - radius), i, min(clip.n - 1, i + radius)))
+        e[max(0, i - min_gap) : i + min_gap + 1] = 0
+    return sorted(out)
+
+
+def window_sheet(clip: Clip, windows: list[tuple[int, int, int]], out: str, width: int = 300) -> None:
+    """Every frame of every window, one window per row, frame numbers drawn on, the peak outlined in red."""
+    rows = []
+    cols = max(e - s + 1 for s, _, e in windows)
+    for s, pk, e in windows:
+        cells = []
+        for i in range(s, e + 1):
+            im = cv2.resize(clip.frames[i], (width, int(width * clip.frames.shape[1] / clip.frames.shape[2]))).copy()
+            cv2.putText(im, str(i), (4, 14), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 1)
+            if i == pk:
+                cv2.rectangle(im, (0, 0), (im.shape[1] - 1, im.shape[0] - 1), (0, 0, 255), 2)
+            cells.append(im)
+        while len(cells) < cols:
+            cells.append(np.zeros_like(cells[0]))
+        rows.append(np.concatenate(cells, 1))
+    cv2.imwrite(out, np.concatenate(rows, 0))
+
+
 def pair_sheet(ref: Clip, mine: Clip, beats: list[dict], out: str, cols: int = 4, min_len: int = 1, width: int = 330) -> None:
     """Reference frame above my aligned frame, for every reference shot: the visual diff, shot by shot."""
     cells = []

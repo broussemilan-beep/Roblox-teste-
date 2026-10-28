@@ -69,12 +69,24 @@ def roblox_forward_kinematics(cframes: dict[str, Transform]) -> dict[str, Transf
 
 
 # ---------------------------------------------------------------- sampling
-def keyframe_times(anim: Animation, step: int = 1, start: int = 0, end: int | None = None) -> list[int]:
+def keyframe_times(anim: Animation, step: int = 1, start: int = 0, end: int | None = None, authored: bool = True) -> list[int]:
+    """Frames to export: a regular grid every ``step`` frames, plus (``authored``) every key the animator placed and the frame
+    just before each *constant* (held) segment ends - so cuts, teleports and holds survive a coarse ``step``.
+
+    Roblox interpolates between exported keyframes (Linear easing): without these extra keys a 60-stud blink-cut would be
+    exported as a smooth slide (see ``export_check``: 35 studs of error at step 2).
+    """
     last = anim.last_frame if end is None else end
-    frames = list(range(start, last + 1, max(1, step)))
-    if frames[-1] != last:
-        frames.append(last)
-    return frames
+    frames = set(range(start, last + 1, max(1, step)))
+    frames.add(last)
+    if authored:
+        for track in anim.tracks.values():
+            for k, nxt in zip(track, track[1:] + [None]):
+                if start <= k.frame <= last:
+                    frames.add(k.frame)
+                if nxt is not None and k.easing == "constant" and start <= nxt.frame - 1 <= last and nxt.frame - 1 > k.frame:
+                    frames.add(nxt.frame - 1)
+    return sorted(frames)
 
 
 def _cf_xml(t: Transform, pad: str) -> str:
@@ -110,10 +122,11 @@ def markers_for(anim: Animation, fps: int) -> list[tuple[int, str]]:
 def to_rbxmx(
     anim: Animation, name: str | None = None, fps: int | None = None, priority: str = "Action",
     loop: bool = False, step: int = 1, extra_markers: list[tuple[int, str]] | None = None,
+    frames: list[int] | None = None,
 ) -> str:
-    """KeyframeSequence as ``.rbxmx`` text. One keyframe every ``step`` frames, Linear easing, R6 rig."""
+    """KeyframeSequence as ``.rbxmx`` text. One keyframe every ``step`` frames (or exactly ``frames``), Linear easing, R6 rig."""
     fps = fps or anim.fps
-    frames = keyframe_times(anim, step)
+    frames = sorted(set(frames)) if frames else keyframe_times(anim, step)
     markers = markers_for(anim, fps) + list(extra_markers or [])
     marker_at: dict[int, list[str]] = {}
     for f, label in markers:  # snap markers to the nearest exported keyframe (markers must sit on keyframes)
@@ -163,10 +176,10 @@ def to_rbxmx(
 
 
 def to_luau(anim: Animation, name: str | None = None, fps: int | None = None, priority: str = "Action", step: int = 1,
-            extra_markers: list[tuple[int, str]] | None = None) -> str:
+            extra_markers: list[tuple[int, str]] | None = None, frames: list[int] | None = None) -> str:
     """Luau script to paste in Studio's command bar: builds the KeyframeSequence in ServerStorage."""
     fps = fps or anim.fps
-    frames = keyframe_times(anim, step)
+    frames = sorted(set(frames)) if frames else keyframe_times(anim, step)
     marker_at: dict[int, list[str]] = {}
     for f, label in markers_for(anim, fps) + list(extra_markers or []):
         marker_at.setdefault(min(frames, key=lambda k: abs(k - f)), []).append(label)

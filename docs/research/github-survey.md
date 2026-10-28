@@ -151,3 +151,8 @@ matplotlib, PySceneDetect) are standard, so `tsb_engine/eyes.py` + `tools/eyes.p
 What it measures: update energy, optical-flow speed/direction, subject height, screen coverage by black/white/cyan, edge density,
 shot cuts and holds, cadence; aligns two clips by hand-picked anchors (or DTW) and prints a numbered diagnosis, a per-shot table
 and a ref-above-mine picture for every reference shot. It does **not** judge appeal or weight: that stays with human eyes.
+
+
+## 8. R&D audit (2026-10-28)
+
+See `docs/research/rnd-audit.md`: claim-by-claim verification of an externally written audit (RigBridge, Staticaliza, Roqer, Willikk Mesh VFX, RoClicks, Motion Tools, Roblox docs), licence matrix, verified Roblox facts, Studio test plan.

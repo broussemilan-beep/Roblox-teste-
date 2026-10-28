@@ -10,13 +10,14 @@ Work in progress toward a skill + toolkit for TSB-style **R6 combat animation**.
 - `docs/research/github-survey.md` – survey of GitHub (Roblox VFX, export, Blender, other engines) with licences and what was applied.
 - `examples/` – a worked heavy punch, two bad animations used by the tests, and `ultimate.py` (a 13 s, 4-act ultimate) and `short.py` (an 11 s short at the level of a TikTok reference: ink smears, impact frames, secondary motion).
 - `tsb_engine/solver.py` / `readability.py` – solve a limb onto a contact point, dislocation/chain helpers, and a numpy z-buffer that measures how readable a pose is from the shot camera (`python tools/check_poses.py duel_short 62,104`); `docs/analysis/method-comparison.md` compares the Gemini method with ours.
+- `tsb_engine/export_check.py` / `tools/check_export.py` – re-reads the exported `.rbxmx`, plays it like Roblox and reports the error in studs; `--optimize` finds the fewest keyframes within a tolerance. `docs/research/rnd-audit.md` – verified audit of the Roblox/VFX repos and docs.
 - `tsb_engine/eyes.py` + `tools/eyes.py` – "eyes": measure a clip (pace, holds, subject size, fx coverage, optical flow, cuts) and diff a render against a reference video with a numbered diagnosis and ref-above-mine pictures (`pip install -r requirements-eyes.txt`).
 - `tsb_engine/secondary.py` – verlet hair / coat tails / hat for the preview; `docs/research/reference-analysis.md` – the reference study.
 - `docs/gemini/` – raw export of the source conversation; `docs/analysis/` – analysis of it;
   `docs/research/` – research on TSB's animators.
 
 ```bash
-python -m unittest discover -s tests          # 71 tests, no dependencies (~30 s)
+python -m unittest discover -s tests          # 79 tests, no dependencies (~30 s)
 python tools/build_viewer.py berserker_ultimate   # then open viewer/output/berserker_ultimate.html
 python tools/build_viewer.py duel_short           # the 11 s short
 python -m tsb_engine lint examples/heavy_punch.json

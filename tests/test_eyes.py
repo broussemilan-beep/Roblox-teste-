@@ -83,3 +83,18 @@ class EyesTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipIf(cv2 is None, "OpenCV not installed")
+class HotWindowsTest(unittest.TestCase):
+    def test_the_strongest_peaks_are_found_with_all_their_frames(self):
+        frames = [grey(130)] * 12 + [with_block(130)] + [grey(130)] * 12 + [grey(10)] + [grey(130)] * 6
+        clip = eyes.analyze(np.stack(frames), "t")
+        wins = eyes.hot_windows(clip, k=2, radius=2)
+        peaks = {pk for _, pk, _ in wins}
+        self.assertTrue(peaks & {12, 13})
+        self.assertTrue(peaks & {25, 26})
+        with tempfile.TemporaryDirectory() as d:
+            out = str(Path(d) / "w.png")
+            eyes.window_sheet(clip, wins, out)
+            self.assertTrue(Path(out).exists())
