@@ -394,7 +394,7 @@ const DATA = /*__DATA__*/null;
     const polys = [];
     for (const ch of D.characters) {
       PARTS.forEach((part, i) => (ch.hide || []).includes(part) || boxFaces(polys, B, ch.frames[f][i], SZ[part], hex(ch.colors[part]), bright, part === 'Head' ? (ch.face || 'std') : false));
-      for (const ex of (ch.extras || [])) boxFaces(polys, B, ex.frames[f], ex.size, hex(ex.color), bright, false, ex.shape);
+      for (const ex of (ch.extras || [])) if (!ex.vis || (f >= ex.vis[0] && f <= ex.vis[1])) boxFaces(polys, B, ex.frames[f], ex.size, hex(ex.color), bright, false, ex.shape);
     }
     if (CINE) {
       for (const p of CINE.props) {

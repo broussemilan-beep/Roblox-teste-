@@ -127,3 +127,20 @@ def char_points(frame: int, *chars: Character, tips: bool = True) -> list:
             for part in ("Right Arm", "Left Arm", "Right Leg", "Left Leg"):
                 pts.append(apply(wp[part], (0.0, -1.0, 0.0)))
     return pts
+
+
+def root_pose(x: float, h: float, z: float, rx: float = 0.0, ry: float = 0.0, rz: float = 0.0) -> Pose:
+    """Root pose with an *intrinsic* attitude: ``ry`` yaw (heading), then ``rx`` pitch (negative = dives forward) about the body's own X, then ``rz`` roll
+    about its own Z; ``h`` is the torso-centre height (Root rests at 3.0). The engine's Euler order is X, Y, Z about the parent's axes, which would pitch
+    about the *world* X after the heading - sideways for a body running along +X."""
+    from .mathutil import euler, mat_mul
+
+    m = mat_mul(mat_mul(euler((0.0, ry, 0.0)), euler((rx, 0.0, 0.0))), euler((0.0, 0.0, rz)))
+    b = math.asin(max(-1.0, min(1.0, m[0][2])))
+    if abs(m[0][2]) < 0.99999:
+        a = math.atan2(-m[1][2], m[2][2])
+        c = math.atan2(-m[0][1], m[0][0])
+    else:  # gimbal: fold the roll into the first angle
+        a = math.atan2(m[2][1], m[1][1])
+        c = 0.0
+    return Pose((x, h - 3.0, z), (math.degrees(a), math.degrees(b), math.degrees(c)))

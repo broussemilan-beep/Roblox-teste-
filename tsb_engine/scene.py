@@ -83,7 +83,7 @@ def export_viewer_data(scene: Scene) -> dict:
         extras = []
         if c.outfit is not None:
             for tr in c.outfit.simulate(c, scene.n_frames, scene.hold, scene.fps):
-                extras.append({"name": tr.name, "shape": tr.shape, "size": [round(v, 3) for v in tr.size], "color": tr.color,
+                extras.append({"name": tr.name, "shape": tr.shape, "size": [round(v, 3) for v in tr.size], "color": tr.color, "vis": list(tr.vis) if tr.vis else None,
                                "frames": [[round(v, 4) for row in t[0] for v in row] + [round(v, 4) for v in t[1]] for t in tr.frames]})
         for mname, mesh in (c.outfit.meshes() if c.outfit is not None else {}).items():
             meshes[mname] = {"v": [round(float(x), 4) for x in mesh.v.reshape(-1)], "f": [int(i) for i in mesh.f.reshape(-1)],

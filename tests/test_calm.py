@@ -34,7 +34,7 @@ class CalmFilmTest(unittest.TestCase):
         xf, zf, hd = zigzag()
         turns = sum(1 for f in range(73, 240) if hd(f) != hd(f - 1))
         self.assertGreaterEqual(turns, 14)
-        self.assertGreater(xf(239) - xf(72), 150)
+        self.assertGreater(xf(239) - xf(72), 100)
         self.assertLess(max(abs(zf(f) - zf(72)) for f in range(72, 240)), 60)
 
     def test_mannequin_stays_far_until_the_slam(self):

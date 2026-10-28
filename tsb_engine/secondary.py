@@ -62,6 +62,7 @@ class ExtraTrack:
     color: str
     frames: list[Transform]
     shape: str = "box"  # "box" | "cyl" (round, axis Y) | "ell" (ellipsoid)
+    vis: tuple[int, int] | None = None  # shown only on images vis[0]..vis[1] (inclusive); None = always
 
 
 @dataclass
@@ -175,6 +176,7 @@ class Attach:
     mesh: object
     offset: Vec = (0.0, 0.0, 0.0)
     tilt: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    vis: tuple[int, int] | None = None  # visible only on these images (e.g. the drawn blade)
 
     def simulate(self, char, n_frames: int, hold: int = 1, fps: int = 60) -> list[ExtraTrack]:
         from .mathutil import compose, euler, translate
@@ -184,7 +186,7 @@ class Attach:
         for f in range(n_frames):
             ff = f - f % hold
             out.append(compose(char.world_parts(ff)[self.parent], local))
-        return [ExtraTrack(self.name, (2.0, 2.0, 2.0), "#888888", out, "mesh:" + self.mesh.name)]
+        return [ExtraTrack(self.name, (2.0, 2.0, 2.0), "#888888", out, "mesh:" + self.mesh.name, self.vis)]
 
 
 @dataclass

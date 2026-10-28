@@ -392,7 +392,15 @@ def main():
         frames = range(int(s), int(e) + 1)
     else:
         frames = range(nfr)
-    build(a.scene, frames, a.width, a.samples)
+    D = build(a.scene, frames, a.width, a.samples)
+    cuts = set()   # motion blur must not smear a cut: the interpolation between two shots is not a movement
+    cams, tors = (D["cine"]["camera"] if D.get("cine") else []), [[ch["frames"][f][D["parts"].index("Torso")][9:12] for f in range(D["nFrames"])] for ch in D["characters"]]
+    for f in range(1, D["nFrames"]):
+        jump = max([math.dist(cams[f][:3], cams[f - 1][:3])] if cams else [0.0] + [math.dist(t[f], t[f - 1]) for t in tors])
+        if cams:
+            jump = max(jump, max(math.dist(t[f], t[f - 1]) for t in tors))
+        if jump > 6.0:
+            cuts.update((f - 1, f))
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     sc = bpy.context.scene
@@ -403,6 +411,7 @@ def main():
     else:
         for f in frames:
             sc.frame_set(f)
+            sc.render.use_motion_blur = f not in cuts
             sc.render.filepath = str(out / f"b_{f:04d}.png")
             bpy.ops.render.render(write_still=True)
             print("frame", f, flush=True)

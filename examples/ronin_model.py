@@ -90,18 +90,18 @@ def goggles() -> M.Mesh:
 
 
 # ------------------------------------------------------------------ katana
-def katana(sheathed: bool = True) -> M.Mesh:
+def katana(sheathed: bool = True, handle: bool = True) -> M.Mesh:
     """Origin at the guard (tsuba), handle toward -Y (0.95 long), blade toward +Y (2.5 long) with a curved sori and a pointed tip.
     Sheathed: a lacquered saya covers the blade."""
     n = 14
     parts: list[M.Mesh] = []
-    # handle (tsuka): wrapped cylinder with diamond ito bands
-    parts.append(M.cylinder(0.075, 0.95, 8, WRAP, "tsuka").translate(0, -0.475, 0))
-    for k in range(5):
-        parts.append(M.cylinder(0.088, 0.045, 8, STRAP, "ito").translate(0, -0.15 - 0.17 * k, 0))
-    parts.append(M.cylinder(0.1, 0.07, 8, GOLD, "kashira").translate(0, -0.97, 0))
-    parts.append(M.cylinder(0.3, 0.04, 14, GOLD, "tsuba").translate(0, 0.0, 0))  # round guard
-    parts.append(M.cylinder(0.11, 0.1, 8, GOLD, "habaki").translate(0, 0.07, 0))
+    if handle:  # handle (tsuka): wrapped cylinder with diamond ito bands, guard, collar
+        parts.append(M.cylinder(0.075, 0.95, 8, WRAP, "tsuka").translate(0, -0.475, 0))
+        for k in range(5):
+            parts.append(M.cylinder(0.088, 0.045, 8, STRAP, "ito").translate(0, -0.15 - 0.17 * k, 0))
+        parts.append(M.cylinder(0.1, 0.07, 8, GOLD, "kashira").translate(0, -0.97, 0))
+        parts.append(M.cylinder(0.3, 0.04, 14, GOLD, "tsuba").translate(0, 0.0, 0))  # round guard
+        parts.append(M.cylinder(0.11, 0.1, 8, GOLD, "habaki").translate(0, 0.07, 0))
     length, sori = 2.5, 0.07
     path = [(sori * math.sin(math.pi * i / n) ** 2 * 0 + 0.0, 0.1 + length * i / n, -sori * math.sin(math.pi * i / n)) for i in range(n + 1)]
     path = [(0.0, y, z * 0.9) for _, y, z in path]
@@ -116,7 +116,7 @@ def katana(sheathed: bool = True) -> M.Mesh:
         sc = [1.0] * (n - 2) + [0.8, 0.45, 0.06]
         parts.append(M.sweep(sec, path, sc, STEEL, "blade"))
         parts.append(M.sweep([(0.0, 0.0), (0.012, 0.0), (0.012, 0.03), (0.0, 0.03)], [(0, 0.1, 0.0), (0, 0.1 + length * 0.85, path[int(n * 0.85)][2] * 0.9)], None, STEEL_DK, "hamon") if False else M.Mesh())
-    return M.merge([p for p in parts if len(p.f)], "ronin_katana" + ("_saya" if sheathed else "_drawn"))
+    return M.merge([p for p in parts if len(p.f)], "ronin_katana" + ("_saya" if sheathed else "_drawn") + ("" if handle else "_empty"))
 
 
 # ------------------------------------------------------------------ body
@@ -163,7 +163,8 @@ def shin() -> M.Mesh:
     ], "ronin_shin")
 
 
-def ronin_outfit(with_sheath: bool = True, drawn: bool = False) -> Outfit:
+def ronin_outfit(with_sheath: bool = True, drawn: bool = False, draw: tuple[int, int] | None = None) -> Outfit:
+    """``draw=(f0, f1)``: the katana is on his back until image ``f0``, then the empty sheath stays there and the blade is in his right hand until ``f1``."""
     items: list[object] = [
         Attach("hair", "Head", hair()),
         Attach("goggles", "Head", goggles()),
@@ -175,8 +176,14 @@ def ronin_outfit(with_sheath: bool = True, drawn: bool = False) -> Outfit:
         Attach("shin_r", "Right Leg", shin()),
         Strand("scarf_tail", "Torso", (0.55, 0.9, 0.55), 4, 0.6, 0.62, 0.1, CREAM, rest_dir=(0.1, -1.0, 0.4), gravity=30, stiffness=3.5, drag=2.2, taper=0.9),
     ]
+    back = ((0.5, 0.78, 0.7), (0.0, 0.0, 140.0))
+    if draw is not None:
+        items.append(Attach("katana", "Torso", katana(True), back[0], back[1], vis=(0, draw[0] - 1)))
+        items.append(Attach("saya_empty", "Torso", katana(True, handle=False), back[0], back[1], vis=(draw[0], 10**6)))
+        items.append(Attach("katana_hand", "Right Arm", katana(False), (0.0, -0.95, -0.15), (-90.0, 0.0, 0.0), vis=(draw[0], draw[1])))
+        return Outfit(items)
     if with_sheath:
-        items.append(Attach("katana", "Torso", katana(True), (0.5, 0.78, 0.7), (0.0, 0.0, 140.0)))
+        items.append(Attach("katana", "Torso", katana(True), back[0], back[1]))
     if drawn:  # blade out, gripped in the right hand and pointing forward (arm local: hand end at -Y 1.0)
         items.append(Attach("katana_hand", "Right Arm", katana(False), (0.0, -0.95, -0.15), (-90.0, 0.0, 0.0)))
     return Outfit(items)

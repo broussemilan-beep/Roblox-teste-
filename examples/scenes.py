@@ -142,4 +142,10 @@ def _calm() -> Scene:
     return build()
 
 
-SCENES = {"calm": _calm, "ronin_showcase": _ronin, "heavy_punch_hit": heavy_punch_hit, "berserker_ultimate": _ultimate, "duel_short": _short, "eyes_bench": _eyes_bench}
+def _run_test() -> Scene:
+    from .run_test import build
+
+    return build()
+
+
+SCENES = {"run_test": _run_test, "calm": _calm, "ronin_showcase": _ronin, "heavy_punch_hit": heavy_punch_hit, "berserker_ultimate": _ultimate, "duel_short": _short, "eyes_bench": _eyes_bench}
