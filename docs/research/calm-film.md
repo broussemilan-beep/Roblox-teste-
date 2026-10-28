@@ -57,3 +57,24 @@ Les consignes « Blender / lens 14 mm / Emission = 10 » du diagnostic ne s'appl
 * Pas de vrai flou de mouvement ni de ligne jaune au sol (la réf en a).
 * Les poses du sprint sont à peine lisibles à cette distance (le héros est petit, comme en réf, mais mes poses ne sont pas aussi nettes).
 * Contact du choc : toujours pas résolu avec `solver.reach_root`.
+
+## v4 : vrai moteur de rendu (Blender / Cycles) + effets 2D composités (2026-10-28)
+
+Retour de l'utilisateur sur v3 : « l'animation ne va pas du tout et le rendu est moche ». Deux causes de fond :
+
+* **Rendu** : le viewer dessinait des polygones plats en 2D (pas de lumière, d'ombres, de matières, de flou). Remplacé par `bpy` (Blender 5.2 en module Python, installé dans un venv à part :
+  `pip install bpy` sous Python 3.13) : `tools/render_blender.py` construit le monde 3D (sol à quadrillé et brume, ciel, soleil + lumière de contre-jour, corps en boîtes biseautées,
+  maillages d'accessoires avec une matière par face, props, débris, caméra clés par image, flou de mouvement réel) ; `tools/render_layers.js` rend les effets 2D du viewer en deux calques
+  transparents (monde / écran) ; `tools/composite.py` assemble, ajoute bloom + grain et applique les effets qui lisent l'image (négatif, silhouette noir/blanc + éclats cyan).
+  Coût : ~13 s par image à 10 échantillons (≈ 85 min les 386 images, 4 cœurs).
+* **Sprint** : je l'avais compris de travers (profil + plongeons horizontaux). Relu en grand : caméra basse **derrière/3/4 arrière**, horizon quasi de niveau (le roll de ±25° venait
+  d'un diagnostic externe, absent de cette vidéo), héros accroupi qui s'éloigne le long des lignes du sol, bulle presque ronde, grand halo fantôme en retard.
+  Correction : `chase_cam` (caméra qui suit le cap avec retard), poses de course accroupie, palette sombre (manches brun sombre au lieu d'orange).
+
+Tentative d'erreur reconnue : j'avais d'abord refusé le point « caméra dans l'axe » de la fiche externe sur la foi d'images de profil ; les images 72-134 en grand lui donnent en partie raison.
+
+### Toujours faux (v4)
+* Le héros est trop petit dans sa bulle pour que ses poses se lisent ; la référence montre un corps plus grand, avec un sabre en travers du dos lisible.
+* La macro du sabre (310-341) est dominée par le mannequin couché au premier plan.
+* De grosses traînées blanches (tubes) apparaissent près de la caméra pendant le sprint (images ~110-130).
+* Les poses sont toujours choisies à la main dans une bibliothèque de 11 poses, pas recalées image par image sur la référence.
