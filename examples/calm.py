@@ -95,12 +95,12 @@ def cycle(a: Animation, f0: int, f1: int, xf, zf, ry, seed: int, every: int = 2)
         run_pose(a, f, xf(f), zf(f), ry(f) if callable(ry) else ry, idx, rng)
 
 
-def copied_poses(path: Path) -> dict[int, list[float]]:
+def copied_poses(path: Path, min_iou: float = 0.62) -> dict[int, list[float]]:
     """Joint angles copied from the reference (tools/copy_poses.py: the R6 rig fitted to the tracked hero's silhouette), lightly smoothed in time."""
     if not path.exists():
         return {}
     d = json.loads(path.read_text())
-    frames = [(x["f"], x["angles"]) for x in d["frames"] if x["angles"] is not None]
+    frames = [(x["f"], x["angles"]) for x in d["frames"] if x["angles"] is not None and (x["iou"] or 0.0) >= min_iou]   # poorly fitted images fall back to the gait
     if not frames:
         return {}
     fs = [f for f, _ in frames]
