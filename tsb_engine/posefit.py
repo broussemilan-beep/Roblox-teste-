@@ -253,7 +253,8 @@ def normalise_labels(lab: np.ndarray, size: int = CANVAS) -> tuple[np.ndarray, t
     return cv2.warpAffine(lab, M, (size, size), flags=cv2.INTER_NEAREST), (float(x0), float(y0), float(side))
 
 
-def fit_frame_labels(target: np.ndarray, init: Fit | None, prev: Fit | None = None, elev: float = 28.0, pop: int = 100, iters: int = 40, w_prev: float = 0.30, seed: int = 0) -> Fit:
+def fit_frame_labels(target: np.ndarray, init: Fit | None, prev: Fit | None = None, elev: float = 28.0, pop: int = 100, iters: int = 40, w_prev: float = 0.30, seed: int = 0,
+                     lo: np.ndarray | None = None, hi: np.ndarray | None = None, w_up: float = 0.0) -> Fit:
     """Same search as ``fit_frame`` but the score is the class agreement of the face-coloured render."""
     rng = np.random.RandomState(seed)
     if init is None:
@@ -265,13 +266,15 @@ def fit_frame_labels(target: np.ndarray, init: Fit | None, prev: Fit | None = No
         base = np.concatenate([init.params, [init.tx, init.ty, init.s]])
         sd = np.concatenate([[18, 14, 12, 12, 10, 6, 9, 9, 40, 22, 40, 22, 28, 14, 28, 14], [3, 3, 2]])
     prev_p = None if prev is None else np.concatenate([prev.params, [prev.tx, prev.ty, prev.s]])
+    lo_, hi_ = (LO if lo is None else lo), (HI if hi is None else hi)
 
     def cost(theta):
-        pp = np.clip(theta[:16], LO, HI)
+        pp = np.clip(theta[:16], lo_, hi_)
         lm = render_labels(pp, theta[16], theta[17], max(2.0, theta[18]), elev)
         c = 1.0 - (0.6 * iou(lm > 0, target > 0) + 0.4 * label_score(lm, target))   # silhouette first (robust to compression), colours decide the orientation
         if prev_p is not None:
             c += w_prev * float(np.sum(((pp - prev_p[:16]) / 60.0) ** 2)) / 16.0
+        c += w_up * float((pp[1] / 40.0) ** 2 + (pp[2] / 40.0) ** 2)   # prefer standing / crouching over lying when the colours are ambiguous
         return c
 
     mean, best, best_c = base.copy(), base.copy(), cost(base)
@@ -285,6 +288,6 @@ def fit_frame_labels(target: np.ndarray, init: Fit | None, prev: Fit | None = No
         elite = cand[order[: max(6, pop // 6)]]
         mean = 0.5 * mean + 0.5 * elite.mean(0)
         sd = 0.5 * sd + 0.5 * (elite.std(0) + 0.05 * np.concatenate([np.ones(16) * 2, [0.3, 0.3, 0.1]]))
-    pp = np.clip(best[:16], LO, HI)
+    pp = np.clip(best[:16], lo_, hi_)
     lm = render_labels(pp, best[16], best[17], best[18], elev)
     return Fit(pp, float(best[16]), float(best[17]), float(best[18]), 0.6 * iou(lm > 0, target > 0) + 0.4 * label_score(lm, target))

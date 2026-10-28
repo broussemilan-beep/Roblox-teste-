@@ -28,10 +28,12 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--overlay")
     ap.add_argument("--iters", type=int, default=40)
+    ap.add_argument("--lying", default="", help="comma list of A-B image ranges where the rig may lie down (everywhere else root pitch/roll are bounded to +-28 deg)")
     a = ap.parse_args()
     out = {"names": posefit.NAMES, "elev": a.elev, "first_frame": a.first, "frames": []}
     prev = None
     vis = []
+    lying = [tuple(int(v) for v in r.split("-")) for r in a.lying.split(",") if r]
     for f in range(a.first, a.last + 1):
         img = cv2.imread(str(Path(a.dir) / f"f_{f:04d}.png"))
         lab = posefit.color_labels(img)
@@ -47,7 +49,11 @@ def main():
         if (lab > 0).sum() < 1800:   # the rig is hidden or tinted by a fx (purple / pink flash): no usable colours
             out["frames"].append({"f": f, "angles": None})
             continue
-        fit = posefit.fit_frame_labels(tc, prev, prev, elev=a.elev, iters=a.iters, seed=f)
+        free = any(x <= f <= y for x, y in lying)
+        lo, hi = posefit.LO.copy(), posefit.HI.copy()
+        if not free:
+            lo[1], hi[1], lo[2], hi[2] = -28.0, 28.0, -28.0, 28.0
+        fit = posefit.fit_frame_labels(tc, prev, prev, elev=a.elev, iters=a.iters, seed=f, lo=lo, hi=hi, w_up=0.0 if free else 0.12)
         prev = fit
         out["frames"].append({"f": f, "angles": [round(float(v), 1) for v in fit.params], "score": round(fit.iou, 3), "crop": [round(x0, 1), round(y0, 1), round(side, 1)],
                               "fit": [round(fit.tx, 2), round(fit.ty, 2), round(fit.s, 3)]})
