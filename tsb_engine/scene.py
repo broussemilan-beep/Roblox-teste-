@@ -30,6 +30,7 @@ class Character:
     colors: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_COLORS))
     outfit: Outfit | None = None  # secondary-motion extras (hair, coat tails, hat), preview only
     face: str = "std"  # "std" (dots + line) or "smirk" (round glasses, one-sided smile)
+    hide: tuple[str, ...] = ()  # parts not drawn in the preview (replaced by an ``Attach`` mesh, e.g. a mannequin's round head)
 
     def base_transform(self) -> Transform:
         return (rot_y(self.base_yaw), self.base_pos)
@@ -67,6 +68,7 @@ class Scene:
 def export_viewer_data(scene: Scene) -> dict:
     """JSON-serialisable data for ``viewer/viewer.html``."""
     chars = []
+    meshes: dict = {}
     for c in scene.characters:
         frames = []
         for f in range(scene.n_frames):
@@ -83,7 +85,10 @@ def export_viewer_data(scene: Scene) -> dict:
             for tr in c.outfit.simulate(c, scene.n_frames, scene.hold, scene.fps):
                 extras.append({"name": tr.name, "shape": tr.shape, "size": [round(v, 3) for v in tr.size], "color": tr.color,
                                "frames": [[round(v, 4) for row in t[0] for v in row] + [round(v, 4) for v in t[1]] for t in tr.frames]})
-        chars.append({"name": c.name, "face": c.face, "colors": c.colors, "frames": frames, "findings": findings, "extras": extras})
+        for mname, mesh in (c.outfit.meshes() if c.outfit is not None else {}).items():
+            meshes[mname] = {"v": [round(float(x), 4) for x in mesh.v.reshape(-1)], "f": [int(i) for i in mesh.f.reshape(-1)],
+                             "m": [int(i) for i in mesh.mat], "cols": list(mesh.materials)}
+        chars.append({"name": c.name, "face": c.face, "colors": c.colors, "frames": frames, "findings": findings, "extras": extras, "hide": list(c.hide)})
     markers = list(scene.markers)
     bands = list(scene.bands)
     ev = scene.events
@@ -101,6 +106,7 @@ def export_viewer_data(scene: Scene) -> dict:
         "parts": list(PARTS),
         "sizes": {p: list(SIZES[p]) for p in PARTS},
         "characters": chars,
+        "meshes": meshes,
         "lookAt": [0.0, 3.0, -2.0],
         "ground": 16,
         "striker": scene.characters[0].anim.striker if scene.cine is None else None,

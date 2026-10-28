@@ -16,6 +16,7 @@ From these it labels events on the clip's timeline (frame indices at ``fps``):
 ``REAL_COMBO``        several *distinct* poses held for a few frames each: genuinely different hits
 ``SINGLE_HIT_SMEAR``  one or two pose changes accompanied by a VFX burst: a single hit sold by effects
 ``HELD_HERO_CYCLING_VICTIM``  the dark actor holds still while the light actor changes pose every 1-3 images
+``PUNCT_NEGATIVE``    inverted-luminance frames (an impact frame in negative)
 ``HELD_WITH_VFX``     nobody changes pose, only effects appear: the hit is carried by the VFX
 
 Validated against clips with known content in ``examples/eyes_bench.py`` (``tools/eyes_bench.py``). It is a classical
@@ -121,6 +122,31 @@ class Perception:
 
 
 # ------------------------------------------------------------------ per-frame measurements
+def punct_busy(i: int, black_f: np.ndarray, white_f: np.ndarray) -> bool:
+    """A plain black/white frame already explains a correlation drop."""
+    return bool(black_f[i] or white_f[i] or black_f[i - 1] or white_f[i - 1])
+
+
+def _compact_blob(m: np.ndarray) -> float:
+    """Area fraction of the most body-like light component (compact, 0.4-15 % of the picture, not a line or a ring), 0 when there is none.
+
+    A victim is a solid figure; speed lines, domes and rings are light too but thin, hollow or huge. Used to refuse hit labels on stretches
+    where no victim exists (reference n°2 has none for its first 240 images)."""
+    h, w = m.shape
+    cnt, lab, st, _ = cv2.connectedComponentsWithStats(m.astype(np.uint8), connectivity=8)
+    best = 0.0
+    for c in range(1, cnt):
+        a = st[c, cv2.CC_STAT_AREA] / (w * h)
+        bw, bh = st[c, cv2.CC_STAT_WIDTH], st[c, cv2.CC_STAT_HEIGHT]
+        if not (0.004 <= a <= 0.15) or max(bw, bh) / max(1, min(bw, bh)) > 5.0:
+            continue
+        cs, _ = cv2.findContours((lab == c).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        ha = cv2.contourArea(cv2.convexHull(max(cs, key=cv2.contourArea)))
+        if ha > 0 and st[c, cv2.CC_STAT_AREA] / ha > 0.7 and st[c, cv2.CC_STAT_AREA] / max(1, bw * bh) > 0.35:
+            best = max(best, a)
+    return best
+
+
 def _measure(frames: np.ndarray) -> dict[str, np.ndarray]:
     n = len(frames)
     small = []
@@ -130,7 +156,7 @@ def _measure(frames: np.ndarray) -> dict[str, np.ndarray]:
     h, w = small[0].shape[:2]
     keys = ["mean", "white", "black", "cyan", "cover", "dark_area", "light_area", "thin", "new_thin", "star",
             "cam_tx", "cam_ty", "cam_s", "cam_rot", "cam_inl", "cam_n", "cam_expl", "hist", "diff", "d_act", "l_act", "d_act2", "l_act2",
-            "d_shift", "l_shift", "wcore", "bg_same", "l_move", "l_h", "l_dx"]
+            "d_shift", "l_shift", "wcore", "bg_same", "l_move", "l_h", "l_dx", "corr", "vic"]
     s = {k: np.zeros(n) for k in keys}
     D = [None] * n
     L = [None] * n
@@ -185,6 +211,7 @@ def _measure(frames: np.ndarray) -> dict[str, np.ndarray]:
         s["star"][i] = star
         D[i], L[i] = body_d, body_l
         s["dark_area"][i], s["light_area"][i] = body_d.mean(), body_l.mean()
+        s["vic"][i] = _compact_blob(body_l)
         sig_d[i], sig_l[i] = _crop_sig(body_d), _crop_sig(body_l)
         SD[i], SL[i] = _soft(body_d), _soft(body_l)
         ys_l, xs_l = np.nonzero(body_l)
@@ -198,6 +225,7 @@ def _measure(frames: np.ndarray) -> dict[str, np.ndarray]:
     for i in range(1, n):
         g0, g1 = grays[i - 1], grays[i]
         s["diff"][i] = np.abs(g1.astype(np.int16) - g0.astype(np.int16)).mean()
+        s["corr"][i] = float(cv2.matchTemplate(g1, g0, cv2.TM_CCOEFF_NORMED)[0, 0]) if g0.std() > 1 and g1.std() > 1 else 1.0
         s["hist"][i] = cv2.compareHist(hists[i], hists[i - 1], cv2.HISTCMP_BHATTACHARYYA)
         bright0 = cv2.dilate((g0 > 235).astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool)
         s["wcore"][i] = ((g1 > 235) & ~bright0).mean()        # NEW blown-out white: flashes, star spikes, fresh streaks
@@ -241,6 +269,7 @@ def _measure(frames: np.ndarray) -> dict[str, np.ndarray]:
                 v = _soft_iou(S[i], S[i - 2])
                 s[f"{name}_act2"][i] = 0.0 if np.isnan(v) else 1.0 - v
     s["_sig_d"], s["_sig_l"] = sig_d, sig_l  # type: ignore[assignment]
+    s["_gray"] = grays  # type: ignore[assignment]
     return s
 
 
@@ -276,7 +305,28 @@ def perceive(frames: np.ndarray, fps: int = 30) -> Perception:
     for lab, m, ml in (("PUNCT_BLACK", black_f, 1), ("PUNCT_WHITE", white_f, 1), ("VFX_WALL", wall_f, 4), ("EMPTY", empty_f, 3)):
         for a, b in _runs(m, ml, gap=1 if lab == "VFX_WALL" else 0):
             ev.append(Event(lab, a, b))
-    punct = black_f | white_f
+    # negative frames (inverted luminance, often with cyan/violet): the picture is anti-correlated with its neighbours on entry and on exit
+    neg_f = np.zeros(n, bool)
+    grays = s["_gray"]
+    i = 3  # the first frames of a recording are often a transition from another screen
+    while i < n:
+        if s["corr"][i] < -0.2 and not punct_busy(i, black_f, white_f):
+            ref = grays[i - 1]
+            inv = 255 - ref
+
+            def corr(a, b):
+                return float(cv2.matchTemplate(a, b, cv2.TM_CCOEFF_NORMED)[0, 0]) if a.std() > 1 and b.std() > 1 else 0.0
+
+            j = i
+            while j < n and j - i <= 6 and corr(grays[j], inv) > max(0.05, corr(grays[j], ref)):
+                j += 1
+            if j > i and j - i <= 6:   # a run that never ends is a cut to another scene, not a flash
+                neg_f[i:j] = True
+                ev.append(Event("PUNCT_NEGATIVE", i, j - 1))
+                i = j + 1
+                continue
+        i += 1
+    punct = black_f | white_f | neg_f
 
     # ---- cuts: histogram jump + the camera model cannot explain the change
     cut_f = (s["bg_same"] < 0.8) & (s["diff"] > 8) & (s["cam_expl"] < 0.3) & ((s["cam_inl"] < 0.45) | (s["cam_n"] < 10)) & ~punct
@@ -375,7 +425,7 @@ def _read_poses(s, a: int, b: int, cam_on: np.ndarray, bursts, fps: int) -> list
         cam_frac = float(cam_on[sl].mean())
         det = {"flash_active": round(act_frac, 2), "flashes": len(onsets), "victim_react": round(react_frac, 2), "victim_moves": round(moves, 2), "victim_shake": round(rev, 2)}
         labels: list[str] = []
-        victim_ok = float(np.mean(s["light_area"][sl] > 0.012)) > 0.7     # the victim must actually be on screen (not cut off / macro)
+        victim_ok = float(np.mean(s["light_area"][sl] > 0.012)) > 0.7 and float(np.mean(s["vic"][sl] > 0)) > 0.6     # the victim must actually be on screen (not cut off / macro)
         if cam_frac < 0.2 and victim_ok:
             if act_frac >= 0.2 and moves >= 0.7 and rev >= 0.6:
                 labels.append("MULTIHIT_VFX")          # a flash on (almost) every image and the victim is shaken back and forth each time

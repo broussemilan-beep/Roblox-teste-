@@ -97,5 +97,34 @@ class ReadingTest(unittest.TestCase):
         self.assertEqual(reading.validate(self.entry(camera="static", punct="none"), self.pc()), [])
 
 
+@unittest.skipIf(cv2 is None, "OpenCV not installed")
+class NegativeAndVictimTest(unittest.TestCase):
+    def read(self, frames):
+        return perception.perceive(np.stack(frames), fps=30)
+
+    def labels(self, pc):
+        return {e.label for e in pc.events}
+
+    def test_negative_frames_are_named_and_normal_scene_is_not_negative_and_normal_scene_is_not_negative(self):
+        base = scene()
+        neg = 255 - base
+        frames = [base] * 10 + [neg] * 3 + [base] * 10
+        pc = self.read(frames)
+        found = [e for e in pc.events if e.label == "PUNCT_NEGATIVE"]
+        self.assertEqual([(e.start, e.end) for e in found], [(10, 12)])
+        self.assertNotIn("PUNCT_NEGATIVE", self.labels(self.read([base] * 24)))
+
+    def test_compact_blob_sees_a_body_but_not_a_line_or_a_ring(self):
+        body = np.zeros((100, 200), bool)
+        body[30:90, 130:150] = True
+        line = np.zeros((100, 200), bool)
+        line[50, 10:190] = True
+        ring = np.zeros((100, 200), np.uint8)
+        cv2.circle(ring, (100, 50), 40, 1, 3)
+        self.assertGreater(perception._compact_blob(body), 0.04)
+        self.assertEqual(perception._compact_blob(line), 0.0)
+        self.assertEqual(perception._compact_blob(ring.astype(bool)), 0.0)
+
+
 if __name__ == "__main__":
     unittest.main()

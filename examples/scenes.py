@@ -130,4 +130,10 @@ def _eyes_bench() -> Scene:
     return build()[0]
 
 
-SCENES = {"heavy_punch_hit": heavy_punch_hit, "berserker_ultimate": _ultimate, "duel_short": _short, "eyes_bench": _eyes_bench}
+def _ronin() -> Scene:
+    from .ronin_showcase import build
+
+    return build()
+
+
+SCENES = {"ronin_showcase": _ronin, "heavy_punch_hit": heavy_punch_hit, "berserker_ultimate": _ultimate, "duel_short": _short, "eyes_bench": _eyes_bench}

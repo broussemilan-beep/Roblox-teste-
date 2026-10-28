@@ -96,3 +96,16 @@ annoncé un strobe sur la jambe tenue ; remplacée par un test de période 2 (|x
 * Un objet petit, noir, caché derrière le corps, ou foreshortené (bras qui pointe vers la caméra) n'est pas suivi : la mesure « portée » est alors vraie *et* nulle
   (cas du banc : le strobe existe mais n'a aucune extension à l'écran).
 * Calibré sur 4 + 18 suivis du banc et un jonglage ; pas de statistique sur beaucoup de vidéos. Coût : ~3 min pour 30 images et 2-3 objets.
+
+---
+
+## Addendum v4 (2026-10-28): lecture de la 2ᵉ vidéo, négatifs et victime
+
+Relue image par image (`reference-analysis-2.md`), la 2ᵉ référence a mis trois trous à nu :
+1. **Images négatives** (luminance inversée, cyan/violet) non vues : ajout de `PUNCT_NEGATIVE` (anti-corrélation avec l'image précédente + corrélation avec son inverse,
+   durée ≤ 6). 5 des 6 négatifs lus à l'œil sont retrouvés (257-259 manquant). Garde-fou : sans le plafond de durée, les coupes franches du banc étaient lues « négatif ».
+2. **Pas de victime, mais des étiquettes de coup** : `_compact_blob` exige un corps clair compact (ni ligne, ni anneau) avant tout verdict de coup.
+   Les étiquettes entre 102 et 268 disparaissent ; 3 fausses étiquettes subsistent (voir la section 5 de l'analyse).
+3. Banc : toujours **28/30** (les 2 échecs : encre sombre sur la victime). Le banc ne contient pas de négatifs ni de clip sans victime : ces deux ajouts sont validés
+   sur **une seule** vidéo (la 2ᵉ référence) et sur un test unitaire synthétique, rien de plus.
+

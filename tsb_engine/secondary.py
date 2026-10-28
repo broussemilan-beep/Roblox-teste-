@@ -164,10 +164,38 @@ class Rigid:
 
 
 @dataclass
+class Attach:
+    """A real triangle mesh (``tsb_engine.modeling.Mesh``) glued to a part, modelled in that part's local frame (origin = part centre).
+
+    ``offset``/``tilt`` move it relative to the part (Roblox CFrame.Angles order, degrees). The mesh keeps its own per-face colours.
+    """
+
+    name: str
+    parent: str
+    mesh: object
+    offset: Vec = (0.0, 0.0, 0.0)
+    tilt: tuple[float, float, float] = (0.0, 0.0, 0.0)
+
+    def simulate(self, char, n_frames: int, hold: int = 1, fps: int = 60) -> list[ExtraTrack]:
+        from .mathutil import compose, euler, translate
+
+        local = compose(translate(self.offset), (euler(self.tilt), (0.0, 0.0, 0.0)))
+        out = []
+        for f in range(n_frames):
+            ff = f - f % hold
+            out.append(compose(char.world_parts(ff)[self.parent], local))
+        return [ExtraTrack(self.name, (2.0, 2.0, 2.0), "#888888", out, "mesh:" + self.mesh.name)]
+
+
+@dataclass
 class Outfit:
     """A set of extras for one character."""
 
     items: list[object] = field(default_factory=list)
+
+    def meshes(self) -> dict:
+        """Distinct triangle meshes used by ``Attach`` items, by name."""
+        return {it.mesh.name: it.mesh for it in self.items if isinstance(it, Attach)}
 
     def simulate(self, char, n_frames: int, hold: int = 1, fps: int = 60) -> list[ExtraTrack]:
         tracks: list[ExtraTrack] = []

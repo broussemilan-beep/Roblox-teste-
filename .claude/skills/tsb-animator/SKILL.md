@@ -97,6 +97,10 @@ Work like this instead:
    contact sheets with **two views** (3/4 + profile) plus a 2-frame stride strip to judge the motion.
 5. Lint (`TSB001/007` must be clean), then show it. Your eye, not the metric, decides.
 
+## Modelling (real meshes, not boxes)
+
+Characters get recognisable through *accessories*: build them with `tsb_engine.modeling` (`bevel_box`, `lathe`, `sweep`, `cone`, `torus`, `merge`), glue them with `secondary.Attach(name, part, mesh, offset, tilt)` in the part's local frame, hide a box part with `Character(hide=("Head",))` when a mesh replaces it. `examples/ronin_model.py` is the worked example (hair spikes from cones, katana from a swept blade + lathe handle). Check `Mesh.stats()` and render close-ups (`tools/render_frames.js ... film`) before judging; the viewer shades flat per face. Not verified: Studio import, MeshPart triangle limit. Details: `docs/research/modeling.md`.
+
 ## Roblox integration facts (verified on the official docs, 2026-10-28; details in `docs/research/rnd-audit.md`)
 
 - Procedural offsets on `Motor6D.Transform` (fake limb, dislocation, tilt) must be written in `RunService.PreSimulation`; otherwise the Animator overwrites them next frame.
