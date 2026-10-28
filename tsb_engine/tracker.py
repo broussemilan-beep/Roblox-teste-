@@ -44,14 +44,19 @@ class Prompt:
     box: tuple[float, float, float, float] | None = None  # (x0, y0, x1, y1)
 
 
-def track(frames_bgr: list[np.ndarray], prompts: list[Prompt], model_id: str = MODEL_ID, device: str = "cpu") -> dict[int, np.ndarray]:
-    """Boolean masks [N, H, W] per object id, tracked forward and backward from each object's prompt frame."""
+def track(frames_bgr: list[np.ndarray], prompts: list[Prompt], model_id: str = MODEL_ID, device: str = "cpu", return_scores: bool = False):
+    """Boolean masks [N, H, W] per object id, tracked forward and backward from each object's prompt frame.
+
+    ``return_scores=True`` returns ``(masks, scores)`` where ``scores[obj][i]`` is the model's own object-presence logit on frame ``i``
+    (high = the object is there, low/negative = the tracker lost it).
+    """
     import torch
 
     model, proc = load(model_id, device)
     rgb = [np.ascontiguousarray(f[..., ::-1]) for f in frames_bgr]
     h, w = rgb[0].shape[:2]
     out: dict[int, np.ndarray] = {p.obj: np.zeros((len(rgb), h, w), bool) for p in prompts}
+    scores: dict[int, np.ndarray] = {p.obj: np.full(len(rgb), np.nan) for p in prompts}
     for p in prompts:  # one session per object: objects may be first visible on different frames
         for reverse in (False, True):
             if reverse and p.frame == 0:
@@ -72,7 +77,8 @@ def track(frames_bgr: list[np.ndarray], prompts: list[Prompt], model_id: str = M
                     masks = proc.post_process_masks([o.pred_masks], original_sizes=[[h, w]], binarize=True)[0]
                     for k, oid in enumerate(o.object_ids):
                         out[int(oid)][o.frame_idx] |= masks[k, 0].cpu().numpy().astype(bool)
-    return out
+                        scores[int(oid)][o.frame_idx] = float(o.object_score_logits[k].flatten()[0])
+    return (out, scores) if return_scores else out
 
 
 def propose(frame_bgr: np.ndarray, model_id: str = MODEL_ID, points_per_side: int = 16, min_area: float = 0.002, max_masks: int = 40) -> list[dict]:
