@@ -69,6 +69,7 @@ SPRINT_POSES = [
 
 def run_pose(a: Animation, f: int, x: float, z: float, ry: float, idx: int, rng: random.Random) -> None:
     rx, rz, h, t, hd, ra, la, rl, ll = SPRINT_POSES[idx]
+    h = h - 0.5
     j = lambda v: tuple(c + rng.uniform(-8, 8) for c in v)
     K(a, f, "linear", R=root(x, h, z, rx + rng.uniform(-6, 6), ry + rng.uniform(-8, 8), rz), T=t, H=P(j(hd)), RA=P(j(ra)), LA=P(j(la)), RL=P(j(rl)), LL=P(j(ll)))
 
@@ -232,8 +233,8 @@ def build() -> Scene:
     cine.shot(48, 52, tracking(hp, (3.6, 0.4, 8.5), look_dy=0.0, fov=32))
     cine.shot(53, 71, tracking(hp, (7.0, 1.6, 15.0), look_dy=0.2, fov=36, roll=(0, 6)))
     _, _, hdg = zigzag()
-    cine.shot(72, 148, chase_cam(hp, hdg, 72, 148, back=lambda f: 30.0 - 14.0 * min(1.0, (f - 72) / 26.0), side=-7.0, up=1.3, ahead=9.0, lift=3.0, fov=40, roll=5.0))
-    cine.shot(149, 183, chase_cam(hp, hdg, 149, 183, back=17.0, side=6.0, up=1.3, ahead=9.0, lift=3.0, fov=42, roll=5.0))
+    cine.shot(72, 148, chase_cam(hp, hdg, 72, 148, back=lambda f: 24.0 - 13.0 * min(1.0, (f - 72) / 26.0), side=-6.0, up=1.3, ahead=9.0, lift=3.0, fov=40, roll=5.0))
+    cine.shot(149, 183, chase_cam(hp, hdg, 149, 183, back=12.0, side=5.0, up=1.2, ahead=8.0, lift=2.6, fov=42, roll=5.0))
     for f0 in range(184, 240, 10):   # the low side travelling shot (the reference's 184-239): the roll still snaps at every turn
         sg = 1 if hdg(f0) >= 0 else -1
         cine.shot(f0, min(239, f0 + 9), tracking(hp, (6.0, 1.0, -22.0), look_dy=0.8, fov=34, roll=(sg * 3, sg * 6)))
@@ -254,7 +255,7 @@ def build() -> Scene:
 
     # ---- smooth speed shell around the torso (stretched along the heading), thin ring, needles behind it, thin diagonals that avoid him
     dir_at = lambda f: (math.cos(math.radians(hdg(f))), 0.0, math.sin(math.radians(hdg(f)))) if 72 <= f <= 239 else ((1.0, 0.0, 0.0) if f < 282 else (-1.0, 0.0, 0.0))
-    cine.bubble(66, 256, hp, 2.4, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.0, hatch=6)
+    cine.bubble(66, 256, hp, 2.1, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.0, hatch=6)
     cine.bubble(78, 239, lambda f: tuple(v + o for v, o in zip(hp(max(72, f - 7)), (0, 1.2, 0))), 4.0, "#c4d8e8", 0.12, dir_at=dir_at, stretch=1.0)   # the ghost of the shell, lagging behind him
     cine.bubble(265, 273, hp, 2.2, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.1)
     cine.bubble(282, 305, hp, 2.4, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.0)
