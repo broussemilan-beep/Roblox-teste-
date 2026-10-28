@@ -6,6 +6,8 @@
   python tools/eyes.py compare REF_DIR MINE_DIR OUTDIR        side-by-side measurements, diagnosis, compare.png, beats.md
   python tools/eyes.py read DIR OUT [--mask-right 0.17]        events timeline + hot windows + reading.json template
   python tools/eyes.py check DIR READING.json                  contradictions between my written reading and the measurements
+  python tools/eyes.py propose DIR FRAME OUT.png               SAM 2: numbered candidate objects on one frame (+ OUT.json prompt points)
+  python tools/eyes.py track DIR OUT --obj arm=F:X,Y ...       SAM 2: follow objects I pointed at; reliability + strobe verdict + overlay strip
   python tools/eyes.py hot DIR OUT.png [--top 6 --radius 3]   every frame around the strongest motion peaks (catches 2-frame smears)
   python tools/eyes.py trail DIR A B OUT.png                  where things moved between frames A..B (colour = time)
   python tools/eyes.py flow DIR I OUT.png                     optical flow of frame I (hue = direction, brightness = speed)
@@ -16,11 +18,13 @@ Typical loop: ``film duel_short /tmp/mine`` then ``compare /tmp/ref /tmp/mine /t
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
 
 import cv2
+import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -109,6 +113,75 @@ def cmd_check(a):
     sys.exit(1 if issues else 0)
 
 
+def _frames(path, first, last, step=1):
+    files = sorted(Path(path).glob("*.png"))[first : last + 1 : step]
+    return [cv2.imread(str(f)) for f in files], list(range(first, first + len(files) * step, step))
+
+
+def cmd_propose(a):
+    """Number the candidate objects on one frame so they can be chosen by eye, then tracked."""
+    from tsb_engine import tracker
+
+    frames, _ = _frames(a.dir, a.frame, a.frame)
+    cands = tracker.propose(frames[0], points_per_side=a.grid, max_masks=a.max)
+    Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+    cv2.imwrite(a.out, tracker.overlay(frames[0], cands))
+    info = [{"id": c["id"], "point": [round(c["point"][0], 1), round(c["point"][1], 1)], "area": round(c["area"], 4)} for c in cands]
+    Path(a.out).with_suffix(".json").write_text(json.dumps(info, indent=1))
+    print(f"{len(cands)} candidates -> {a.out} (+ .json with a prompt point for each id)")
+
+
+def cmd_track(a):
+    """Track objects chosen by eye. --obj NAME=FRAME:X,Y[:X,Y...][!X,Y] (frame index inside the range; '!' = negative point)."""
+    from tsb_engine import tracker
+
+    frames, idx = _frames(a.dir, a.first, a.last, a.step)
+    prompts, names = [], {}
+    for k, spec in enumerate(a.obj, 1):
+        name, rest = spec.split("=")
+        fr, pts = rest.split(":", 1)
+        pos, _, neg = pts.partition("!")
+        points = [tuple(float(v) for v in q.split(",")) for q in pos.split(":") if q]
+        labels = [1] * len(points)
+        if neg:
+            points += [tuple(float(v) for v in q.split(",")) for q in neg.split(":") if q]
+            labels += [0] * (len(points) - len(labels))
+        prompts.append(tracker.Prompt(k, int(fr), points=points, labels=labels))
+        names[k] = name
+    masks, scores = tracker.track(frames, prompts, return_scores=True)
+    out = Path(a.out)
+    out.mkdir(parents=True, exist_ok=True)
+    report = {}
+    cols = [(0, 0, 255), (0, 200, 0), (255, 120, 0), (0, 200, 255), (255, 0, 200)]
+    for k, name in names.items():
+        m = tracker.measure(masks[k], toward=a.toward)
+        rel, med = tracker.reliability(scores[k], prompts[k - 1].frame)
+        st = tracker.strobe(m["reach"], m["area"])
+        report[name] = {"reliability": rel, "median_presence_logit": round(med, 1), **st,
+                        "reach_range": round(float(np.ptp(m["reach"][m["area"] > 0])) if (m["area"] > 0).any() else 0.0, 3),
+                        "frames": [int(i) for i in idx], "reach": [round(float(v), 4) for v in m["reach"]], "scores": [round(float(v), 1) for v in scores[k]]}
+        meaning = {"strobe": "STROBE: flips between two extensions on every image (one pose + VFX / multi-hit illusion)",
+                   "cycling": "CYCLING: keeps changing pose (no return to the same value 2 images later)",
+                   "moving": "MOVING: smooth sweep in one direction at a time", "steady": "STEADY: held pose", "unknown": "too few frames"}
+        verdict = meaning[st["kind"]] if rel == "good" else f"track {rel}: look at the overlay before using any number ({st['kind']} if it were right)"
+        print(f"{name:<14} track {rel:<8} (logit {med:>5.1f})  reach range {report[name]['reach_range']:.2f}  big steps {st['big_frac']:.0%}, 2-back/1-back ratio {st['ratio']}  -> {verdict}")
+    cells = []
+    for i, fr in enumerate(frames):
+        im = fr.copy()
+        for k, name in names.items():
+            m = masks[k][i]
+            c = np.array(cols[(k - 1) % len(cols)], np.float32)
+            im[m] = (im[m] * 0.45 + c * 0.55).astype(np.uint8)
+        cv2.putText(im, str(idx[i]), (4, 16), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+        cells.append(cv2.resize(im, (320, int(320 * im.shape[0] / im.shape[1]))))
+    ncol = 5
+    while len(cells) % ncol:
+        cells.append(np.zeros_like(cells[0]))
+    cv2.imwrite(str(out / "track.png"), np.concatenate([np.concatenate(cells[r : r + ncol], 1) for r in range(0, len(cells), ncol)], 0))
+    (out / "track.json").write_text(json.dumps(report, indent=1))
+    print(f"wrote {out}/track.png (colour = object) and track.json")
+
+
 def cmd_hot(a):
     clip = _load(a.dir, a.mask_right, a.last)
     wins = eyes.hot_windows(clip, a.top, a.radius)
@@ -136,6 +209,8 @@ def main():
     s = sp.add_parser("compare"); s.add_argument("ref"); s.add_argument("mine"); s.add_argument("out"); s.add_argument("--ref-mask", type=float, default=UI_RIGHT); s.add_argument("--ref-last", type=int); s.add_argument("--min-shot", type=int, default=3); s.add_argument("--anchors", help="ref:mine,ref:mine,... frames (30 fps) that must line up"); s.set_defaults(f=cmd_compare)
     s = sp.add_parser("read"); s.add_argument("dir"); s.add_argument("out"); s.add_argument("--mask-right", type=float, default=0.0); s.add_argument("--last", type=int); s.add_argument("--fps", type=int, default=30); s.add_argument("--top", type=int, default=6); s.add_argument("--radius", type=int, default=3); s.set_defaults(f=cmd_read)
     s = sp.add_parser("check"); s.add_argument("dir"); s.add_argument("reading"); s.add_argument("--mask-right", type=float, default=0.0); s.add_argument("--last", type=int); s.add_argument("--fps", type=int, default=30); s.set_defaults(f=cmd_check)
+    s = sp.add_parser("propose"); s.add_argument("dir"); s.add_argument("frame", type=int); s.add_argument("out"); s.add_argument("--grid", type=int, default=16); s.add_argument("--max", type=int, default=40); s.set_defaults(f=cmd_propose)
+    s = sp.add_parser("track"); s.add_argument("dir"); s.add_argument("out"); s.add_argument("--obj", action="append", required=True); s.add_argument("--first", type=int, default=0); s.add_argument("--last", type=int, default=29); s.add_argument("--step", type=int, default=1); s.add_argument("--toward", type=int, default=1, help="+1 if the other actor is on the right of the tracked one, -1 if on the left"); s.set_defaults(f=cmd_track)
     s = sp.add_parser("hot"); s.add_argument("dir"); s.add_argument("out"); s.add_argument("--top", type=int, default=6); s.add_argument("--radius", type=int, default=3); s.add_argument("--mask-right", type=float, default=0.0); s.add_argument("--last", type=int); s.set_defaults(f=cmd_hot)
     s = sp.add_parser("trail"); s.add_argument("dir"); s.add_argument("a", type=int); s.add_argument("b", type=int); s.add_argument("out"); s.add_argument("--mask-right", type=float, default=0.0); s.set_defaults(f=cmd_trail)
     s = sp.add_parser("flow"); s.add_argument("dir"); s.add_argument("i", type=int); s.add_argument("out"); s.add_argument("--mask-right", type=float, default=0.0); s.set_defaults(f=cmd_flow)

@@ -174,13 +174,32 @@ def reliability(scores: np.ndarray, prompt_frame: int = 0, good: float = 7.0, ba
     return ("good" if med >= good else "lost" if med < bad else "doubtful"), med
 
 
-def strobe(reach: np.ndarray, area: np.ndarray, min_step: float = 0.012, rate: float = 0.8, min_steps: int = 8) -> dict:
-    """Does the tracked limb flip between two extensions on (almost) every image?  -> {'strobe': bool, 'reversals', 'rate', 'steps'}"""
-    r = reach[area > 0]
-    d = np.diff(r)
-    big = d[np.abs(d) > min_step]
-    rev, rt = alternation(r, min_step)
-    return {"strobe": bool(len(big) >= min_steps and rt >= rate), "reversals": rev, "rate": round(rt, 2), "steps": int(len(big))}
+def strobe(reach: np.ndarray, area: np.ndarray, big_step: float = 0.03) -> dict:
+    """Classify how a tracked limb's reach moves from image to image.
+
+    * ``strobe``  it flips between two extensions: big steps on most images and the image two steps back is nearly the same
+                  (|x[t]-x[t-2]| << |x[t]-x[t-1]|): one pose + VFX / a multi-hit illusion made by animation
+    * ``cycling`` big steps on many images and no return to the same value two steps later: it keeps going through different poses
+    * ``moving``  big steps but in one direction at a time: a smooth sweep (a real swing, a camera-like drift)
+    * ``steady``  few big steps: held pose (plus drift)
+    """
+    r = np.asarray(reach, float)[np.asarray(area) > 0]
+    if len(r) < 8:
+        return {"kind": "unknown", "strobe": False, "reversals": 0, "rate": 0.0, "steps": 0, "ratio": float("nan"), "big_frac": 0.0}
+    d1 = np.abs(np.diff(r))
+    d2 = np.abs(r[2:] - r[:-2])
+    big_frac = float(np.mean(d1 > big_step))
+    ratio = float(d2.mean() / max(d1.mean(), 1e-9))
+    rev, rt = alternation(r, big_step / 2)
+    if big_frac >= 0.7 and ratio < 0.5 and rt >= 0.7:
+        kind = "strobe"
+    elif big_frac >= 0.4 and rt >= 0.35:
+        kind = "cycling"
+    elif big_frac >= 0.4:
+        kind = "moving"
+    else:
+        kind = "steady"
+    return {"kind": kind, "strobe": kind == "strobe", "reversals": rev, "rate": round(rt, 2), "steps": int((d1 > big_step).sum()), "ratio": round(ratio, 2), "big_frac": round(big_frac, 2)}
 
 
 def alternation(signal: np.ndarray, min_step: float) -> tuple[int, float]:

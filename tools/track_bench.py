@@ -74,7 +74,7 @@ def main():
         if not prompts:
             continue
         t = time.time()
-        got = tracker.track(imgs, prompts)
+        got, sco = tracker.track(imgs, prompts, return_scores=True)
         row = {"class": seg["class"], "variant": seg["variant"], "arms": {}, "seconds": round(time.time() - t, 1)}
         d_hero = gt_masks(scene, s0, n, "Torso", size)
         for arm, oid in ids.items():
@@ -83,7 +83,10 @@ def main():
             gm = tracker.measure(gts[arm], toward=1)
             rev, rate = tracker.alternation(m["reach"][m["area"] > 0], 0.012)
             grev, grate = tracker.alternation(gm["reach"][gm["area"] > 0], 0.012)
-            row["arms"][arm] = {"iou_mean": round(float(np.nanmean(ious)), 3), "iou_min": round(float(np.nanmin(ious)), 3),
+            rel, med = tracker.reliability(sco[oid], next(i for i in range(n) if gts[arm][i].sum() > 60))
+            kind_t = tracker.strobe(m["reach"], m["area"])["kind"]
+            kind_g = tracker.strobe(gm["reach"], gm["area"])["kind"]
+            row["arms"][arm] = {"reliability": rel, "presence_logit": round(med, 1), "kind_tracked": kind_t, "kind_truth": kind_g, "iou_mean": round(float(np.nanmean(ious)), 3), "iou_min": round(float(np.nanmin(ious)), 3),
                                 "alt_tracked": [rev, round(rate, 2)], "alt_truth": [grev, round(grate, 2)],
                                 "reach_range_tracked": round(float(np.ptp(m["reach"][m["area"] > 0])), 3), "reach_range_truth": round(float(np.ptp(gm["reach"][gm["area"] > 0])), 3)}
         res.append(row)
