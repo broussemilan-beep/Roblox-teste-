@@ -109,3 +109,17 @@ Relue image par image (`reference-analysis-2.md`), la 2ᵉ référence a mis tro
 3. Banc : toujours **28/30** (les 2 échecs : encre sombre sur la victime). Le banc ne contient pas de négatifs ni de clip sans victime : ces deux ajouts sont validés
    sur **une seule** vidéo (la 2ᵉ référence) et sur un test unitaire synthétique, rien de plus.
 
+---
+
+## Addendum v5 (2026-10-28): the eyes failed on the *story*, and on the follow camera
+
+User verdict on the reproduction of the second reference: the film did not show what happens in the video (the final blow is one blow seen from three angles; I had the runner flee instead
+of attack), the run looked like a puppet and the follow camera was strange. Causes on the reading side: I trusted a summary written from sparse sheets instead of looking at every second image of
+each shot; I had no tool that says *which way* someone moves or *how the camera follows*. Added:
+
+* `tsb_engine/hero.py` + `tools/eyes.py hero`: SAM 2 track of the hero -> `cx, cy, h, w` per image and a stride cadence. Measured on the reference: the run at the mannequin is a **sweep** (he crosses the picture
+  from 1.6 to 0.5 picture-heights while the camera moves toward the mannequin), the sprint is a **lock** (cx ~ 1.0-1.25, cy ~ 0.65, size 0.13 -> 0.30).
+* `hero.my_framing` + `tools/eyes.py match`: the same numbers for the engine's own camera, so a shot is compared by subtraction (calm: error 0.02-0.05 picture heights on both tracked shots).
+* Limits: the points are still chosen by eye; the sprint track has a low median presence (4.9, flagged *lost*) although only 2 of 77 images fall below 3; cadence detection returned `None` on the run shot
+  (a strong zoom hides it: the width series is dominated by the approach) - the period I use (8 images) comes from looking at the leg spread, not from the detector.
+

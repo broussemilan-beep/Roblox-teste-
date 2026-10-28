@@ -101,6 +101,17 @@ Work like this instead:
 
 Characters get recognisable through *accessories*: build them with `tsb_engine.modeling` (`bevel_box`, `lathe`, `sweep`, `cone`, `torus`, `merge`), glue them with `secondary.Attach(name, part, mesh, offset, tilt)` in the part's local frame, hide a box part with `Character(hide=("Head",))` when a mesh replaces it. `examples/ronin_model.py` is the worked example (hair spikes from cones, katana from a swept blade + lathe handle). Check `Mesh.stats()` and render close-ups (`tools/render_frames.js ... film`) before judging; the viewer shades flat per face. Not verified: Studio import, MeshPart triangle limit. Details: `docs/research/modeling.md`.
 
+## Running, and following a runner (what "marionette" and "weird follow" were)
+
+* **Run with `tsb_engine/gait.py`**, never with hand-keyed flapping limbs: `run_keys` (legs in opposite phase, trailing leg swings further back, arms counter-swing, torso counter-rotates,
+  head level), then `rest_on_ground` (the root height comes from the planted foot - R6 legs are rigid sticks) and `add_air` (flight phases). **Tie speed to stride**:
+  `stride_speed(amp, period)` studs/image, or the feet skate. A stylised accent pose every ~9th image pair keeps the silhouette jumping without breaking the gait.
+* **Never guess a reference's camera.** Track the hero in the reference (`tools/eyes.py hero DIR OUT.json --prompt F --points X,Y X,Y ...`, points on head, torso and legs) and read
+  `cx, cy, h` (centre and size in picture heights): the follow is either **locked** (cx, cy constant: the sprint) or a **sweep** (he crosses the frame: the run at the mannequin).
+  Build the camera from the track (`framed_cam`, `chase_framed` in `examples/calm.py`) and check with `tools/eyes.py match SCENE TRACK.json` (error in picture heights).
+* **Read the story before animating it**: list what happens in each shot, who runs which way, where each actor stands, and which beats are the *same action seen again from another angle*
+  (the final blow of the reel is one blow in three camera angles). A wrong story cannot be fixed by polish.
+
 ## Roblox integration facts (verified on the official docs, 2026-10-28; details in `docs/research/rnd-audit.md`)
 
 - Procedural offsets on `Motor6D.Transform` (fake limb, dislocation, tilt) must be written in `RunService.PreSimulation`; otherwise the Animator overwrites them next frame.

@@ -78,3 +78,14 @@ Tentative d'erreur reconnue : j'avais d'abord refusé le point « caméra dans l
 * La macro du sabre (310-341) est dominée par le mannequin couché au premier plan.
 * De grosses traînées blanches (tubes) apparaissent près de la caméra pendant le sprint (images ~110-130).
 * Les poses sont toujours choisies à la main dans une bibliothèque de 11 poses, pas recalées image par image sur la référence.
+
+## v5 (2026-10-28): after "ce n'est pas ce qui se passe dans la vidéo, la course est une marionnette, le suivi est bizarre"
+
+* **Story**: the end re-read (reference-analysis-2.md §6). He runs **toward** the mannequin (side view, real gait), draws the blade during the run (the sheathed katana turns into an empty saya + a blade in the hand,
+  `Attach.vis`), strikes once with the hand **solved** onto the mannequin's neck (`solver.reach_root`), and that one blow is shown three times: A 300-309 (low side + silhouettes), B 310-341 (macro, flash, red),
+  C 342-355 (wide, the mannequin bursts into blocks). Before it, a second exchange (274-283): he kneels on the felled mannequin.
+* **Run**: `tsb_engine/gait.py`. The sprint (72-239) is a crouched gait on the zig-zag path with an accent pose every ninth image pair; the finale run is a gait at stride speed.
+* **Follow**: cameras built from the tracked reference (`chase_framed` for the sprint, `framed_cam` for the run at the mannequin); measured error 0.02-0.05 picture heights.
+* **Still wrong**: the sprint's accent poses are my own, not matched to the reference silhouettes; the macro's composition is approximate; only two shots were tracked (the rest of the framing is hand-set);
+  the katana in the hand has no hand/grip fit; no dust/skid animation under the feet in the run.
+

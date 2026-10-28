@@ -200,6 +200,39 @@ def cmd_flow(a):
     cv2.imwrite(a.out, cv2.resize(eyes.flow_picture(fr, a.i), None, fx=2, fy=2))
 
 
+def cmd_hero(a):
+    """Follow the hero (points chosen by eye on one frame) and write his framing and stride numbers: where he sits in the picture, how big, how fast he cycles."""
+    import json as _json
+
+    from tsb_engine import hero
+
+    frames, _ = _frames(a.dir, a.first, a.last, 1)
+    pts = [tuple(float(v) for v in p.split(",")) for p in a.points]
+    r = hero.follow(frames, a.prompt - a.first, pts)
+    r["first_frame"], r["prompt"] = a.first, {"frame": a.prompt, "points": [list(p) for p in pts]}
+    Path(a.out).write_text(_json.dumps(r, indent=1))
+    print(f"hero track {r['reliability']} (median presence logit {r['median_logit']}), cadence {r['cadence']}")
+    print("cx", r["cx"]); print("cy", r["cy"]); print("h ", r["h"])
+
+
+def cmd_match(a):
+    """Compare MY framing of the hero with a reference track (tools/eyes.py hero ...): the same numbers, subtracted."""
+    import json as _json
+
+    from examples.scenes import SCENES
+    from tsb_engine import hero
+
+    ref = _json.loads(Path(a.track).read_text())
+    f0 = ref["first_frame"]
+    n = len(ref["cx"])
+    mine = hero.my_framing(SCENES[a.scene](), f0, f0 + n - 1)
+    err = hero.compare_framing(mine, ref)
+    print(f"framing error over {err['n']} images (picture heights): centre x {err['cx']}, centre y {err['cy']}, size {err['h']}")
+    for i in range(0, n, max(1, n // 12)):
+        fmt = lambda v: "  -  " if v is None else f"{v:5.2f}"
+        print(f"  {f0 + i:4d}  ref cx {fmt(ref['cx'][i])} cy {fmt(ref['cy'][i])} h {fmt(ref['h'][i])}   mine cx {fmt(mine['cx'][i])} cy {fmt(mine['cy'][i])} h {fmt(mine['h'][i])}")
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sp = p.add_subparsers(dest="cmd", required=True)
@@ -211,6 +244,8 @@ def main():
     s = sp.add_parser("check"); s.add_argument("dir"); s.add_argument("reading"); s.add_argument("--mask-right", type=float, default=0.0); s.add_argument("--last", type=int); s.add_argument("--fps", type=int, default=30); s.set_defaults(f=cmd_check)
     s = sp.add_parser("propose"); s.add_argument("dir"); s.add_argument("frame", type=int); s.add_argument("out"); s.add_argument("--grid", type=int, default=16); s.add_argument("--max", type=int, default=40); s.set_defaults(f=cmd_propose)
     s = sp.add_parser("track"); s.add_argument("dir"); s.add_argument("out"); s.add_argument("--obj", action="append", required=True); s.add_argument("--first", type=int, default=0); s.add_argument("--last", type=int, default=29); s.add_argument("--step", type=int, default=1); s.add_argument("--toward", type=int, default=1, help="+1 if the other actor is on the right of the tracked one, -1 if on the left"); s.set_defaults(f=cmd_track)
+    s = sp.add_parser("hero"); s.add_argument("dir"); s.add_argument("out"); s.add_argument("--prompt", type=int, required=True, help="frame (absolute index in DIR) the points are on"); s.add_argument("--points", nargs="+", required=True, help="X,Y pixels on the hero (head, torso, legs)"); s.add_argument("--first", type=int, default=0); s.add_argument("--last", type=int, default=29); s.set_defaults(f=cmd_hero)
+    s = sp.add_parser("match"); s.add_argument("scene"); s.add_argument("track"); s.set_defaults(f=cmd_match)
     s = sp.add_parser("hot"); s.add_argument("dir"); s.add_argument("out"); s.add_argument("--top", type=int, default=6); s.add_argument("--radius", type=int, default=3); s.add_argument("--mask-right", type=float, default=0.0); s.add_argument("--last", type=int); s.set_defaults(f=cmd_hot)
     s = sp.add_parser("trail"); s.add_argument("dir"); s.add_argument("a", type=int); s.add_argument("b", type=int); s.add_argument("out"); s.add_argument("--mask-right", type=float, default=0.0); s.set_defaults(f=cmd_trail)
     s = sp.add_parser("flow"); s.add_argument("dir"); s.add_argument("i", type=int); s.add_argument("out"); s.add_argument("--mask-right", type=float, default=0.0); s.set_defaults(f=cmd_flow)

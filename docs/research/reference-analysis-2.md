@@ -88,3 +88,32 @@ Après correctifs (`perception.py`, 2026-10-28) :
   Ces trois sont à **ne pas citer** sans relecture des images ci-dessus.
 * `CUT` : dizaines de fausses coupes (caméra qui roule + bulle) : non fiable sur ce type de clip.
 * Le suivi SAM 2 n'a pas été lancé sur ce clip (le sprint a 9-12 poses distinctes : c'est le cas d'usage prévu).
+
+
+## 6. Correction de lecture (2026-10-28, après le retour de l'utilisateur : « ce n'est pas ce qui se passe dans la vidéo »)
+
+J'avais mal compris la fin. Relue en grand (planches de 12 images, une toutes les 2) :
+
+| Images | Ce que montre la vidéo | Mon erreur |
+|---|---|---|
+| 258-264 | choc : image blanche (négatif) puis héros couché à plat contre le mannequin, gouttes rouges | - |
+| 266-272 | plan large : le mannequin **debout** au premier plan à gauche (tête cylindrique), le héros accroupi à droite dans sa bulle | - |
+| 274-277 | **deux nouvelles images blanches** (cyan/vert/noir) : un second coup | je n'en avais qu'une |
+| 278-283 | le héros **agenouillé sur le mannequin**, vue de dessus (cheveux en pointes, manches), éclaboussures rouges | je l'avais « accroupi à côté » |
+| 284-299 | **le héros court de profil vers le mannequin** avec une vraie foulée (jambes qui alternent, sabre en travers du dos, anneau devant lui) ; le mannequin entre dans le cadre à droite vers 298 | j'avais inversé le sens : il « s'enfuyait » |
+| 300-305 | le héros, flou, au premier plan à gauche ; la tête cylindrique du mannequin au premier plan à droite | - |
+| 306-309 | silhouette noire sur blanc ×3 puis sur rouge ×1 : le héros bras tendu, **sabre vers la tête du mannequin** | - |
+| 310-341 | **même coup, deuxième angle** : macro basse, la lame vient de la gauche jusqu'à la tête du mannequin, le visage et les cheveux du héros au-dessus, éclair blanc 318-324 puis éclats rouges | j'y avais mis le mannequin couché en bloc au premier plan |
+| 342-355 | **même coup, troisième angle** : plan large sombre, le mannequin éclate en blocs gris, le héros accroupi lame verticale (352-354) | - |
+| 356-368 | plan haut oblique : le héros glisse / roule en s'éloignant, traînée blanche, ligne jaune au sol | - |
+| 370-385 | petit, de dos, au loin, sabre en travers du dos | trop près |
+
+**Le coup final est donc un seul geste montré sous trois angles** (A 300-309, B 310-341, C 342-355), pour l'intensifier.
+
+### Ce que le traqueur a mesuré (tsb_engine/hero.py, pistes dans docs/research/reference-tracks/)
+* **Course 284-299** (piste fiable, présence 7,4) : le héros **traverse le cadre de droite à gauche** (cx 1,6 -> 0,5 hauteurs d'image) pendant que le mannequin entre à droite : la caméra
+  **ne se verrouille pas sur lui**, elle balaie à vitesse constante vers le mannequin. Sa taille passe de 0,40 à 0,23-0,28 de la hauteur du cadre. La largeur de la silhouette a deux maxima
+  par cycle, un cycle de course ≈ 24 images (≈ 0,8 s ; l'image est mise à jour 1 fois sur 2 par endroits : images 1=2 et 4=5 identiques).
+* **Sprint 72-148** (piste « perdue » à la médiane, 4,9, mais seules les images 74 et 146 passent sous 3) : ici la caméra **colle** au héros : cx ≈ 1,0-1,25 (au centre), cy ≈ 0,65,
+  taille 0,13 -> 0,30 en une trentaine d'images (la caméra s'approche).
+Ces séries pilotent maintenant la caméra du film (`framed_cam`, `chase_framed` dans examples/calm.py) au lieu de ma conjecture.

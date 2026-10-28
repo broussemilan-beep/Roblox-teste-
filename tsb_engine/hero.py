@@ -61,3 +61,56 @@ def cadence(w: list, h: list) -> dict | None:
         return None
     k = peaks[0]
     return {"width_period": k, "cycle_period": 2 * k, "strength": round(float(ac[k]), 2)}
+
+
+# ------------------------------------------------------------------ the same numbers for *my* film (so the two can be compared, not eyeballed)
+def my_framing(scene, f0: int, f1: int, char: int = 0, aspect: float | None = None) -> dict:
+    """Where the engine's own camera puts a character: ``cx, cy`` (centre of the projected bounding box) and ``h, w`` of it, in picture heights,
+    per image of ``[f0, f1]`` - the same units as ``follow`` so ``compare_framing`` can subtract them."""
+    import math
+
+    from .kinematics import corners
+
+    cine = scene.cine
+    asp = aspect or cine.aspect
+    out = {k: [] for k in ("cx", "cy", "h", "w")}
+    for f in range(f0, f1 + 1):
+        pos, tgt, fov, roll = cine.camera_state(f)
+        fw = np.array(tgt, float) - np.array(pos, float)
+        fw /= np.linalg.norm(fw)
+        up = np.array([0, 0, -1.0]) if abs(fw[1]) > 0.98 else np.array([0, 1.0, 0])
+        r = np.cross(fw, up)
+        r /= np.linalg.norm(r)
+        u = np.cross(r, fw)
+        if roll:
+            c, s = math.cos(math.radians(roll)), math.sin(math.radians(roll))
+            r, u = r * c + u * s, u * c - r * s
+        k = 1.0 / (2.0 * math.tan(math.radians(fov) / 2.0))
+        xs, ys = [], []
+        for part, tf in scene.characters[char].world_parts(f).items():
+            for p in corners(part, tf):
+                d = np.array(p, float) - np.array(pos, float)
+                z = float(d @ fw)
+                if z < 0.25:
+                    continue
+                xs.append(asp / 2 + float(d @ r) / z * k)
+                ys.append(0.5 - float(d @ u) / z * k)
+        if len(xs) < 4:
+            for key in out:
+                out[key].append(None)
+            continue
+        out["cx"].append((min(xs) + max(xs)) / 2)
+        out["cy"].append((min(ys) + max(ys)) / 2)
+        out["h"].append(max(ys) - min(ys))
+        out["w"].append(max(xs) - min(xs))
+    return out
+
+
+def compare_framing(mine: dict, ref: dict) -> dict:
+    """Mean absolute error (picture heights) of centre and size between my framing and a reference track; ``None`` entries are skipped."""
+    err = {}
+    for k in ("cx", "cy", "h"):
+        d = [abs(a - b) for a, b in zip(mine[k], ref[k]) if a is not None and b is not None]
+        err[k] = round(float(np.mean(d)), 3) if d else None
+    err["n"] = len([1 for a, b in zip(mine["cx"], ref["cx"]) if a is not None and b is not None])
+    return err
