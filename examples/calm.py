@@ -312,7 +312,7 @@ def build() -> Scene:
     cine.shot(48, 52, tracking(hp, (3.6, 0.4, 8.5), look_dy=0.0, fov=32))
     cine.shot(53, 71, tracking(hp, (7.0, 1.6, 15.0), look_dy=0.2, fov=36, roll=(0, 6)))
     _, _, hdg = zigzag()
-    cine.shot(72, 148, chase_framed(hp, hdg, 72, 148, json.loads(TRACK72.read_text()), yaw_off=28.0, fov=40.0))
+    cine.shot(72, 148, chase_framed(hp, hdg, 72, 148, json.loads(TRACK72.read_text()), yaw_off=58.0, fov=40.0))
     cine.shot(149, 183, chase_cam(hp, hdg, 149, 183, back=12.0, side=5.0, up=1.2, ahead=8.0, lift=2.6, fov=42, roll=5.0))
     for f0 in range(184, 240, 10):   # the low side travelling shot (the reference's 184-239): the roll still snaps at every turn
         sg = 1 if hdg(f0) >= 0 else -1
@@ -326,7 +326,7 @@ def build() -> Scene:
     # the final blow, three angles on the same cut: A (300-309) low side, the runner crosses the left foreground; B (310-341) the macro on the blade; C (342-355) pulled back
     cine.shot(300, 305, dolly((XD2 - 11.0, 1.3, 8.5), (XD2 - 8.5, 1.4, 7.5), (XD2 - 5.0, 2.5, 0.0), (XD2 - 3.8, 2.7, 0.0), fov=34))
     cine.shot(306, 309, dolly((XD2 - 6.0, 2.5, 6.8), (XD2 - 5.6, 2.6, 6.4), (XD2 - 3.4, 3.4, 0.0), (XD2 - 3.2, 3.5, 0.0), fov=28))
-    cine.shot(310, 341, dolly((XD2 - 5.2, 2.6, 5.4), (XD2 - 4.6, 2.8, 5.0), (XD2 - 2.4, 3.6, 0.0), (XD2 - 2.0, 3.7, 0.0), fov=24))
+    cine.shot(310, 341, dolly((XD2 - 6.6, 3.0, 7.6), (XD2 - 6.0, 3.1, 7.2), (XD2 - 2.6, 3.7, 0.0), (XD2 - 2.2, 3.8, 0.0), fov=26))
     cine.shot(342, 349, autoframe(both, 342, 349, azimuth=30, elevation=10, fov=36, fill=0.9, follow=0.3, min_radius=3.0))
     cine.shot(350, 359, tracking(hp, (5.0, 2.0, 9.0), look_dy=0.4, fov=36))
     cine.shot(360, 369, tracking(hp, (9.0, 14.0, 10.0), fov=40))
@@ -385,8 +385,9 @@ def build() -> Scene:
     # ---- red sparks (the only warm colour), blade glints, the blocks
     cine.emit(258, 281, origin=(DX - 1.0, 2.0, 0.6), rate=3.0, burst=30, vel=(0.12, 0.45), dir=(0, 1, 0.2), spread=1.6, grav=0.02, life=(10, 26), size=(0.22, 0.06), color=("#ff3b2a", "#a01212"), alpha=(1.0, 0.0), add=True, seed=6, shape="spark", stretch=3.0)
     cine.emit(278, 283, origin=(DX - 0.4, 1.2, 0.8), rate=3.0, burst=20, vel=(0.1, 0.4), dir=(0, 1, 0.3), spread=1.6, grav=0.02, life=(10, 24), size=(0.2, 0.05), color=("#ff3b2a", "#a01212"), alpha=(1.0, 0.0), add=True, seed=14, shape="spark", stretch=3.0)
-    for t in range(319, 324):   # the glint of the blade in the macro
-        cine.flash(t, 1, "#ffffff", 0.9)
+    cine.glow(318, 324, c=(XD2 - 2.6, 4.0, 0.3), r0=2.2, r1=5.0, color="#ffffff")   # the glint of the blade in the macro: a local glare, not a white screen
+    for t in range(320, 323):
+        cine.flash(t, 1, "#ffffff", 0.28)
     cine.emit(322, 341, origin=(XD2 - 1.6, 4.1, 0.2), rate=1.5, vel=(0.03, 0.2), dir=(0, 1, 0.3), spread=1.2, grav=0.015, life=(8, 20), size=(0.15, 0.04), color=("#ff3b2a", "#7a0c0c"), alpha=(1.0, 0.0), add=True, seed=7, shape="spark", stretch=2.5)
     cine.emit(342, 349, origin=(XD2, 2.5, 0.0), burst=26, rate=0.0, vel=(0.1, 0.4), dir=(0, 1, 0), spread=1.8, grav=0.02, life=(10, 24), size=(0.25, 0.08), color=("#d9d9de", "#6a6a70"), alpha=(0.9, 0.0), add=False, seed=8, shape="shard")
     return Scene("calm — reproduction de la 2e référence", [hero, dummy], fps=FPS, cine=cine)
