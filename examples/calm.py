@@ -30,39 +30,53 @@ FACE, RUN_X, RUN_Z = 180.0, 270.0, 3.5  # yaw: faces the camera (+Z) / runs alon
 
 
 def root(x, h, z, rx=0.0, ry=0.0, rz=0.0):
-    return P((rx, ry, rz), (x, h - 3.0, z))
+    """Root pose with an *intrinsic* attitude: ``ry`` yaw (heading), then ``rx`` pitch (negative = dives forward) about the body's own X,
+    then ``rz`` roll about its own Z. The engine's Euler order (X, Y, Z about the parent axes) would pitch about the *world* X after the
+    heading, i.e. sideways for a body running along +X: the sprint tilted toward the camera instead of diving."""
+    import math
+
+    from tsb_engine.mathutil import euler, mat_mul
+
+    m = mat_mul(mat_mul(euler((0.0, ry, 0.0)), euler((rx, 0.0, 0.0))), euler((0.0, 0.0, rz)))
+    b = math.asin(max(-1.0, min(1.0, m[0][2])))
+    if abs(m[0][2]) < 0.99999:
+        a = math.atan2(-m[1][2], m[2][2])
+        c = math.atan2(-m[0][1], m[0][0])
+    else:  # gimbal: fold the roll into the first angle
+        a = math.atan2(m[2][1], m[1][1])
+        c = 0.0
+    return P((math.degrees(a), math.degrees(b), math.degrees(c)), (x, h - 3.0, z))
 
 
-# a different silhouette for (almost) every image of the sprint: (root pitch, root roll, height, torso, head, RA, LA, RL, LL)
+# The sprint is a low horizontal dive (as in the reference: body parallel to the floor, head forward, blade across the back). The silhouette changes
+# every 2 images through an *ordered* cycle of designed dive poses - limbs, roll and twist change, the line of travel never does:
+# (root pitch, root roll, height, torso, head, RA, LA, RL, LL)
 SPRINT_POSES = [
-    (-80, 0, 3.2, tp(0, -10), (20, 0, 0), (170, 0, 10), (170, 0, -10), (-20, 0, 3), (-25, 0, -3)),     # superman
-    (-30, 0, 2.4, tp(1.0, -40), (30, 0, 0), (60, 0, 20), (60, 0, -20), (100, 0, 4), (90, 0, -4)),      # folded ball
-    (-10, 25, 3.0, tp(0.3, -15, 25), (0, 0, 0), (100, 0, 60), (95, 0, -50), (20, 0, 4), (-30, 0, -4)),  # blade across the chest
-    (-50, 0, 3.0, tp(0.4, -25), (10, 0, 0), (-60, 0, 20), (120, 0, -20), (70, 0, 4), (-50, 0, -4)),    # lunge
-    (40, 0, 3.4, tp(0, 20), (-20, 0, 0), (-60, 0, 40), (-60, 0, -40), (30, 0, 10), (20, 0, -10)),     # arched back
-    (0, 80, 3.0, tp(0, 0), (0, 0, 0), (80, 0, 70), (-60, 0, -70), (40, 0, 20), (-20, 0, -20)),         # on its side
-    (-20, 0, 2.2, tp(0.8, -30), (35, 0, 0), (50, 0, 14), (70, 0, -14), (80, 0, 5), (70, 0, -5)),       # low slide
-    (-160, 0, 4.2, tp(0, -10), (10, 0, 0), (60, 0, 60), (80, 0, -60), (-30, 0, 8), (-20, 0, -8)),      # upside down
-    (-20, -20, 3.2, tp(0, -10), (0, 0, 0), (-30, 0, 90), (-30, 0, -90), (120, 0, 5), (-20, 0, -4)),    # high kick, arms wide
-    (-65, 0, 3.0, tp(0.2, -30), (30, 0, 0), (140, 0, 40), (20, 0, -30), (40, 0, 4), (-70, 0, -4)),     # draw
-    (10, 50, 2.8, tp(0.5, 10, -30), (-10, 0, 0), (110, 0, 20), (-100, 0, -20), (60, 0, 3), (10, 0, -8)),  # spinning
+    (-85, 0, 1.7, tp(0, -5), (15, 0, 0), (170, 0, 8), (170, 0, -8), (-5, 0, 3), (-5, 0, -3)),        # superman, arms ahead
+    (-82, 20, 1.7, tp(0, -10), (10, 0, 0), (-10, 0, 15), (-10, 0, -15), (40, 0, 4), (-30, 0, -4)),    # arms trailing, scissor legs
+    (-80, -25, 1.8, tp(0, -10, 25), (20, 0, 0), (140, 0, 40), (30, 0, -25), (60, 0, 4), (0, 0, -4)),  # hand on the blade
+    (-78, 40, 1.9, tp(0.2, -20), (10, 0, 0), (-60, 0, 20), (150, 0, -20), (80, 0, 4), (-40, 0, -4)),  # lunge, rolled
+    (-85, 0, 1.6, tp(0, -5), (10, 0, 0), (-80, 0, 30), (-80, 0, -30), (20, 0, 4), (20, 0, -4)),       # hands swept back
+    (-80, 80, 1.9, tp(0, 0), (0, 0, 0), (100, 0, 60), (-60, 0, -60), (40, 0, 10), (-10, 0, -10)),     # on its side
+    (-85, 180, 1.7, tp(0, 10), (-10, 0, 0), (60, 0, 50), (60, 0, -50), (30, 0, 4), (50, 0, -4)),     # belly up
+    (-62, 0, 2.2, tp(0.8, -35), (30, 0, 0), (70, 0, 15), (70, 0, -15), (100, 0, 4), (90, 0, -4)),     # tucked crouch-dive
+    (-80, 40, 1.8, tp(0, 0, 30), (0, 0, 0), (90, 0, 90), (90, 0, -90), (10, 0, 4), (-10, 0, -4)),     # arms wide, twisting
+    (-80, -30, 1.9, tp(0, -10), (15, 0, 0), (150, 0, 20), (-40, 0, -20), (120, 0, 5), (-30, 0, -4)),  # kick
 ]
 
 
 def run_pose(a: Animation, f: int, x: float, z: float, ry: float, idx: int, rng: random.Random) -> None:
     rx, rz, h, t, hd, ra, la, rl, ll = SPRINT_POSES[idx]
-    K(a, f, "linear", R=root(x, h, z, rx, ry + rng.uniform(-25, 25), rz), T=t, H=P(hd), RA=P(ra), LA=P(la), RL=P(rl), LL=P(ll))
+    j = lambda v: tuple(c + rng.uniform(-8, 8) for c in v)
+    K(a, f, "linear", R=root(x, h, z, rx + rng.uniform(-6, 6), ry + rng.uniform(-8, 8), rz), T=t, H=P(j(hd)), RA=P(j(ra)), LA=P(j(la)), RL=P(j(rl)), LL=P(j(ll)))
 
 
-def cycle(a: Animation, f0: int, f1: int, xf, zf, ry: float, seed: int, every: int = 1) -> None:
+def cycle(a: Animation, f0: int, f1: int, xf, zf, ry: float, seed: int, every: int = 2) -> None:
     rng = random.Random(seed)
-    last = -1
-    idx = 0
+    idx = rng.randrange(len(SPRINT_POSES))
     for f in range(f0, f1 + 1):
         if (f - f0) % every == 0:
-            while idx == last:
-                idx = rng.randrange(len(SPRINT_POSES))
-            last = idx
+            idx = (idx + 1 + rng.randrange(2)) % len(SPRINT_POSES)
         run_pose(a, f, xf(f), zf(f), ry, idx, rng)
 
 
@@ -173,30 +187,30 @@ def build() -> Scene:
     cine.shot(37, 47, tracking(hp, (7.0, 1.6, 14.0), look_dy=-0.4, fov=34))
     cine.shot(48, 52, tracking(hp, (3.6, 0.4, 8.5), look_dy=0.0, fov=32))
     cine.shot(53, 71, tracking(hp, (7.0, 1.6, 15.0), look_dy=0.2, fov=36, roll=(0, 6)))
-    cine.shot(72, 110, tracking(hp, (-10.0, 2.2, 20.0), look_dy=1.0, fov=38, roll=(-6, 6)))
-    cine.shot(111, 148, tracking(hp, (-9.0, 3.8, 19.0), look_dy=1.0, fov=38, roll=(8, -8)))
-    cine.shot(149, 183, tracking(hp, (12.0, 2.6, 16.0), look_dy=1.0, fov=40, roll=(-10, 10)))
-    cine.shot(184, 239, tracking(hp, (9.0, 0.8, 16.0), look_dy=2.0, fov=42))
+    cine.shot(72, 110, tracking(hp, (-2.5, 1.5, -13.5), look_dy=0.2, fov=30, roll=(-6, 6)))
+    cine.shot(111, 148, tracking(hp, (-2.0, 2.4, -13.0), look_dy=0.2, fov=30, roll=(8, -8)))
+    cine.shot(149, 183, tracking(hp, (3.0, 1.6, -12.5), look_dy=0.2, fov=32, roll=(-10, 10)))
+    cine.shot(184, 239, tracking(hp, (4.0, 0.7, -13.0), look_dy=0.6, fov=34, roll=(0, 5)))
     cine.shot(240, 256, autoframe(both, 240, 256, azimuth=15, elevation=5, fov=36, fill=1.0, follow=0.25, min_radius=3.5))
     cine.shot(257, 264, autoframe(both, 257, 264, azimuth=40, elevation=8, fov=34, fill=0.95, follow=0.4, min_radius=2.6))
     cine.shot(265, 273, autoframe(both, 265, 273, azimuth=65, elevation=12, fov=38, fill=0.6, follow=0.2, min_radius=3.5))
     cine.shot(274, 281, autoframe(both, 274, 281, azimuth=30, elevation=8, fov=32, fill=0.8, follow=0.3, min_radius=2.6))
-    cine.shot(282, 299, tracking(hp, (-9.0, 2.0, 18.0), look_dy=1.0, fov=38, roll=(6, -6)))
+    cine.shot(282, 299, tracking(hp, (2.5, 1.5, 13.0), look_dy=0.2, fov=30, roll=(6, -6)))
     cine.shot(300, 305, autoframe(both, 300, 305, azimuth=20, elevation=6, fov=34, fill=0.55, follow=0.2, min_radius=4))
     cine.shot(306, 309, tracking(hd, (2.6, 0.2, 5.0), look_dy=0.2, fov=30))
     bx = DX - 5.5
     cine.shot(310, 341, dolly((bx - 1.0, 2.6, 7.0), (bx - 0.2, 2.7, 6.6), (bx + 1.2, 2.2, 0.0), (bx + 1.5, 2.3, 0.0), fov=30))
     cine.shot(342, 349, autoframe(both, 342, 349, azimuth=30, elevation=10, fov=36, fill=0.9, follow=0.3, min_radius=3.0))
-    cine.shot(350, 359, tracking(hp, (7.0, 1.6, 14.0), look_dy=0.6, fov=38, roll=(0, -8)))
+    cine.shot(350, 359, tracking(hp, (-2.0, 1.5, 12.5), look_dy=0.2, fov=30, roll=(0, -8)))
     cine.shot(360, 369, tracking(hp, (9.0, 14.0, 10.0), fov=40))
     cine.shot(370, N - 1, dolly((4.5, 2.2, 27), (4.5, 2.2, 27), (-0.6, 3.0, 0), (-0.6, 3.0, 0), fov=30))
 
     # ---- speed bubble that follows him, ground speed lines, long diagonals
-    gp = lambda f: (hp(f)[0], 0.0, hp(f)[2])
-    cine.bubble(66, 256, gp, 3.6, "#b9d2e4", 0.45, half=True)
-    cine.bubble(265, 273, gp, 3.0, "#b9d2e4", 0.45, half=True)
-    cine.bubble(282, 305, gp, 3.6, "#b9d2e4", 0.45, half=True)
-    cine.bubble(350, 369, gp, 3.6, "#b9d2e4", 0.45, half=True)
+    gp = lambda f: (hp(f)[0] + 0.8 * (1 if (f < 282 or 265 <= f <= 273) else -1), 0.0, hp(f)[2])
+    cine.bubble(66, 256, gp, 2.4, "#b9d2e4", 0.4, half=True)
+    cine.bubble(265, 273, gp, 2.4, "#b9d2e4", 0.4, half=True)
+    cine.bubble(282, 305, gp, 2.4, "#b9d2e4", 0.4, half=True)
+    cine.bubble(350, 369, gp, 2.4, "#b9d2e4", 0.4, half=True)
     for f0, f1 in ((72, 239), (282, 305), (350, 369)):
         for f in range(f0, f1, 6):
             x = hp(f)[0]
@@ -205,6 +219,8 @@ def build() -> Scene:
     for f0, f1 in ((72, 140), (150, 180), (184, 239), (282, 305), (350, 369)):
         for f in range(f0, f1, 5):
             cine.screen_fx("diag", f, 3, n=7, angle=-22, seed=f)
+    for f0, f1 in ((72, 239), (282, 305), (350, 369)):
+        cine.ink_trail(f0, f1, 0, "Torso", (0, 0, 0), 12, 2.2, 0.0, "#cfcfd4", rag=0.5, seed=21, alpha=0.45)
     # ---- the roll: thin white arcs; the landing dust; the dark smear before the first negative
     for k in range(3):
         cine.ring(22 + 4 * k, 12, (0, 2.0 + 0.2 * k, 2.0 + 0.5 * k), 1.2, 2.6, 0.06, 0.02, "#ffffff", 0.6, 0.0, n=(1, 0, 0), add=True, easing="quad_out")

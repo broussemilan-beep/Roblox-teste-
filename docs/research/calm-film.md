@@ -24,7 +24,7 @@
 
 * **Lumière et matières** : la référence est très sombre, avec ombres rosées et flou de mouvement ; le viewer est plat, sans flou, avec un sol plus clair.
 * **Cadrages** : ils suivent la liste de plans mais pas pixel pour pixel (héros plus petit et plus centré qu'en référence, au début et à la fin).
-* **Le sprint** : mes 11 poses se répètent ; la référence en montre 9 à 12 mais *différentes* et plus lisibles. Les poses sont tirées au hasard avec graine, pas dessinées une à une.
+* **Le sprint** : 10 poses de plongeon horizontal, enchaînées dans un ordre fixe (changement toutes les 2 images) ; la référence en montre 9 à 12 mais plus variées. Première version : poses tirées au hasard **et** rotation de la racine appliquée dans l'ordre X-Y-Z du monde, donc le corps basculait de côté au lieu de plonger : c'était illisible (retour de l'utilisateur : « c'est n'importe quoi »). Corrigé : `root()` utilise maintenant une attitude intrinsèque (cap, tangage, roulis), caméra latérale proche, héros qui court vers la gauche comme en référence, bulle en demi-dôme devant lui, traînée grise.
 * **Le sabre** du macro est une boîte (prop), pas le maillage ; le héros n'a que le fourreau dans le dos.
 * **Le contact** à 257-264 n'est pas résolu par `solver.reach_root` : héros et mannequin s'enchevêtrent plus qu'ils ne se touchent proprement.
 * **Pas d'audio, pas de sous-titres, pas d'export Roblox** (non fait pour ce film).
