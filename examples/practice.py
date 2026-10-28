@@ -163,7 +163,7 @@ def build() -> Scene:
     cine.emit(fr(16), fr(34), attach=foot, rate=2.0, vel=(0.01, 0.05), dir=(0, 1, 0), spread=1.2, life=(20, 38), size=(0.9, 2.6), color=("#8e9099", "#6b6d75"), alpha=(0.3, 0.0), add=False, seed=5, radius=0.6, shape="smoke")
     # the charge: a violet aura rising off the body, a soft glow
     cine.emit(fr(56), fr(66), attach=chest, rate=7.0, vel=(0.03, 0.16), dir=(0, 1, 0), spread=0.7, grav=-0.01, life=(10, 22), size=(0.7, 0.2), color=VIOLET, alpha=(0.9, 0.0), add=True, seed=6, radius=0.9, shape="soft")
-    cine.glow(fr(57), fr(65), attach=chest, r0=1.0, r1=2.0, color="#5a30d8", a0=0.35, a1=0.0)
+    cine.glow(fr(57), fr(65), attach=chest, r0=0.8, r1=1.7, color="#5a30d8", a0=0.16, a1=0.0)
     # the spin: thin white arcs circling the body
     for k in range(4):
         cine.ring(fr(74) + 2 * k, 8, torso(fr(76)), 1.7 + 0.2 * k, 2.6 + 0.2 * k, 0.05, 0.02, "#ffffff", 0.8, 0.0, n=(0, 1, 0), add=True, easing="quad_out")
