@@ -159,3 +159,132 @@ def overlay(mask: np.ndarray, fit: Fit, size: int = 256) -> np.ndarray:
     img[..., 2] = mm * 200
     img[(mc > 0) & (mm > 0)] = (200, 200, 60)
     return cv2.resize(img, (size, size), interpolation=cv2.INTER_NEAREST)
+
+
+# ================================================================== colour-labelled rigs (a "face test" rig: every face of every part has its own colour)
+# The reference "VFX Practice Day2" animates the classic R6 test dummy whose faces are painted FRONT red, BACK blue, RIGHT green, LEFT orange, TOP light blue,
+# BOTTOM yellow, with a plain light head. Colours say which way each part faces, which a silhouette cannot (a limb turned 180 degrees has the same outline).
+FACE_CLASS = {"front": 1, "back": 2, "right": 3, "left": 4, "top": 5, "bottom": 6}   # target label classes; 7 = head / unlabeled grey
+FACE_NORMALS = {"right": (1, 0, 0), "left": (-1, 0, 0), "top": (0, 1, 0), "bottom": (0, -1, 0), "back": (0, 0, 1), "front": (0, 0, -1)}  # the character faces -Z
+
+
+def color_labels(img_bgr: np.ndarray) -> np.ndarray:
+    """Classify every pixel of a crop into the face classes (0 = background / smoke / purple fx)."""
+    hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+    h, s, v = hsv[..., 0].astype(int), hsv[..., 1].astype(int), hsv[..., 2].astype(int)
+    out = np.zeros(h.shape, np.uint8)
+    ok = (s > 105) & (v > 70)
+    out[ok & ((h < 7) | (h > 172))] = 1      # red (front)
+    out[ok & (h >= 100) & (h <= 128) & (v < 215)] = 2   # deep blue (back)
+    out[ok & (h >= 38) & (h <= 85)] = 3      # green (right)
+    out[ok & (h >= 8) & (h <= 17)] = 4       # orange (left)
+    out[ok & (h >= 86) & (h <= 99)] = 5      # light blue / cyan (top)
+    out[ok & (h >= 18) & (h <= 34)] = 6      # yellow (bottom)
+    # the head: light, almost colourless, right next to the coloured body (the floor is darker and the haze is far away)
+    near = cv2.dilate((out > 0).astype(np.uint8), np.ones((19, 19), np.uint8)) > 0
+    head = near & (out == 0) & (s < 60) & (v > 150)
+    head = cv2.morphologyEx(head.astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8)) > 0
+    out[head] = 7
+    return out
+
+
+def _view(elev_deg: float):
+    e = math.radians(elev_deg)
+    f = np.array([0.0, -math.sin(e), -math.cos(e)])   # looking along -Z, pitched down
+    r = np.array([1.0, 0.0, 0.0])
+    u = np.array([0.0, math.cos(e), -math.sin(e)])
+    return f, r, u
+
+
+def render_labels(p: np.ndarray, tx: float, ty: float, s: float, elev: float = 28.0, size: int = CANVAS) -> np.ndarray:
+    """Painter's-algorithm render of the face-coloured rig into a class map (the head is class 7), orthographic, camera pitched down by ``elev`` degrees."""
+    fwd, rgt, up = _view(elev)
+    root = compose(translate((0.0, 3.0, 0.0)), pose_transform(root_pose(0.0, 3.0, 0.0, p[1], p[0], p[2])))
+    tf = part_transforms(sample(p), root=root)
+    polys = []   # (depth, class, 2D points)
+    for part in PARTS:
+        R, t = tf[part]
+        sx, sy, sz = SIZES_[part]
+        for face, n in FACE_NORMALS.items():
+            nw = np.array(R) @ np.array(n, float)
+            if nw @ fwd > -1e-6:      # facing away from the camera
+                continue
+            ax = [i for i in range(3) if n[i] != 0][0]
+            others = [i for i in range(3) if i != ax]
+            c = []
+            for a, b in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+                local = np.zeros(3)
+                local[ax] = n[ax] * (sx, sy, sz)[ax] / 2
+                local[others[0]] = a * (sx, sy, sz)[others[0]] / 2
+                local[others[1]] = b * (sx, sy, sz)[others[1]] / 2
+                c.append(np.array(R) @ local + np.array(t))
+            c = np.array(c)
+            pts = np.stack([c @ rgt, c @ up], 1)
+            polys.append((float((c.mean(0)) @ fwd), 7 if part == "Head" else FACE_CLASS[face], pts))
+    m = np.zeros((size, size), np.uint8)
+    for _, cls, pts in sorted(polys, key=lambda x: -x[0]):   # far to near
+        xy = np.stack([tx + s * pts[:, 0], ty - s * pts[:, 1]], 1)
+        cv2.fillConvexPoly(m, np.round(xy).astype(np.int32), int(cls))
+    return m
+
+
+SIZES_ = {"Torso": (2.0, 2.0, 1.0), "Head": (1.0, 1.0, 1.0), "Right Arm": (1.0, 2.0, 1.0), "Left Arm": (1.0, 2.0, 1.0), "Right Leg": (1.0, 2.0, 1.0), "Left Leg": (1.0, 2.0, 1.0)}
+
+
+def label_score(model: np.ndarray, target: np.ndarray) -> float:
+    """Agreement in [0, 1]: over the union of the two foregrounds, the share of pixels whose class matches (the head, class 7, matches only itself or unlabeled)."""
+    fg = (model > 0) | (target > 0)
+    n = int(fg.sum())
+    if n == 0:
+        return 0.0
+    same = (model == target) & fg
+    return float(same.sum()) / n
+
+
+def normalise_labels(lab: np.ndarray, size: int = CANVAS) -> tuple[np.ndarray, tuple[float, float, float]]:
+    """Square crop around the labelled foreground, resized by nearest neighbour (class ids must not blend)."""
+    ys, xs = np.nonzero(lab)
+    if len(xs) < 20:
+        return np.zeros((size, size), np.uint8), (0.0, 0.0, 1.0)
+    cx, cy = (np.percentile(xs, 1) + np.percentile(xs, 99)) / 2.0, (np.percentile(ys, 1) + np.percentile(ys, 99)) / 2.0
+    side = max(np.percentile(xs, 99) - np.percentile(xs, 1), np.percentile(ys, 99) - np.percentile(ys, 1)) * 1.3 + 6
+    x0, y0 = cx - side / 2, cy - side / 2
+    M = np.array([[size / side, 0, -x0 * size / side], [0, size / side, -y0 * size / side]], np.float32)
+    return cv2.warpAffine(lab, M, (size, size), flags=cv2.INTER_NEAREST), (float(x0), float(y0), float(side))
+
+
+def fit_frame_labels(target: np.ndarray, init: Fit | None, prev: Fit | None = None, elev: float = 28.0, pop: int = 100, iters: int = 40, w_prev: float = 0.30, seed: int = 0) -> Fit:
+    """Same search as ``fit_frame`` but the score is the class agreement of the face-coloured render."""
+    rng = np.random.RandomState(seed)
+    if init is None:
+        base = np.zeros(19)
+        base[0], base[3], base[6] = 180.0, -5, 5
+        base[16], base[17], base[18] = CANVAS / 2, CANVAS * 0.55, CANVAS * 0.80 / HERO_H
+        sd = np.concatenate([[60, 25, 20, 25, 20, 10, 15, 15, 70, 45, 70, 45, 50, 25, 50, 25], [4, 4, 3]])
+    else:
+        base = np.concatenate([init.params, [init.tx, init.ty, init.s]])
+        sd = np.concatenate([[18, 14, 12, 12, 10, 6, 9, 9, 40, 22, 40, 22, 28, 14, 28, 14], [3, 3, 2]])
+    prev_p = None if prev is None else np.concatenate([prev.params, [prev.tx, prev.ty, prev.s]])
+
+    def cost(theta):
+        pp = np.clip(theta[:16], LO, HI)
+        lm = render_labels(pp, theta[16], theta[17], max(2.0, theta[18]), elev)
+        c = 1.0 - (0.6 * iou(lm > 0, target > 0) + 0.4 * label_score(lm, target))   # silhouette first (robust to compression), colours decide the orientation
+        if prev_p is not None:
+            c += w_prev * float(np.sum(((pp - prev_p[:16]) / 60.0) ** 2)) / 16.0
+        return c
+
+    mean, best, best_c = base.copy(), base.copy(), cost(base)
+    for it in range(iters):
+        cand = mean + rng.randn(pop, 19) * sd
+        cand[0] = mean
+        costs = np.array([cost(c) for c in cand])
+        order = np.argsort(costs)
+        if costs[order[0]] < best_c:
+            best_c, best = float(costs[order[0]]), cand[order[0]].copy()
+        elite = cand[order[: max(6, pop // 6)]]
+        mean = 0.5 * mean + 0.5 * elite.mean(0)
+        sd = 0.5 * sd + 0.5 * (elite.std(0) + 0.05 * np.concatenate([np.ones(16) * 2, [0.3, 0.3, 0.1]]))
+    pp = np.clip(best[:16], LO, HI)
+    lm = render_labels(pp, best[16], best[17], best[18], elev)
+    return Fit(pp, float(best[16]), float(best[17]), float(best[18]), 0.6 * iou(lm > 0, target > 0) + 0.4 * label_score(lm, target))

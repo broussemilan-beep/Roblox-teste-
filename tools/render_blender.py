@@ -104,7 +104,7 @@ class Keyer:
         ob.keyframe_insert("rotation_quaternion", frame=frame)
 
 
-def make_ground(far_color: str, floor: str):
+def make_ground(far_color: str, floor: str, style: str = "film"):
     bpy.ops.mesh.primitive_plane_add(size=4000, location=(0, 0, 0))
     ob = bpy.context.object
     ob.name = "ground"
@@ -113,13 +113,19 @@ def make_ground(far_color: str, floor: str):
     img = np.zeros((n, n, 4), np.float32)
     base = np.array(lin(floor), np.float32)
     img[:] = base
-    fine, bold = np.array(lin("#6e6c76"), np.float32), np.array(lin("#908e9a"), np.float32)
-    for k in range(0, n, tile // 2):  # an 8-stud grid (lines ~0.2 stud wide so they survive distance)
-        img[max(0, k - 7) : k + 7, :] = fine
-        img[:, max(0, k - 7) : k + 7] = fine
-    for k in range(0, n, tile):  # a stronger line every 16 studs
-        img[max(0, k - 12) : k + 12, :] = bold
-        img[:, max(0, k - 12) : k + 12] = bold
+    if style == "studio":   # the Studio viewport: a plain baseplate with a faint big checker, no drawn grid
+        cell = n // 4
+        yy, xx = np.mgrid[0:n, 0:n]
+        chk = (((yy // cell) + (xx // cell)) % 2).astype(np.float32)
+        img[:] = base * (0.94 + 0.12 * chk)[..., None]
+    else:
+        fine, bold = np.array(lin("#6e6c76"), np.float32), np.array(lin("#908e9a"), np.float32)
+        for k in range(0, n, tile // 2):  # an 8-stud grid (lines ~0.2 stud wide so they survive distance)
+            img[max(0, k - 7) : k + 7, :] = fine
+            img[:, max(0, k - 7) : k + 7] = fine
+        for k in range(0, n, tile):  # a stronger line every 16 studs
+            img[max(0, k - 12) : k + 12, :] = bold
+            img[:, max(0, k - 12) : k + 12] = bold
     img[:, :, 3] = 1.0
     im = bpy.data.images.new("grid", n, n, alpha=False, float_buffer=True)
     im.colorspace_settings.name = "Non-Color"  # must come BEFORE the pixels: changing it afterwards converts (and here zeroes) them
@@ -219,8 +225,12 @@ def build(scene_name: str, frames: range, width: int, samples: int):
 
     sky = (CINE or {}).get("skyColor", "#3d3b41")
     floor = (CINE or {}).get("floorColor", "#66646a")
-    make_world("#1d1c21", "#4a484f")
-    make_ground("#5c5a62", "#3c3a42")
+    if (CINE or {}).get("look") == "studio":
+        make_world("#7d8394", "#a4a9b7")
+        make_ground("#a4a9b7", "#3d3e44", "studio")
+    else:
+        make_world("#1d1c21", "#4a484f")
+        make_ground("#5c5a62", "#3c3a42")
 
     keyer = Keyer()
     # ---- characters
@@ -232,8 +242,13 @@ def build(scene_name: str, frames: range, width: int, samples: int):
             if part in ch.get("hide", []):
                 objs.append(None)
                 continue
-            box = M.bevel_box(tuple(SZ[part]), 0.07, ch["colors"][part], f"{ch['name']}_{part}")
-            ob = obj_from_mesh(f"{ch['name']}_{part}", box, 35.0, rough=0.62)
+            if part == "Head" and ch.get("headShape") == "ball":
+                box = M.sphere(0.5, 22, 14, ch["colors"][part], f"{ch['name']}_{part}").scale(1.0, 1.0, 1.0)
+            else:
+                box = M.bevel_box(tuple(SZ[part]), 0.02 if ch.get("faceColors") else 0.07, ch["colors"][part], f"{ch['name']}_{part}")
+                if ch.get("faceColors"):
+                    box = M.face_painted(box, ch["faceColors"])
+            ob = obj_from_mesh(f"{ch['name']}_{part}", box, 35.0 if not ch.get("faceColors") else None, rough=0.62)
             objs.append(ob)
             if part == "Head" and ch.get("face", "std") in ("std", "smirk"):
                 for fx_, (ex, ey, ew, eh) in enumerate([(-0.28, 0.12, 0.12, 0.17), (0.28, 0.12, 0.12, 0.17), (0.0, -0.2, 0.36, 0.05)]):

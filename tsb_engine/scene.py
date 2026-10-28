@@ -30,6 +30,8 @@ class Character:
     colors: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_COLORS))
     outfit: Outfit | None = None  # secondary-motion extras (hair, coat tails, hat), preview only
     face: str = "std"  # "std" (dots + line) or "smirk" (round glasses, one-sided smile)
+    face_colors: dict[str, str] | None = None  # paint every face of every part (the R6 "face test" dummy): front/back/right/left/top/bottom -> hex
+    head_shape: str = "box"  # "box" | "ball" (a light rounded head, as on the test dummy)
     hide: tuple[str, ...] = ()  # parts not drawn in the preview (replaced by an ``Attach`` mesh, e.g. a mannequin's round head)
 
     def base_transform(self) -> Transform:
@@ -88,7 +90,7 @@ def export_viewer_data(scene: Scene) -> dict:
         for mname, mesh in (c.outfit.meshes() if c.outfit is not None else {}).items():
             meshes[mname] = {"v": [round(float(x), 4) for x in mesh.v.reshape(-1)], "f": [int(i) for i in mesh.f.reshape(-1)],
                              "m": [int(i) for i in mesh.mat], "cols": list(mesh.materials)}
-        chars.append({"name": c.name, "face": c.face, "colors": c.colors, "frames": frames, "findings": findings, "extras": extras, "hide": list(c.hide)})
+        chars.append({"name": c.name, "face": c.face, "colors": c.colors, "frames": frames, "findings": findings, "extras": extras, "hide": list(c.hide), "faceColors": c.face_colors, "headShape": c.head_shape})
     markers = list(scene.markers)
     bands = list(scene.bands)
     ev = scene.events

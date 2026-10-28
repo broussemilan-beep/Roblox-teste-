@@ -372,3 +372,20 @@ def parse_obj(text: str) -> Mesh:
             f.append([int(x.split("/")[0]) - 1 for x in p[1:4]])
             mat.append(cur)
     return Mesh(np.array(v), np.array(f, np.int32), np.array(mat, np.int32), materials, "parsed")
+
+
+def face_painted(mesh: Mesh, colors: dict[str, str]) -> Mesh:
+    """Give each triangle the colour of the box face it lies on (``colors``: +x/-x/+y/-y/+z/-z or right/left/top/bottom/back/front), by dominant normal axis.
+
+    For the classic R6 *face test* dummy: every face of every part has its own colour, which is what lets an animator (and ``posefit``) see how each limb is turned."""
+    names = {"right": "+x", "left": "-x", "top": "+y", "bottom": "-y", "back": "+z", "front": "-z"}
+    cols = {names.get(k, k): v for k, v in colors.items()}
+    order = ["+x", "-x", "+y", "-y", "+z", "-z"]
+    n = mesh.normals()
+    ax = np.abs(n).argmax(1)
+    sign = np.take_along_axis(n, ax[:, None], 1)[:, 0] >= 0
+    face = np.array([order[2 * a + (0 if s else 1)] for a, s in zip(ax, sign)])
+    m = mesh.copy()
+    m.materials = [cols[o] for o in order]
+    m.mat = np.array([order.index(f) for f in face], np.int32)
+    return m
