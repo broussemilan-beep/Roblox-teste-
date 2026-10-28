@@ -89,3 +89,13 @@ Tentative d'erreur reconnue : j'avais d'abord refusé le point « caméra dans l
 * **Still wrong**: the sprint's accent poses are my own, not matched to the reference silhouettes; the macro's composition is approximate; only two shots were tracked (the rest of the framing is hand-set);
   the katana in the hand has no hand/grip fit; no dust/skid animation under the feet in the run.
 
+## v6 (2026-10-28): "copie une autre animation" - the poses are now extracted from the reference
+
+User advice after v5: the animation is incomprehensible; copy an existing animation; when you do not know how to do something, pivot instead of scribbling.
+`tsb_engine/posefit.py` + `tools/copy_poses.py`: the hero is tracked (SAM 2) and the 16 joint angles of the R6 rig are searched so that its orthographic silhouette overlaps the mask (cross-entropy search, warm-started and
+pulled toward the previous image). Result files: `docs/research/reference-poses/hero_284_299.json` (run at the mannequin, mean IoU 0.77) and `hero_72_148.json` (sprint, mean IoU 0.70, min 0.37).
+Used in `examples/calm.py`: 284-299 fully, 72-148 on the 58 images with IoU >= 0.62 (the others - hero tiny or hidden in the shell - fall back to the gait). Limits, said plainly:
+a silhouette is ambiguous (left/right limbs swap, depth is lost); the heading and the position are ours, not copied; the body's pitch/roll depend on the view angle assumed by the fit and are damped by half;
+the hero is framed 1.4x larger than the raw track in the sprint (otherwise unreadable). The strike (306-309) is still solved by hand (the black-on-white frames merge hero and mannequin in one mask).
+Not done: copying the poses of the other shots (roll 22-36, crouch 37-62, approach and slam 240-283), a perspective fit, a fit that includes the hair/blade.
+
