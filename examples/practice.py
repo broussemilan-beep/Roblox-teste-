@@ -203,7 +203,7 @@ def build() -> Scene:
     # grey dust: a trail behind the dash and the spin, a burst on every landing
     cine.emit(fr(62), fr(100), attach=foot, rate=2.2, vel=(0.01, 0.06), dir=(0, 1, 0), spread=1.4, life=(22, 44), size=(1.0, 3.2), color=("#6f7178", "#4f5056"), alpha=(0.30, 0.0), add=False, seed=2, radius=0.6, shape="smoke")
     cine.emit(fr(120), fr(136), attach=foot, rate=2.0, vel=(0.01, 0.05), dir=(0, 1, 0), spread=1.2, life=(20, 40), size=(1.0, 2.8), color=("#6f7178", "#4f5056"), alpha=(0.26, 0.0), add=False, seed=3, radius=0.6, shape="smoke")
-    cine.emit(fr(156), fr(176), attach=foot, rate=2.4, vel=(0.01, 0.06), dir=(0, 1, 0), spread=1.4, life=(22, 44), size=(1.0, 3.0), color=("#6f7178", "#4f5056"), alpha=(0.30, 0.0), add=False, seed=4, radius=0.6, shape="smoke")
+    cine.emit(fr(156), fr(172), attach=foot, rate=1.6, vel=(0.01, 0.05), dir=(0, 1, 0), spread=1.2, life=(10, 22), size=(0.7, 1.9), color=("#6f7178", "#4f5056"), alpha=(0.20, 0.0), add=False, seed=4, radius=0.6, shape="smoke")
     # the charge: a violet aura rising off the body, a soft glow
     cine.emit(fr(56), fr(66), attach=chest, rate=7.0, vel=(0.03, 0.16), dir=(0, 1, 0), spread=0.7, grav=-0.01, life=(10, 22), size=(0.7, 0.2), color=VIOLET, alpha=(0.9, 0.0), add=True, seed=6, radius=0.9, shape="soft")
     cine.glow(fr(57), fr(65), attach=chest, r0=0.8, r1=1.7, color="#5a30d8", a0=0.16, a1=0.0)
