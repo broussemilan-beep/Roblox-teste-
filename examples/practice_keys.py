@@ -28,7 +28,7 @@ KEYS: dict[int, dict] = {
     114: dict(ry=300, rx=-10, T_rx=-20, RA_rx=70, RA_rz=90, LA_rx=40, LA_rz=-30, RL_rx=45, LL_rx=-30),
     120: dict(ry=200, rx=-10, T_rx=-30, RA_rx=130, RA_rz=30, LA_rx=40, LA_rz=-40, RL_rx=60, LL_rx=-40),
     124: dict(ry=10, rx=-12, rz=22, T_rx=-15, RA_rx=-20, RA_rz=40, LA_rx=60, LA_rz=-40, RL_rx=-40, LL_rx=50, air=0.8),
-    128: dict(ry=0, rx=0, T_rx=-10, RA_rx=-10, RA_rz=85, LA_rx=-10, LA_rz=-85, RL_rx=-30, RL_rz=15, LL_rx=30, LL_rz=-15, air=2.0),
+    128: dict(ry=-25, rx=-14, rz=8, T_rx=-18, T_ry=-15, RA_rx=-70, RA_rz=35, LA_rx=95, LA_rz=-25, RL_rx=-55, RL_rz=8, LL_rx=45, LL_rz=-6, air=2.0),
     132: dict(ry=-40, rx=-35, T_rx=-20, RA_rx=-120, RA_rz=40, LA_rx=60, LA_rz=-60, RL_rx=-40, LL_rx=50, air=1.8),
     138: dict(ry=-80, rx=-80, T_rx=-10, RA_rx=170, LA_rx=170, RL_rx=20, LL_rx=-10, air=1.2),
     144: dict(ry=-150, rx=-30, T_rx=-40, RA_rx=130, RA_rz=20, LA_rx=130, LA_rz=-20, RL_rx=65, LL_rx=-60),
