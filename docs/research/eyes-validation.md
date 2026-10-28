@@ -1,0 +1,62 @@
+# Les « yeux » : ce qu'ils lisent bien, ce qu'ils lisent mal (validation du 2026-10-28)
+
+Question de l'utilisateur : construire des yeux qui voient, lisent et comprennent, parce que je confondais par exemple un coup
+transformé en VFX pour faire un effet de multi-coups ultra rapide avec de vrais coups. « Dis-moi quand c'est bon. »
+
+**Verdict : pas « bon » pour la lecture des poses. Bon pour une partie des faits mesurables, avec un protocole qui m'empêche de
+conclure sans avoir regardé.**
+
+## Outils
+
+| Outil | Rôle |
+|---|---|
+| `tsb_engine/perception.py` | lit un clip : ponctuation noire/blanche, scène vide, mur de VFX, mouvement de caméra (ajustement affine sur le fond), coupes, flashs, réaction de la victime ; étiquettes `MULTIHIT_VFX`, `REAL_COMBO`, `SINGLE_HIT_SMEAR`, `HELD_WITH_VFX`, `VICTIM_CYCLING` |
+| `tsb_engine/reading.py` | registre de lecture : je note par plan ce que j'ai regardé et vu ; le validateur signale les contradictions avec les mesures et les images jamais regardées |
+| `examples/eyes_bench.py` + `tools/eyes_bench.py` | banc d'essai : clips du moteur dont le contenu est connu (10 classes × 3 variantes aléatoires, 1 320 images) ; `--reference DIR` note aussi l'outil contre ma propre lecture de la vidéo de référence |
+| `tools/eyes.py read / check / hot` | timeline des événements, toutes les images autour des pics de mouvement, modèle `reading.json`, contrôle des contradictions |
+
+## Résultats
+
+### Banc d'essai (28/30)
+
+| Classe (vérité connue) | Résultat |
+|---|---|
+| ponctuation noir/blanc, scène vide, mur de traits, coupe franche, caméra seule (pan/orbite/travelling), cycle de victime avec héros tenu | 3/3 chacune |
+| faux multi-coups (un bras strobe + flash sur chaque image), coup unique avec smear, vrai enchaînement de 4 coups | 3/3 chacune |
+| effets sans réaction (flashs, traînées, encre, victime immobile) | **1/3** : de l'encre sombre qui recouvre la victime la fait paraître « en réaction » → lu `REAL_COMBO` ou `MULTIHIT_VFX` |
+
+Le banc a été durci en cours de route (sa première version était trop facile : flashs trop espacés, victime qui ne réagissait pas). Les
+seuils de décision ont été calibrés **sur ce banc** : 28/30 est donc un score d'entraînement, pas de généralisation.
+
+### Vidéo de référence (ma lecture image par image = vérité)
+
+* **Fiable** (7/7 attendus, aucune fausse détection) : image vide 14-18, impact frame blanc 166-168, mur de traits 195-238, images noires 257-258
+  et 282, impact frame blanc 284-286, mouvement de caméra 268-275.
+* **Pas fiable** : `CUT` (55 détectés, trop ; la caméra bouge avec parallaxe et les relances de mise en page ressemblent à des coupes) ;
+  `REAL_COMBO` détecté 2 fois dans une période où le héros s'accroupit (faux) ; `SINGLE_HIT_SMEAR` une fois (plausible, non vérifié).
+* **Raté** : le jonglage 97-132 (héros tenu, victime qui change de pose toutes les 1-2 images) n'est pas reconnu : la caméra bouge fort et
+  l'encre sombre recouvre le héros.
+
+## Pourquoi (limites de fond)
+
+1. **Noir sur noir.** Le bras noir se confond avec le manteau noir : la silhouette du héros ne dit presque rien d'un strobe de bras. Ce qui se
+   voit, ce sont les flashs, traînées blanches et la réaction de la victime blanche. Un strobe sans VFX ni victime visible n'est pas lisible.
+2. **L'encre est sombre aussi.** Les traînées noires du style de référence ressemblent aux membres noirs : le lecteur ne les sépare pas.
+3. **Fort mouvement de caméra + parallaxe** : le modèle de caméra (similitude 2D) ne les explique pas, donc fausses « coupes ».
+4. Les réglages ont été trouvés sur du synthétique (rendu du viewer) : une vidéo réelle compressée, avec d'autres couleurs, sera plus dure.
+
+## Protocole qui en découle (ce que je dois faire à chaque vidéo)
+
+1. `eyes.py ref VIDEO DIR` (30 fps ; `--fps 60` si le clip est animé en 60).
+2. `eyes.py read DIR OUT --mask-right 0.17` : timeline, `hot_windows.png` (toutes les images autour des pics), `reading.json`.
+3. **Regarder** les fenêtres `hot_windows.png` et les planches de chaque plan (12 images par planche, numérotées), puis remplir `reading.json` :
+   `viewed` (plages d'images réellement regardées), `camera`, `punct`, `hits`, `vfx_multihit`, `victim`.
+4. `eyes.py check DIR reading.json` : chaque contradiction ou plage non regardée est une raison de rouvrir les images, **pas** une preuve que j'ai tort.
+5. Seulement alors, écrire l'analyse. Les classes marquées « pas fiable » ne sont jamais citées comme faits sans lecture visuelle.
+
+## Pour aller plus loin (non fait)
+
+* Mode « vérité moteur » pour **mes propres films** : rendre la même scène sans effets donne les poses exactes (cinématique), ce qui supprime le
+  problème noir sur noir ; non implémenté pour l'instant.
+* Un lecteur appris (suivi de points type CoTracker, segmentation SAM 2) pour séparer encre et membres : lourd, non essayé ici.
+* Plus de vidéos de référence annotées à la main : le seuil actuel repose sur une seule vidéo.

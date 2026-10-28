@@ -124,4 +124,10 @@ def _short() -> Scene:
     return build()
 
 
-SCENES = {"heavy_punch_hit": heavy_punch_hit, "berserker_ultimate": _ultimate, "duel_short": _short}
+def _eyes_bench() -> Scene:
+    from .eyes_bench import build
+
+    return build()[0]
+
+
+SCENES = {"heavy_punch_hit": heavy_punch_hit, "berserker_ultimate": _ultimate, "duel_short": _short, "eyes_bench": _eyes_bench}

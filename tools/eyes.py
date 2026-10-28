@@ -4,6 +4,8 @@
   python tools/eyes.py film SCENE OUTDIR                      render a scene's film camera at 30 fps (clean, no HUD)
   python tools/eyes.py analyze DIR OUTDIR [--mask-right 0.17] measurements + rhythm.png + report.json
   python tools/eyes.py compare REF_DIR MINE_DIR OUTDIR        side-by-side measurements, diagnosis, compare.png, beats.md
+  python tools/eyes.py read DIR OUT [--mask-right 0.17]        events timeline + hot windows + reading.json template
+  python tools/eyes.py check DIR READING.json                  contradictions between my written reading and the measurements
   python tools/eyes.py hot DIR OUT.png [--top 6 --radius 3]   every frame around the strongest motion peaks (catches 2-frame smears)
   python tools/eyes.py trail DIR A B OUT.png                  where things moved between frames A..B (colour = time)
   python tools/eyes.py flow DIR I OUT.png                     optical flow of frame I (hue = direction, brightness = speed)
@@ -23,7 +25,7 @@ import cv2
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from tsb_engine import eyes  # noqa: E402
+from tsb_engine import eyes, perception, reading  # noqa: E402
 
 UI_RIGHT = 0.17  # share of the right side hidden by the TikTok buttons in screen recordings
 
@@ -81,6 +83,32 @@ def cmd_compare(a):
     print(f"\nwrote {out}/compare.png, pairs.png, diagnosis.txt, beats.md, report.json")
 
 
+def cmd_read(a):
+    """Perceive a clip: timeline of events, every frame around the strongest peaks, and a reading template to fill in."""
+    out = Path(a.out)
+    out.mkdir(parents=True, exist_ok=True)
+    frames = eyes.load_clip(a.dir, width=perception.WORK_W, mask_right=a.mask_right, last=a.last)
+    pc = perception.perceive(frames, fps=a.fps)
+    full = eyes.analyze(eyes.load_clip(a.dir, mask_right=a.mask_right, last=a.last), name=Path(a.dir).name)
+    eyes.window_sheet(full, eyes.hot_windows(full, a.top, a.radius), str(out / "hot_windows.png"))
+    eyes.plot_clip(full, str(out / "rhythm.png"))
+    reading.save(reading.skeleton(pc), str(out / "reading.json"))
+    (out / "timeline.txt").write_text(pc.timeline() + "\n", encoding="utf-8")
+    print(pc.timeline())
+    print(f"\nwrote {out}/timeline.txt, hot_windows.png, rhythm.png, reading.json (fill it in, then: eyes.py check)")
+    print("RELIABLE: PUNCT_BLACK/WHITE, VFX_WALL, EMPTY, CAMERA_MOVE (validated). ADVISORY ONLY: CUT, hit labels, VICTIM_CYCLING (see docs/research/eyes-validation.md)")
+
+
+def cmd_check(a):
+    frames = eyes.load_clip(a.dir, width=perception.WORK_W, mask_right=a.mask_right, last=a.last)
+    pc = perception.perceive(frames, fps=a.fps)
+    issues = reading.validate(reading.load(a.reading), pc)
+    for i in issues:
+        print(i)
+    print(f"\n{len(issues)} issue(s)")
+    sys.exit(1 if issues else 0)
+
+
 def cmd_hot(a):
     clip = _load(a.dir, a.mask_right, a.last)
     wins = eyes.hot_windows(clip, a.top, a.radius)
@@ -106,6 +134,8 @@ def main():
     s = sp.add_parser("film"); s.add_argument("scene"); s.add_argument("out"); s.add_argument("--fps", type=int, default=30); s.add_argument("--width", type=int, default=960); s.set_defaults(f=cmd_film)
     s = sp.add_parser("analyze"); s.add_argument("dir"); s.add_argument("out"); s.add_argument("--mask-right", type=float, default=0.0); s.add_argument("--last", type=int); s.set_defaults(f=cmd_analyze)
     s = sp.add_parser("compare"); s.add_argument("ref"); s.add_argument("mine"); s.add_argument("out"); s.add_argument("--ref-mask", type=float, default=UI_RIGHT); s.add_argument("--ref-last", type=int); s.add_argument("--min-shot", type=int, default=3); s.add_argument("--anchors", help="ref:mine,ref:mine,... frames (30 fps) that must line up"); s.set_defaults(f=cmd_compare)
+    s = sp.add_parser("read"); s.add_argument("dir"); s.add_argument("out"); s.add_argument("--mask-right", type=float, default=0.0); s.add_argument("--last", type=int); s.add_argument("--fps", type=int, default=30); s.add_argument("--top", type=int, default=6); s.add_argument("--radius", type=int, default=3); s.set_defaults(f=cmd_read)
+    s = sp.add_parser("check"); s.add_argument("dir"); s.add_argument("reading"); s.add_argument("--mask-right", type=float, default=0.0); s.add_argument("--last", type=int); s.add_argument("--fps", type=int, default=30); s.set_defaults(f=cmd_check)
     s = sp.add_parser("hot"); s.add_argument("dir"); s.add_argument("out"); s.add_argument("--top", type=int, default=6); s.add_argument("--radius", type=int, default=3); s.add_argument("--mask-right", type=float, default=0.0); s.add_argument("--last", type=int); s.set_defaults(f=cmd_hot)
     s = sp.add_parser("trail"); s.add_argument("dir"); s.add_argument("a", type=int); s.add_argument("b", type=int); s.add_argument("out"); s.add_argument("--mask-right", type=float, default=0.0); s.set_defaults(f=cmd_trail)
     s = sp.add_parser("flow"); s.add_argument("dir"); s.add_argument("i", type=int); s.add_argument("out"); s.add_argument("--mask-right", type=float, default=0.0); s.set_defaults(f=cmd_flow)

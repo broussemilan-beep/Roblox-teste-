@@ -106,6 +106,21 @@ Work like this instead:
 - Before exporting with fewer keys than frames run `python tools/check_export.py <scene> <char> --optimize`: it re-reads the exported file, plays it with Roblox's interpolation and reports the error in studs (a 60-stud blink-cut turned into a slide at a coarse step; fixed by keeping authored keys, but fast spins still need dense keys).
 - Reusable code only from MIT sources (Willikk, RoClicks, Chrrxs/robloxstudio-mcp), with credit; RigBridge / Motion Tools have no licence, Staticaliza is GPL, Roqer is AGPL: ideas only.
 
+## Reading a reference video (do this BEFORE any analysis; details in `docs/research/eyes-validation.md`)
+
+The eyes are **not** reliable for poses (black limbs on a black coat, dark ink, camera parallax). They are reliable for black/white
+punctuation frames, empty stage, walls of strokes and clear camera moves. Never state a hit count, "held hero" or "VFX-made multi-hit"
+from the measurements alone. Protocol:
+
+1. `python tools/eyes.py ref VIDEO DIR` (add `--fps 60` for fast effects), then `python tools/eyes.py read DIR OUT --mask-right 0.17`.
+2. Open `OUT/hot_windows.png` and the numbered sheets; look at EVERY frame around each peak (a 2-frame smear is invisible when sampling).
+3. Tell apart before writing: a **real hit** (pose changes, victim reacts, flash once per hit) / a **VFX-made multi-hit** (one or two
+   arm poses flipping every image + a new flash/streak fan on every image + the victim shaken back and forth) / a **held pose with VFX**
+   (effects fire, nobody reacts) / a **camera move** (the whole background shifts consistently) / a **cut** (the background is replaced).
+4. Fill `OUT/reading.json` (`viewed`, `camera`, `punct`, `hits`, `vfx_multihit`, `victim`) and run `python tools/eyes.py check DIR OUT/reading.json`;
+   re-open the frames behind every contradiction.
+5. Validate the tools themselves with `python tools/eyes_bench.py --reference DIR` after changing them (bench 28/30, reference 7/7 reliable checkpoints).
+
 ## Rules of engagement
 
 - Tag every number you introduce: `[physical]` follows from the rig, `[heuristic]` a starting
@@ -137,6 +152,7 @@ C0/C1 — verify when writing an exporter).
 - `tsb_engine/` – model, forward kinematics, `moves.py`/`footwork.py` (planted feet, steps, gaits), `authoring.py`, `cinematic.py`, `linter.py`, CLI.
 - `examples/builders.py` – a worked heavy punch plus two deliberately bad animations; `examples/ultimate.py` – the 13 s berserker ultimate; `examples/short.py` – the reference-level 11 s short.
 - `tsb_engine/secondary.py` – hair, coat and hat secondary motion (preview only).
+- `tsb_engine/perception.py`, `reading.py`, `examples/eyes_bench.py`, `tools/eyes_bench.py` – the reader, the reading ledger and the labelled bench (results and limits: `docs/research/eyes-validation.md`).
 - `tsb_engine/export_check.py` + `tools/check_export.py` – round-trip check of the `.rbxmx` export (Roblox interpolation + Motor6D FK vs the engine) and adaptive keyframe optimisation.
 - `docs/research/rnd-audit.md` – verified audit of the Roblox/Blender/VFX repos and docs (licences, what is verified, test plan for Studio).
 - `tsb_engine/solver.py` – limb aiming/contact solving, dislocation, moving hold, kinetic chain; `tsb_engine/readability.py` + `tools/check_poses.py` – picture-space pose checks.

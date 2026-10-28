@@ -1,0 +1,19 @@
+{
+  "source": "my own frame-by-frame reading of the study reel (336 frames at 30 fps, 0-based indices = sheet labels - 1); see docs/research/reference-analysis.md",
+  "tolerance_frames": 2,
+  "expected": [
+    {"label": "EMPTY", "start": 14, "end": 18, "note": "stage empty while the camera pans to the dummy (labels 15-19)"},
+    {"label": "PUNCT_WHITE", "start": 165, "end": 168, "note": "manga impact frame 1: black/white shards (labels 166-169)"},
+    {"label": "VFX_WALL", "start": 195, "end": 227, "note": "slash storm, cyan-edged white strokes (labels 196-228); the reader may extend it over the bars that follow"},
+    {"label": "PUNCT_BLACK", "start": 257, "end": 258, "note": "labels 258-259"},
+    {"label": "PUNCT_BLACK", "start": 282, "end": 282, "note": "label 283"},
+    {"label": "PUNCT_WHITE", "start": 284, "end": 286, "note": "manga impact frame 2 (labels 285-287)"},
+    {"label": "CAMERA_MOVE", "start": 268, "end": 275, "note": "slow drift of the sleeve macro (labels 264-281)"}
+  ],
+  "forbid_outside": ["PUNCT_BLACK", "PUNCT_WHITE", "VFX_WALL", "EMPTY"],
+  "unverified_classes": ["CUT", "REAL_COMBO", "SINGLE_HIT_SMEAR", "MULTIHIT_VFX", "HELD_WITH_VFX", "VICTIM_CYCLING", "VFX_BURST"],
+  "known_truth_not_yet_measurable": [
+    {"start": 97, "end": 132, "note": "juggle: the hero is held in one kick pose, the dummy changes pose every 1-2 frames (labels 98-133)"},
+    {"start": 288, "end": 330, "note": "final macro hold (48 frames), static apart from micro motion"}
+  ]
+}
