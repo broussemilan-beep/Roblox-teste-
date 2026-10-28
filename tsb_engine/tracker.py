@@ -162,6 +162,27 @@ def measure(masks: np.ndarray, toward: int = 1) -> dict[str, np.ndarray]:
     return m
 
 
+def reliability(scores: np.ndarray, prompt_frame: int = 0, good: float = 7.0, bad: float = 5.0) -> tuple[str, float]:
+    """('good' | 'doubtful' | 'lost', median presence logit away from the prompt frame).
+
+    Calibrated on the bench (``tools/track_bench.py`` + the confidence test): tracks that followed the arm held a median logit of 8-10;
+    tracks that lost it sat between 0 and 4. In between, look at the overlay before believing any number.
+    """
+    s = np.array(scores, float)
+    s = np.delete(s, prompt_frame) if 0 <= prompt_frame < len(s) else s
+    med = float(np.nanmedian(s)) if len(s) else float("nan")
+    return ("good" if med >= good else "lost" if med < bad else "doubtful"), med
+
+
+def strobe(reach: np.ndarray, area: np.ndarray, min_step: float = 0.012, rate: float = 0.8, min_steps: int = 8) -> dict:
+    """Does the tracked limb flip between two extensions on (almost) every image?  -> {'strobe': bool, 'reversals', 'rate', 'steps'}"""
+    r = reach[area > 0]
+    d = np.diff(r)
+    big = d[np.abs(d) > min_step]
+    rev, rt = alternation(r, min_step)
+    return {"strobe": bool(len(big) >= min_steps and rt >= rate), "reversals": rev, "rate": round(rt, 2), "steps": int(len(big))}
+
+
 def alternation(signal: np.ndarray, min_step: float) -> tuple[int, float]:
     """(reversals, fraction of steps that reverse) of a 1-D signal, counting only steps larger than ``min_step``."""
     d = np.diff(signal)
