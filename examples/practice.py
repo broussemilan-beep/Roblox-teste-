@@ -36,7 +36,6 @@ ASPECT = VIEW_W / VIEW_H
 FOCAL = (VIEW_H / 2.0) / math.tan(math.radians(FOV) / 2.0)
 FACES = {"front": "#e03a30", "back": "#2f56e0", "right": "#36b04a", "left": "#f0932a", "top": "#47c4f0", "bottom": "#f0d322"}
 COLORS = {p: "#cfd1d8" for p in ("Torso", "Head", "Right Arm", "Left Arm", "Right Leg", "Left Leg")}
-AIR_SPANS = ((67, 80), (84, 93), (122, 137))   # images where the rig leaves the ground (its fitted point rises with it)
 VIOLET, MAGENTA = ("#8a5cff", "#3a1c9a"), "#c64cff"
 
 
@@ -61,29 +60,89 @@ def on_plane(u: float, v: float, p0: np.ndarray, n: np.ndarray) -> np.ndarray:
     return o + t * d
 
 
-def load_track():
-    """Per image of the loop: the pixel of the rig's ground point (from the fits, smoothed; airborne spans replaced by a straight run between their ends)
-    and the 16 hand-read key angles interpolated with a Catmull-Rom spline (``practice_keys.py``)."""
-    d = json.loads(POSES.read_text())
-    pix = np.full((N, 2), np.nan)
-    for fr in d["frames"]:
-        i = fr["f"] - F0
-        if 0 <= i < N and fr.get("angles") and fr.get("score", 0) >= 0.40:
-            x0, y0, side = fr["crop"]
-            tx, ty, _ = fr["fit"]
-            pix[i] = (x0 + tx * side / 128.0, y0 + ty * side / 128.0)
+TRACK = Path(__file__).resolve().parent.parent / "docs" / "research" / "reference-poses" / "practice_track.json"
+AIR_SPANS = ((75, 90), (122, 136))   # reference images where the rig is off the ground (its lowest pixel rises above the ground line)
+PX_PER_STUD = 30.0
+
+
+def measured_track():
+    """Reference screen track per image of the loop: median x of the rig's pixels and its lowest pixel (``tools/measure_track.py``), smoothed."""
+    d = json.loads(TRACK.read_text())
+    x = np.full(N, np.nan)
+    foot = np.full(N, np.nan)
+    for k, v in d.items():
+        i = int(k) - F0
+        if 0 <= i < N and v:
+            x[i], foot[i] = v["x"], v["foot"]
     idx = np.arange(N)
-    for k in range(2):
-        ok = ~np.isnan(pix[:, k])
-        pix[:, k] = np.interp(idx, idx[ok], pix[ok, k])
-    for a, b in AIR_SPANS:   # the fitted point rises with the body: the ground point just runs straight across the jump
+    for arr in (x, foot):
+        ok = ~np.isnan(arr)
+        arr[:] = np.interp(idx, idx[ok], arr[ok])
+    def med(v, k=5):
+        pad = np.pad(v, k // 2, mode="edge")
+        return np.array([np.median(pad[i : i + k]) for i in range(len(v))])
+    g = np.exp(-0.5 * (np.arange(-3, 4) / 1.2) ** 2)
+    g /= g.sum()
+    sm = lambda v: np.convolve(np.pad(med(v), 3, mode="edge"), g, mode="valid")
+    return sm(x), sm(foot)
+
+
+def ground_baseline(foot: np.ndarray) -> np.ndarray:
+    """Pixel row of the ground contact: the measured lowest pixel where the rig stands, a straight run across the jumps."""
+    base = foot.copy()
+    for a, b in AIR_SPANS:
         a, b = a - F0, b - F0
-        pix[a : b + 1, 1] = np.linspace(pix[a, 1], pix[b, 1], b - a + 1)
-    k9 = np.exp(-0.5 * (np.arange(-4, 5) / 2.0) ** 2)
-    k9 /= k9.sum()
-    px = np.convolve(np.pad(pix[:, 0], 4, mode="edge"), k9, mode="valid")
-    py = np.convolve(np.pad(pix[:, 1], 4, mode="edge"), k9, mode="valid")
-    return keyed_angles(), px, py
+        base[a : b + 1] = np.linspace(foot[a - 1], foot[b + 1], b - a + 1)
+    return base
+
+
+def world_corners(a: np.ndarray, X: float, h: float, Z: float) -> np.ndarray:
+    """The 48 corners of the posed rig in the world (root: torso-centre height ``h``)."""
+    from tsb_engine.kinematics import corners, part_transforms, pose_transform
+    from tsb_engine.mathutil import compose, translate
+    from tsb_engine.model import PARTS, Pose
+
+    v = [float(t) for t in a[:16]]
+    root = compose(translate((0.0, 3.0, 0.0)), pose_transform(root_pose(X, h, Z, v[1], v[0], v[2])))
+    pose = {"Torso": Pose((0, 0, 0), (v[3], v[4], v[5])), "Head": Pose((0, 0, 0), (v[6], v[7], 0)), "Right Arm": Pose((0, 0, 0), (v[8], 0, v[9])),
+            "Left Arm": Pose((0, 0, 0), (v[10], 0, v[11])), "Right Leg": Pose((0, 0, 0), (v[12], 0, v[13])), "Left Leg": Pose((0, 0, 0), (v[14], 0, v[15]))}
+    tf = part_transforms(pose, root=root)
+    return np.array([c for p in PARTS for c in corners(p, tf[p])], float)
+
+
+def project(pts: np.ndarray) -> np.ndarray:
+    """World points -> picture pixels of the recording (columns: u, v)."""
+    f, r, up = camera_basis()
+    d = pts - np.array(CAM)
+    z = d @ f
+    return np.stack([VIEW_W / 2 + FOCAL * (d @ r) / z, VIEW_H / 2 - FOCAL * (d @ up) / z], 1)
+
+
+def solve_track(ang: np.ndarray):
+    """Place the rig so that, in the recording's camera, its median x and its lowest pixel fall where the reference's do, image by image.
+
+    Jump heights come from the reference too: the lowest pixel above the ground line, converted to studs.  Returns (X, Z, air)."""
+    xm, foot = measured_track()
+    base = ground_baseline(foot)
+    air = np.clip((base - foot) / PX_PER_STUD, 0.0, 2.4)
+    X, Z = np.zeros(N), np.zeros(N)
+    for i in range(N):
+        g = on_ground(xm[i], base[i])
+        x, z = float(g[0]), float(g[2])
+        h = 3.0 + lowest(ang[i]) + air[i]
+        for _ in range(5):
+            def err(x_, z_):
+                uv = project(world_corners(ang[i], x_, h, z_))
+                return np.array([np.median(uv[:, 0]) - xm[i], np.percentile(uv[:, 1], 99.5) - foot[i]])
+            e0 = err(x, z)
+            J = np.stack([(err(x + 0.05, z) - e0) / 0.05, (err(x, z + 0.05) - e0) / 0.05], 1)
+            try:
+                dx, dz = np.linalg.solve(J, -e0)
+            except np.linalg.LinAlgError:
+                break
+            x, z = x + float(np.clip(dx, -1.5, 1.5)), z + float(np.clip(dz, -1.5, 1.5))
+        X[i], Z[i] = x, z
+    return X, Z, air
 
 
 def keyed_angles() -> np.ndarray:
@@ -118,31 +177,16 @@ def keyed_angles() -> np.ndarray:
 
 def lowest(a: np.ndarray) -> float:
     """Root height (above its 3-stud standing value) that puts the lowest corner of the posed rig on the ground."""
-    from tsb_engine.kinematics import corners, part_transforms, pose_transform
-    from tsb_engine.mathutil import compose, translate
-    from tsb_engine.model import PARTS, Pose
-
-    root = compose(translate((0.0, 3.0, 0.0)), pose_transform(root_pose(0.0, 3.0, 0.0, a[1], a[0], a[2])))
-    v = [float(x) for x in a[:16]]
-    pose = {"Torso": Pose((0, 0, 0), (v[3], v[4], v[5])), "Head": Pose((0, 0, 0), (v[6], v[7], 0)), "Right Arm": Pose((0, 0, 0), (v[8], 0, v[9])),
-            "Left Arm": Pose((0, 0, 0), (v[10], 0, v[11])), "Right Leg": Pose((0, 0, 0), (v[12], 0, v[13])), "Left Leg": Pose((0, 0, 0), (v[14], 0, v[15]))}
-    tf = part_transforms(pose, root=root)
-    return -min(float(np.array(corners(p, tf[p]), float)[:, 1].min()) for p in PARTS)
+    return -float(world_corners(a, 0.0, 3.0, 0.0)[:, 1].min())
 
 
 def build() -> Scene:
     hero = Character("rig", Animation("rig", fps=FPS, archetype="cinematic"), colors=COLORS, face_colors=FACES, head_shape="ball")
-    ang, px, py = load_track()
-    # the vertical plane the rig moves in: through its ground point on the first and the last image (both standing)
-    pl, pr = on_ground(px[0], py[0]), on_ground(px[-1], py[-1])
-    along = (pr - pl) * np.array([1, 0, 1])
-    along /= np.linalg.norm(along)
-    normal = np.array([-along[2], 0.0, along[0]])
-    low = [lowest(ang[i]) for i in range(N)]   # height of the root so that the lowest corner touches the ground
+    ang = keyed_angles()
+    X, Z, air = solve_track(ang)
     for i in range(N):
-        o = on_plane(px[i], py[i], pl, normal)
         a = ang[i]
-        K(hero.anim, i, "linear", R=root_pose(float(o[0]), 3.0 + low[i] + a[16], float(o[2]), a[1], a[0], a[2]), T=P((a[3], a[4], a[5])), H=P((a[6], a[7], 0)),
+        K(hero.anim, i, "linear", R=root_pose(float(X[i]), 3.0 + lowest(a) + float(air[i]), float(Z[i]), a[1], a[0], a[2]), T=P((a[3], a[4], a[5])), H=P((a[6], a[7], 0)),
           RA=P((a[8], 0, a[9])), LA=P((a[10], 0, a[11])), RL=P((a[12], 0, a[13])), LL=P((a[14], 0, a[15])))
     cine = Cinematic(N, fps=FPS)
     cine.look = "studio"
