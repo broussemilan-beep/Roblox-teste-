@@ -18,7 +18,7 @@ from pathlib import Path
 
 import numpy as np
 
-from examples.practice_keys import KEYS, NAMES
+from examples.practice_keys import KEYS, LAG, NAMES
 from tsb_engine.authoring import K, P, root_pose
 from tsb_engine.cinematic import Cinematic, dolly
 from tsb_engine.model import Animation
@@ -36,7 +36,7 @@ ASPECT = VIEW_W / VIEW_H
 FOCAL = (VIEW_H / 2.0) / math.tan(math.radians(FOV) / 2.0)
 FACES = {"front": "#e03a30", "back": "#2f56e0", "right": "#36b04a", "left": "#f0932a", "top": "#47c4f0", "bottom": "#f0d322"}
 COLORS = {p: "#cfd1d8" for p in ("Torso", "Head", "Right Arm", "Left Arm", "Right Leg", "Left Leg")}
-AIR_SPANS = ((60, 66), (82, 88), (122, 140))   # images where the rig leaves the ground (its fitted point rises with it)
+AIR_SPANS = ((67, 80), (84, 93), (122, 137))   # images where the rig leaves the ground (its fitted point rises with it)
 VIOLET, MAGENTA = ("#8a5cff", "#3a1c9a"), "#c64cff"
 
 
@@ -87,19 +87,31 @@ def load_track():
 
 
 def keyed_angles() -> np.ndarray:
-    """(N, 17): the 16 joint angles + ``air`` for each image, Catmull-Rom through the keys (yaw unwrapped so the spin turns the short way as authored)."""
+    """(N, 17): the 16 joint angles + ``air`` for each image: Catmull-Rom through the authored keys, with the overlap an animator adds
+    (the head trails the torso, the arms trail more: ``LAG``) and a tremor on the torso while the charge builds."""
     ts = np.array(sorted(KEYS), float)
     vals = np.zeros((len(ts), 17))
     for j, t in enumerate(ts):
         for n, v in KEYS[int(t)].items():
             vals[j, (NAMES + ["air"]).index(n)] = v
-    out = np.zeros((N, 17))
-    for i in range(N):
-        t = F0 + i
+
+    def at(t: float) -> np.ndarray:
+        t = float(np.clip(t, ts[0], ts[-1]))
         j = int(np.clip(np.searchsorted(ts, t, side="right") - 1, 0, len(ts) - 2))
         p0, p1, p2, p3 = vals[max(j - 1, 0)], vals[j], vals[j + 1], vals[min(j + 2, len(ts) - 1)]
         u = (t - ts[j]) / (ts[j + 1] - ts[j])
-        out[i] = 0.5 * ((2 * p1) + (-p0 + p2) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u + (-p0 + 3 * p1 - 3 * p2 + p3) * u**3)
+        return 0.5 * ((2 * p1) + (-p0 + p2) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u + (-p0 + 3 * p1 - 3 * p2 + p3) * u**3)
+
+    out = np.zeros((N, 17))
+    for i in range(N):
+        t = F0 + i
+        out[i] = at(t)
+        out[i, 6:8] = at(t - LAG["head"])[6:8]
+        out[i, 8:12] = at(t - LAG["arms"])[8:12]
+        if 57 <= t <= 64:   # the charge: the whole body vibrates, harder as it fills
+            k = (t - 56) / 8.0
+            out[i, 2] += 2.6 * k * math.sin(t * 2.7)
+            out[i, 5] += 3.0 * k * math.sin(t * 3.3 + 1.0)
     out[:, 16] = np.maximum(out[:, 16], 0.0)
     return out
 
