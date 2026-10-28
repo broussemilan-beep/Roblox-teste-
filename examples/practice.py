@@ -18,6 +18,7 @@ from pathlib import Path
 
 import numpy as np
 
+from examples.practice_keys import KEYS, NAMES
 from tsb_engine.authoring import K, P, root_pose
 from tsb_engine.cinematic import Cinematic, dolly
 from tsb_engine.model import Animation
@@ -35,6 +36,7 @@ ASPECT = VIEW_W / VIEW_H
 FOCAL = (VIEW_H / 2.0) / math.tan(math.radians(FOV) / 2.0)
 FACES = {"front": "#e03a30", "back": "#2f56e0", "right": "#36b04a", "left": "#f0932a", "top": "#47c4f0", "bottom": "#f0d322"}
 COLORS = {p: "#cfd1d8" for p in ("Torso", "Head", "Right Arm", "Left Arm", "Right Leg", "Left Leg")}
+AIR_SPANS = ((60, 66), (82, 88), (122, 140))   # images where the rig leaves the ground (its fitted point rises with it)
 VIOLET, MAGENTA = ("#8a5cff", "#3a1c9a"), "#c64cff"
 
 
@@ -60,30 +62,60 @@ def on_plane(u: float, v: float, p0: np.ndarray, n: np.ndarray) -> np.ndarray:
 
 
 def load_track():
-    """Per image of the loop: 16 angles and the pixel of the rig's ground point, gaps interpolated, angles smoothed."""
+    """Per image of the loop: the pixel of the rig's ground point (from the fits, smoothed; airborne spans replaced by a straight run between their ends)
+    and the 16 hand-read key angles interpolated with a Catmull-Rom spline (``practice_keys.py``)."""
     d = json.loads(POSES.read_text())
-    ang = np.full((N, 16), np.nan)
     pix = np.full((N, 2), np.nan)
     for fr in d["frames"]:
         i = fr["f"] - F0
-        if 0 <= i < N and fr.get("angles") and fr.get("score", 0) >= 0.40:   # frames tinted or hidden by a fx fit badly: interpolate across them
-            ang[i] = fr["angles"]
+        if 0 <= i < N and fr.get("angles") and fr.get("score", 0) >= 0.40:
             x0, y0, side = fr["crop"]
             tx, ty, _ = fr["fit"]
-            pix[i] = (x0 + tx * side / 128.0, y0 + ty * side / 128.0 + 420 * 0)   # v3c rows are viewport rows (the crop started at the viewport top)
+            pix[i] = (x0 + tx * side / 128.0, y0 + ty * side / 128.0)
     idx = np.arange(N)
-    for arr in (ang, pix):
-        for k in range(arr.shape[1]):
-            ok = ~np.isnan(arr[:, k])
-            if ok.sum() >= 2:
-                arr[:, k] = np.interp(idx, idx[ok], arr[ok, k])
-    sm = ang.copy()
-    for k in range(16):
-        pad = np.pad(ang[:, k], 1, mode="edge")
-        sm[:, k] = 0.25 * pad[:-2] + 0.5 * pad[1:-1] + 0.25 * pad[2:]
-    px = np.convolve(np.pad(pix[:, 0], 1, mode="edge"), [0.25, 0.5, 0.25], mode="valid")
-    py = np.convolve(np.pad(pix[:, 1], 1, mode="edge"), [0.25, 0.5, 0.25], mode="valid")
-    return sm, px, py
+    for k in range(2):
+        ok = ~np.isnan(pix[:, k])
+        pix[:, k] = np.interp(idx, idx[ok], pix[ok, k])
+    for a, b in AIR_SPANS:   # the fitted point rises with the body: the ground point just runs straight across the jump
+        a, b = a - F0, b - F0
+        pix[a : b + 1, 1] = np.linspace(pix[a, 1], pix[b, 1], b - a + 1)
+    k9 = np.exp(-0.5 * (np.arange(-4, 5) / 2.0) ** 2)
+    k9 /= k9.sum()
+    px = np.convolve(np.pad(pix[:, 0], 4, mode="edge"), k9, mode="valid")
+    py = np.convolve(np.pad(pix[:, 1], 4, mode="edge"), k9, mode="valid")
+    return keyed_angles(), px, py
+
+
+def keyed_angles() -> np.ndarray:
+    """(N, 17): the 16 joint angles + ``air`` for each image, Catmull-Rom through the keys (yaw unwrapped so the spin turns the short way as authored)."""
+    ts = np.array(sorted(KEYS), float)
+    vals = np.zeros((len(ts), 17))
+    for j, t in enumerate(ts):
+        for n, v in KEYS[int(t)].items():
+            vals[j, (NAMES + ["air"]).index(n)] = v
+    out = np.zeros((N, 17))
+    for i in range(N):
+        t = F0 + i
+        j = int(np.clip(np.searchsorted(ts, t, side="right") - 1, 0, len(ts) - 2))
+        p0, p1, p2, p3 = vals[max(j - 1, 0)], vals[j], vals[j + 1], vals[min(j + 2, len(ts) - 1)]
+        u = (t - ts[j]) / (ts[j + 1] - ts[j])
+        out[i] = 0.5 * ((2 * p1) + (-p0 + p2) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u + (-p0 + 3 * p1 - 3 * p2 + p3) * u**3)
+    out[:, 16] = np.maximum(out[:, 16], 0.0)
+    return out
+
+
+def lowest(a: np.ndarray) -> float:
+    """Root height (above its 3-stud standing value) that puts the lowest corner of the posed rig on the ground."""
+    from tsb_engine.kinematics import corners, part_transforms, pose_transform
+    from tsb_engine.mathutil import compose, translate
+    from tsb_engine.model import PARTS, Pose
+
+    root = compose(translate((0.0, 3.0, 0.0)), pose_transform(root_pose(0.0, 3.0, 0.0, a[1], a[0], a[2])))
+    v = [float(x) for x in a[:16]]
+    pose = {"Torso": Pose((0, 0, 0), (v[3], v[4], v[5])), "Head": Pose((0, 0, 0), (v[6], v[7], 0)), "Right Arm": Pose((0, 0, 0), (v[8], 0, v[9])),
+            "Left Arm": Pose((0, 0, 0), (v[10], 0, v[11])), "Right Leg": Pose((0, 0, 0), (v[12], 0, v[13])), "Left Leg": Pose((0, 0, 0), (v[14], 0, v[15]))}
+    tf = part_transforms(pose, root=root)
+    return -min(float(np.array(corners(p, tf[p]), float)[:, 1].min()) for p in PARTS)
 
 
 def build() -> Scene:
@@ -94,11 +126,11 @@ def build() -> Scene:
     along = (pr - pl) * np.array([1, 0, 1])
     along /= np.linalg.norm(along)
     normal = np.array([-along[2], 0.0, along[0]])
+    low = [lowest(ang[i]) for i in range(N)]   # height of the root so that the lowest corner touches the ground
     for i in range(N):
         o = on_plane(px[i], py[i], pl, normal)
-        y = max(0.0, float(o[1]))
         a = ang[i]
-        K(hero.anim, i, "linear", R=root_pose(float(o[0]), 3.0 + y, float(o[2]), a[1], a[0], a[2]), T=P((a[3], a[4], a[5])), H=P((a[6], a[7], 0)),
+        K(hero.anim, i, "linear", R=root_pose(float(o[0]), 3.0 + low[i] + a[16], float(o[2]), a[1], a[0], a[2]), T=P((a[3], a[4], a[5])), H=P((a[6], a[7], 0)),
           RA=P((a[8], 0, a[9])), LA=P((a[10], 0, a[11])), RL=P((a[12], 0, a[13])), LL=P((a[14], 0, a[15])))
     cine = Cinematic(N, fps=FPS)
     cine.look = "studio"
