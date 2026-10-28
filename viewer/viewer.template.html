@@ -89,6 +89,7 @@ const DATA = /*__DATA__*/null;
   const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
   const $ = (id) => document.getElementById(id);
   const q = new URLSearchParams(location.search);
+  const LAYER = q.get('layer');   // 'world' = only the world-space fx, 'screen' = only the screen overlays (transparent canvas, for the Blender compositor)
   const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -332,6 +333,7 @@ const DATA = /*__DATA__*/null;
     const roll = cs.roll || 0;
     ctx.save();
     ctx.clearRect(0, 0, W, H);
+    if (!LAYER) {
     // sky + ground (the ground is a big quad so the horizon is right)
     const hzc = toCam(B, add(cs.pos, [B.f[0] * 2000, -0.0001, B.f[2] * 2000])), hy = hzc[2] < NEAR ? (B.f[1] > 0 ? H * 2 : -H) : clamp(scr(B, hzc).y, -H, H * 2);
     { const g = ctx.createLinearGradient(0, 0, 0, Math.max(hy, 1)); g.addColorStop(0, rgba(mul(sky, bright * 0.7), 1)); g.addColorStop(1, rgba(mul(sky, bright), 1)); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
@@ -360,9 +362,11 @@ const DATA = /*__DATA__*/null;
     ctx.stroke();
     { const g = ctx.createLinearGradient(0, hy - H * 0.05, 0, hy + H * 0.32); const fogc = mul(sky, bright); g.addColorStop(0, rgba(fogc, 0.95)); g.addColorStop(1, rgba(fogc, 0)); ctx.fillStyle = g; ctx.fillRect(0, hy - H * 0.05, W, H * 0.4); }
 
+    }
+
     // fx are split around the characters: ground decals and anything farther than them paint first
     let frontItems = [];
-    if (CINE) {
+    if (CINE && LAYER !== 'screen') {
       const all = buildFx(B, f), zs = D.characters.map(ch => toCam(B, apply(ch.frames[f][PARTS.indexOf('Torso')], [0, 0, 0]))[2]);
       const focusZ = zs.reduce((a, b) => a + b, 0) / zs.length;
       const back = all.filter(it => it.ground || it.z > focusZ + 0.4);
@@ -370,6 +374,7 @@ const DATA = /*__DATA__*/null;
       paintItems(back);
     }
 
+    if (!LAYER) {
     // shadows (one union path)
     ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.beginPath();
     for (const ch of D.characters) {
@@ -424,6 +429,8 @@ const DATA = /*__DATA__*/null;
       }
     }
 
+    }
+
     paintItems(frontItems);
 
     // fist trail (viewer helper for the punch scene)
@@ -437,8 +444,8 @@ const DATA = /*__DATA__*/null;
       }
     }
     ctx.restore();
-    if (S) drawScreen(S, f);
-    if (q.get('clean') !== '1') hud(f);
+    if (S && LAYER !== 'world') drawScreen(S, f);
+    if (q.get('clean') !== '1' && !LAYER) hud(f);
   }
 
 
@@ -731,6 +738,7 @@ const DATA = /*__DATA__*/null;
     ctx.closePath(); ctx.fill();
   }
   function screenFx(sf, u, f) {
+    if (LAYER && (sf.kind === 'negative' || sf.kind === 'bw')) return;
     const cx = (sf.focus ? sf.focus[0] : 0.5) * W, cy = (sf.focus ? sf.focus[1] : 0.5) * H, rnd = mulberry32((sf.seed || 1) * 97 + f * 17);
     if (sf.kind === 'black') { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); return; }
     if (sf.kind === 'white') { ctx.save(); ctx.globalAlpha = sf.alpha == null ? 1 : sf.alpha; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); ctx.restore(); return; }

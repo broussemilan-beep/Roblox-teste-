@@ -49,20 +49,21 @@ def root(x, h, z, rx=0.0, ry=0.0, rz=0.0):
     return P((math.degrees(a), math.degrees(b), math.degrees(c)), (x, h - 3.0, z))
 
 
-# The sprint is a low horizontal dive (as in the reference: body parallel to the floor, head forward, blade across the back). The silhouette changes
-# every 2 images through an *ordered* cycle of designed dive poses - limbs, roll and twist change, the line of travel never does:
+# The sprint (re-read at full size in the reference, images 72-134): the camera sits low and slightly behind him, he runs away along the floor lines in a crouch,
+# leaning hard forward, his silhouette changing every couple of images (tilt, tuck, hand to the blade, stride, slide, spin) while the shell stays round around him.
 # (root pitch, root roll, height, torso, head, RA, LA, RL, LL)
 SPRINT_POSES = [
-    (-85, 0, 1.7, tp(0, -5), (15, 0, 0), (170, 0, 8), (170, 0, -8), (-5, 0, 3), (-5, 0, -3)),        # superman, arms ahead
-    (-82, 20, 1.7, tp(0, -10), (10, 0, 0), (-10, 0, 15), (-10, 0, -15), (40, 0, 4), (-30, 0, -4)),    # arms trailing, scissor legs
-    (-80, -25, 1.8, tp(0, -10, 25), (20, 0, 0), (140, 0, 40), (30, 0, -25), (60, 0, 4), (0, 0, -4)),  # hand on the blade
-    (-78, 40, 1.9, tp(0.2, -20), (10, 0, 0), (-60, 0, 20), (150, 0, -20), (80, 0, 4), (-40, 0, -4)),  # lunge, rolled
-    (-85, 0, 1.6, tp(0, -5), (10, 0, 0), (-80, 0, 30), (-80, 0, -30), (20, 0, 4), (20, 0, -4)),       # hands swept back
-    (-80, 80, 1.9, tp(0, 0), (0, 0, 0), (100, 0, 60), (-60, 0, -60), (40, 0, 10), (-10, 0, -10)),     # on its side
-    (-85, 180, 1.7, tp(0, 10), (-10, 0, 0), (60, 0, 50), (60, 0, -50), (30, 0, 4), (50, 0, -4)),     # belly up
-    (-62, 0, 2.2, tp(0.8, -35), (30, 0, 0), (70, 0, 15), (70, 0, -15), (100, 0, 4), (90, 0, -4)),     # tucked crouch-dive
-    (-80, 40, 1.8, tp(0, 0, 30), (0, 0, 0), (90, 0, 90), (90, 0, -90), (10, 0, 4), (-10, 0, -4)),     # arms wide, twisting
-    (-80, -30, 1.9, tp(0, -10), (15, 0, 0), (150, 0, 20), (-40, 0, -20), (120, 0, 5), (-30, 0, -4)),  # kick
+    (-40, 10, 2.5, tp(0.6, -25), (25, 0, 0), (-70, 0, 18), (-70, 0, -18), (80, 0, 4), (-30, 0, -4)),       # crouch sprint, arms streaming
+    (-55, -15, 2.2, tp(0.8, -35), (30, 0, 0), (-90, 0, 20), (-80, 0, -20), (100, 0, 4), (40, 0, -4)),     # deep lean
+    (-35, 20, 2.6, tp(0.4, -20, 15), (15, 0, 0), (-160, 0, -15), (30, 0, -20), (60, 0, 4), (-40, 0, -4)),  # hand reaches the blade on his back
+    (-45, 0, 3.2, tp(0.2, -20), (20, 0, 0), (-60, 0, 25), (120, 0, -25), (-30, 0, 4), (70, 0, -4)),        # leaping stride
+    (-70, 25, 1.7, tp(1.0, -30), (35, 0, 0), (50, 0, 20), (-60, 0, -30), (100, 0, 6), (80, 0, -6)),       # low slide
+    (-30, 40, 2.4, tp(0.5, -15, 25), (10, 0, 0), (80, 0, 60), (-40, 0, -60), (60, 0, 12), (-20, 0, -12)),  # banked, arms out
+    (-50, -30, 2.4, tp(1.0, -40), (40, 0, 0), (70, 0, 15), (70, 0, -15), (115, 0, 4), (110, 0, -4)),      # tucked ball
+    (-35, -25, 2.9, tp(0.2, -15), (15, 0, 0), (-50, 0, 30), (90, 0, -20), (125, 0, 4), (-30, 0, -4)),     # kick extended
+    (-25, 55, 2.8, tp(0.3, -10, -25), (0, 0, 0), (100, 0, 80), (-80, 0, -70), (40, 0, 6), (30, 0, -6)),   # spinning
+    (-60, 5, 2.0, tp(1.1, -45), (45, 0, 0), (-120, 0, 10), (-100, 0, -10), (95, 0, 4), (85, 0, -4)),      # bundled crouch
+    (-15, 0, 3.0, tp(0.1, -10), (10, 0, 0), (60, 0, 12), (-60, 0, -12), (70, 0, 4), (-50, 0, -4)),        # upright stride
 ]
 
 
@@ -185,6 +186,29 @@ def dummy_anim(a: Animation) -> None:
         K(a, 385, "linear", **{SHORT[part]: P(tuple(base.rot[i] + spin[i] for i in range(3)), off)})
 
 
+def chase_cam(hp, hdg, f0: int, f1: int, back=13.0, side: float = 2.4, up: float = 1.3, ahead: float = 5.0, lift: float = 1.6,
+              fov: float = 42.0, lag: float = 0.22, roll: float = 25.0, seg: int = 10):
+    """Camera low behind and slightly beside the runner, looking along his line of travel. The heading it follows lags behind his sharp turns (so the
+    picture swings), and the roll snaps to the other side at every turn."""
+    ang, a = {}, math.radians(hdg(f0))
+    for f in range(f0, f1 + 1):
+        a += (math.radians(hdg(f)) - a) * lag
+        ang[f] = a
+
+    def fn(u: float, f: float):
+        f = max(f0, min(f1, int(round(f))))
+        h = ang[f]
+        d = (math.cos(h), 0.0, math.sin(h))
+        r = (-d[2], 0.0, d[0])
+        c = hp(f)
+        bk = back(f) if callable(back) else back
+        pos = (c[0] - d[0] * bk + r[0] * side, up, c[2] - d[2] * bk + r[2] * side)
+        tgt = (c[0] + d[0] * ahead, lift, c[2] + d[2] * ahead)
+        sg = 1 if hdg(f) >= 0 else -1
+        return pos, tgt, fov, sg * roll
+    return fn
+
+
 def build() -> Scene:
     hero = Character("hero", Animation("hero", fps=FPS, archetype="cinematic"), colors=RONIN_COLORS, outfit=ronin_outfit(), face="std")
     dummy = Character("dummy", Animation("dummy", fps=FPS, archetype="cinematic"), colors=PALE, outfit=dummy_outfit(), hide=("Head",))
@@ -208,11 +232,11 @@ def build() -> Scene:
     cine.shot(48, 52, tracking(hp, (3.6, 0.4, 8.5), look_dy=0.0, fov=32))
     cine.shot(53, 71, tracking(hp, (7.0, 1.6, 15.0), look_dy=0.2, fov=36, roll=(0, 6)))
     _, _, hdg = zigzag()
-    for f0 in range(72, 240, 10):   # a roll that snaps to the opposite side on every turn of the zig-zag
+    cine.shot(72, 148, chase_cam(hp, hdg, 72, 148, back=lambda f: 30.0 - 15.0 * min(1.0, (f - 72) / 26.0), side=3.2, up=1.5, ahead=9.0, lift=3.6, fov=40))
+    cine.shot(149, 183, chase_cam(hp, hdg, 149, 183, back=16.0, side=-4.0, up=1.6, ahead=9.0, lift=3.4, fov=42))
+    for f0 in range(184, 240, 10):   # the low side travelling shot (the reference's 184-239): the roll still snaps at every turn
         sg = 1 if hdg(f0) >= 0 else -1
-        f1 = min(239, f0 + 9)
-        off, fv, ly = ((-3.5, 2.4, -23.0), 30, 0.4) if f0 < 149 else ((4.5, 2.4, -21.0), 32, 0.4) if f0 < 184 else ((6.0, 1.0, -22.0), 34, 0.8)
-        cine.shot(f0, f1, tracking(hp, off, look_dy=ly, fov=fv, roll=(sg * 22, sg * 28)))
+        cine.shot(f0, min(239, f0 + 9), tracking(hp, (6.0, 1.0, -22.0), look_dy=0.8, fov=34, roll=(sg * 14, sg * 18)))
     cine.shot(240, 256, autoframe(both, 240, 256, azimuth=15, elevation=5, fov=36, fill=1.0, follow=0.25, min_radius=3.5))
     cine.shot(257, 264, autoframe(both, 257, 264, azimuth=40, elevation=8, fov=34, fill=0.95, follow=0.4, min_radius=2.6))
     cine.shot(265, 273, autoframe(both, 265, 273, azimuth=65, elevation=12, fov=38, fill=0.6, follow=0.2, min_radius=3.5))
@@ -230,26 +254,24 @@ def build() -> Scene:
 
     # ---- smooth speed shell around the torso (stretched along the heading), thin ring, needles behind it, thin diagonals that avoid him
     dir_at = lambda f: (math.cos(math.radians(hdg(f))), 0.0, math.sin(math.radians(hdg(f)))) if 72 <= f <= 239 else ((1.0, 0.0, 0.0) if f < 282 else (-1.0, 0.0, 0.0))
-    cine.bubble(66, 256, hp, 2.5, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.35, hatch=6)
+    cine.bubble(66, 256, hp, 2.4, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.0, hatch=6)
+    cine.bubble(78, 239, lambda f: tuple(v + o for v, o in zip(hp(max(72, f - 7)), (0, 1.2, 0))), 4.0, "#c4d8e8", 0.12, dir_at=dir_at, stretch=1.0)   # the ghost of the shell, lagging behind him
     cine.bubble(265, 273, hp, 2.2, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.1)
-    cine.bubble(282, 305, hp, 2.5, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.35)
-    cine.bubble(350, 365, hp, 2.5, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.35)
-    for f in range(72, 240, 4):
-        d, c = dir_at(f), hp(f)
-        cine.ring(f, 5, c, 1.7, 2.0, 0.05, 0.03, "#ffffff", 0.8, 0.2, n=d, add=True, easing="linear")
+    cine.bubble(282, 305, hp, 2.4, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.0)
+    cine.bubble(350, 365, hp, 2.4, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.0)
     for f0, f1 in ((72, 239), (282, 305), (350, 365)):
         for f in range(f0, f1, 3):
             d, c = dir_at(f), hp(f)
-            a_ = (c[0] - d[0] * 32, max(0.3, c[1] * 0.5), c[2] - d[2] * 32)
-            b_ = (c[0] - d[0] * 3.2, max(0.4, c[1] * 0.7), c[2] - d[2] * 3.2)
-            cine.streaks(f, 3, a_, b_, n=35, r0=0.1, r1=2.2, w=0.035, color="#f2f2f5", seed=f)
+            a_ = (c[0] - d[0] * 22, 0.12, c[2] - d[2] * 22)   # toward the camera: the fan opens
+            b_ = (c[0] - d[0] * 1.5, 0.12, c[2] - d[2] * 1.5)  # at his feet: it closes
+            cine.streaks(f, 3, a_, b_, n=35, r0=3.0, r1=0.12, w=0.04, color="#f2f2f5", seed=f)
     for f0, f1 in ((72, 140), (150, 180), (184, 239), (282, 305), (350, 365)):
         for f in range(f0, f1, 5):
             cine.screen_fx("diag", f, 3, n=8, angle=-22, seed=f, avoid=0, avoidR=0.22, thick=0.012)
             if f % 10 == 0:
                 cine.screen_fx("diag", f, 3, n=2, angle=-26, seed=f + 1, avoid=0, avoidR=0.22)
     # thin curved wakes off the feet, hands and shoulder (not one rigid tube), a faint wide one behind the torso
-    for f0, f1 in ((72, 239), (282, 305), (350, 365)):
+    for f0, f1 in ((184, 239), (282, 305), (350, 365)):
         for part, w, al in (("Right Leg", 0.3, 0.5), ("Left Leg", 0.3, 0.5)):
             cine.ink_trail(f0, f1, 0, part, (0, -1.0, 0), 9, w, 0.0, "#f2f2f5", rag=0.25, seed=21, alpha=al)
         cine.ink_trail(f0, f1, 0, "Torso", (0, 0, 0), 12, 0.7, 0.0, "#cfcfd4", rag=0.5, seed=22, alpha=0.16)
