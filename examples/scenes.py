@@ -136,4 +136,10 @@ def _ronin() -> Scene:
     return build()
 
 
-SCENES = {"ronin_showcase": _ronin, "heavy_punch_hit": heavy_punch_hit, "berserker_ultimate": _ultimate, "duel_short": _short, "eyes_bench": _eyes_bench}
+def _calm() -> Scene:
+    from .calm import build
+
+    return build()
+
+
+SCENES = {"calm": _calm, "ronin_showcase": _ronin, "heavy_punch_hit": heavy_punch_hit, "berserker_ultimate": _ultimate, "duel_short": _short, "eyes_bench": _eyes_bench}

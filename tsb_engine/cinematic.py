@@ -316,6 +316,11 @@ class Cinematic:
         self.fx.append({"type": "dome", "t0": t0, "dur": dur, "c": list(c), "r0": r0, "r1": r1, "color": color,
                         "a0": a0, "a1": a1, "add": add, "ease": easing})
 
+    def bubble(self, t0: int, t1: int, center_at: Callable[[int], Vec], r: float, color: str = "#bcd4e6", alpha: float = 0.5, half: bool = False) -> None:
+        """A translucent speed bubble (bright rim, hatched inner rings) that follows ``center_at(frame)``."""
+        self.fx.append({"type": "bubble", "t0": t0, "t1": t1, "pts": [[round(v, 3) for v in center_at(f)] for f in range(t0, t1 + 1)],
+                        "r": r, "color": color, "alpha": alpha, "half": half})
+
     def emit(self, t0: int, t1: int, origin: Vec | None = None, attach: dict | None = None, rate: float = 2.0,
              burst: int = 0, vel: tuple[float, float] = (0.05, 0.25), dir: Vec = (0, 1, 0), spread: float = 0.6,
              grav: float = 0.0, drag: float = 0.0, life: tuple[int, int] = (20, 40), size: tuple[float, float] = (0.3, 0.1),
