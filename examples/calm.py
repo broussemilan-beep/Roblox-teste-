@@ -114,7 +114,8 @@ def copied_poses(path: Path, min_iou: float = 0.62) -> dict[int, list[float]]:
 
 def key_copied(a: Animation, f: int, ang: list[float], x: float, z: float, ry: float) -> None:
     """Key one image from copied angles: the body's own attitude (pitch, roll) and every joint from the fit; the heading and the position are ours (story and path)."""
-    K(a, f, "linear", R=root(x, 3.0, z, ang[1], ry, ang[2]), T=P((ang[3], ang[4], ang[5])), H=P((ang[6], ang[7], 0)),
+    damp = lambda v: max(-45.0, min(45.0, 0.5 * v))
+    K(a, f, "linear", R=root(x, 3.0, z, damp(ang[1]), ry, damp(ang[2])), T=P((ang[3], ang[4], ang[5])), H=P((ang[6], ang[7], 0)),
       RA=P((ang[8], 0, ang[9])), LA=P((ang[10], 0, ang[11])), RL=P((ang[12], 0, ang[13])), LL=P((ang[14], 0, ang[15])))
 
 
@@ -269,7 +270,7 @@ def chase_cam(hp, hdg, f0: int, f1: int, back=13.0, side: float = 2.4, up: float
     return fn
 
 
-def chase_framed(hp, hdg, f0: int, f1: int, track: dict, yaw_off: float = 28.0, fov: float = 40.0, hero_h: float = 5.0, lag: float = 0.15, aspect: float = 737 / 384):
+def chase_framed(hp, hdg, f0: int, f1: int, track: dict, yaw_off: float = 28.0, fov: float = 40.0, hero_h: float = 5.0, lag: float = 0.15, aspect: float = 737 / 384, gain: float = 1.0):
     """The reference's *chase*: the camera turns with his heading (lagging a little, ``yaw_off`` degrees off his back), and the distance / on-screen position come
     from the tracked reference hero (size ``h`` -> distance, centroid ``cx, cy`` -> where he sits in the frame)."""
     def fill(v):
@@ -292,7 +293,7 @@ def chase_framed(hp, hdg, f0: int, f1: int, track: dict, yaw_off: float = 28.0, 
         h = ang[f] + math.radians(yaw_off)
         fwd = (math.cos(h), 0.0, math.sin(h))
         r = (-fwd[2], 0.0, fwd[0])
-        D = hero_h / (max(float(hh[i]), 0.08) * 2.0 * t)
+        D = hero_h / (max(float(hh[i]) * gain, 0.08) * 2.0 * t)
         S = 2.0 * D * t
         X, Y = (float(cx[i]) - aspect / 2.0) * S, -(float(cy[i]) - 0.5) * S
         c = hp(f)
@@ -348,7 +349,7 @@ def build() -> Scene:
     cine.shot(48, 52, tracking(hp, (3.6, 0.4, 8.5), look_dy=0.0, fov=32))
     cine.shot(53, 71, tracking(hp, (7.0, 1.6, 15.0), look_dy=0.2, fov=36, roll=(0, 6)))
     _, _, hdg = zigzag()
-    cine.shot(72, 148, chase_framed(hp, hdg, 72, 148, json.loads(TRACK72.read_text()), yaw_off=58.0, fov=40.0))
+    cine.shot(72, 148, chase_framed(hp, hdg, 72, 148, json.loads(TRACK72.read_text()), yaw_off=58.0, fov=40.0, gain=1.4))
     cine.shot(149, 183, chase_cam(hp, hdg, 149, 183, back=12.0, side=5.0, up=1.2, ahead=8.0, lift=2.6, fov=42, roll=5.0))
     for f0 in range(184, 240, 10):   # the low side travelling shot (the reference's 184-239): the roll still snaps at every turn
         sg = 1 if hdg(f0) >= 0 else -1
@@ -371,7 +372,7 @@ def build() -> Scene:
 
     # ---- smooth speed shell around the torso (stretched along the heading), thin ring, needles behind it, thin diagonals that avoid him
     dir_at = lambda f: (math.cos(math.radians(hdg(f))), 0.0, math.sin(math.radians(hdg(f)))) if 72 <= f <= 239 else ((1.0, 0.0, 0.0) if f <= 349 else (-1.0, 0.0, 0.0))
-    cine.bubble(66, 256, hp, 2.1, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.0, hatch=6)
+    cine.bubble(66, 256, hp, 3.0, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.0, hatch=6)
     cine.bubble(78, 239, lambda f: tuple(v + o for v, o in zip(hp(max(72, f - 7)), (0, 1.2, 0))), 4.0, "#c4d8e8", 0.12, dir_at=dir_at, stretch=1.0)   # the ghost of the shell, lagging behind him
     cine.bubble(265, 273, hp, 2.2, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.1)
     cine.bubble(284, 305, hp, 2.4, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.0)
