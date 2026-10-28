@@ -131,3 +131,23 @@ Not found in any of the ten: dash / sprint / `LinearVelocity` / hitbox / combo s
 | One command to export everything | `python tools/export_roblox.py` |
 
 Credits: the numbers taken from `zriptic/roclicks-skills` (MIT, Copyright (c) 2026 RoClicks, roblox-vfx adapted from Roqer's skills, Copyright (c) 2026 TabooHarmony) and `Willikk/Roblox` (MIT) are used under their licences; their notices are reproduced here as required.
+
+
+## 7. "Eyes": tools to read motion and fx (searched on request, 2026-10-28)
+
+Goal: stop judging a reel only by looking at contact sheets; measure pace, holds, scale, fx coverage and motion, and diff a
+render against a reference. GitHub/PyPI search results (popular first):
+
+| what | repos / packages | verdict |
+|---|---|---|
+| deep optical flow | NVIDIA/flownet2-pytorch (3.3k), NVlabs/PWC-Net, open-mmlab/mmflow, haofeixu/gmflow | needs GPU + weights; overkill for 900x400 clips. **Not used.** OpenCV's DIS / Farneback flow is enough |
+| shot / cut detection | Breakthrough/PySceneDetect (5.3k, BSD-3), albanie/shot-detection-benchmarks | **Used** as an optional cross-check (`eyes.scenedetect_cuts`); own cut detector (histogram + frame difference + black/white flips) is the default because punctuation frames (1-2 f) matter |
+| frame differencing / motion energy | many small OpenCV demos (surveillance style) | trivial; reimplemented with proper normalisation |
+| anime / sakuga | KytraScript/SakugaDataset (Sakuga-42M, 87 stars), bconstantine/SketchColour, Sakuga-Engine (a Godot fighting game) | a dataset and unrelated engines; **no tool that reads timing/smears or compares two clips**. Ideas only |
+| animation timing charts | Unarmed1000/mb-framepacing-explained (frame pacing, 1 star) | about display frame pacing, not animation craft |
+
+Conclusion: nothing existing does "read an animation clip and diff it against another". The pieces (OpenCV, scikit-image,
+matplotlib, PySceneDetect) are standard, so `tsb_engine/eyes.py` + `tools/eyes.py` assemble them (see `requirements-eyes.txt`).
+What it measures: update energy, optical-flow speed/direction, subject height, screen coverage by black/white/cyan, edge density,
+shot cuts and holds, cadence; aligns two clips by hand-picked anchors (or DTW) and prints a numbered diagnosis, a per-shot table
+and a ref-above-mine picture for every reference shot. It does **not** judge appeal or weight: that stays with human eyes.

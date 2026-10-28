@@ -192,6 +192,7 @@ class Cinematic:
     fx: list[dict] = field(default_factory=list)
     flashes: list[dict] = field(default_factory=list)
     bright: Track = field(default_factory=lambda: Track(1.0))
+    clouds: Track = field(default_factory=lambda: Track(0.0))  # overcast cloud puffs in the sky (0..1), for sky shots
     vignette: Track = field(default_factory=lambda: Track(0.0))
     bars: Track = field(default_factory=lambda: Track(0.0))
     speed: Track = field(default_factory=lambda: Track(0.0))
@@ -201,6 +202,7 @@ class Cinematic:
     sky_color: str = "#c9d3e3"
     seed: int = 7
     sheets: dict = field(default_factory=dict)
+    aspect: float = 16 / 9  # picture aspect ratio (width / height) of the film camera, e.g. 2.45 for the study reel
 
     # --- camera
     def shot(self, f0: int, f1: int, fn: Callable[[float, float], CamState]) -> None:
@@ -471,9 +473,10 @@ class Cinematic:
                 "bright": [round(self.bright.at(f), 3) for f in rng],
                 "vignette": [round(self.vignette.at(f), 3) for f in rng],
                 "bars": [round(self.bars.at(f), 3) for f in rng],
+                "clouds": [round(self.clouds.at(f), 3) for f in rng],
                 "speed": [round(self.speed.at(f), 3) for f in rng],
                 "tint": [round(self.tint.at(f), 3) for f in rng],
                 "tintColor": self.tint_color, "flashes": self.flashes, "fx": self.screenfx,
             },
-            "floorColor": self.floor_color, "skyColor": self.sky_color, "sheets": self.sheets,
+            "floorColor": self.floor_color, "skyColor": self.sky_color, "sheets": self.sheets, "aspect": round(self.aspect, 4),
         }

@@ -1,0 +1,5 @@
+# optional: the "eyes" tools (tools/eyes.py, tsb_engine/eyes.py) - measure clips and diff a render against a reference
+opencv-python-headless>=4.9
+numpy
+matplotlib
+scenedetect>=0.6   # optional cross-check for shot cuts (eyes.scenedetect_cuts)

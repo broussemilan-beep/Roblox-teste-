@@ -322,6 +322,17 @@ const DATA = /*__DATA__*/null;
     // sky + ground (the ground is a big quad so the horizon is right)
     const hzc = toCam(B, add(cs.pos, [B.f[0] * 2000, -0.0001, B.f[2] * 2000])), hy = hzc[2] < NEAR ? (B.f[1] > 0 ? H * 2 : -H) : clamp(scr(B, hzc).y, -H, H * 2);
     { const g = ctx.createLinearGradient(0, 0, 0, Math.max(hy, 1)); g.addColorStop(0, rgba(mul(sky, bright * 0.7), 1)); g.addColorStop(1, rgba(mul(sky, bright), 1)); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
+    const cl = S && S.clouds ? S.clouds[f] : 0;
+    if (cl > 0.01) {   // overcast: soft dark puffs spread over the sky dome (visible whenever the camera looks up)
+      const rc = mulberry32(5);
+      for (let k = 0; k < 110; k++) {
+        const az = rc() * Math.PI * 2, el = 0.04 + rc() * 1.35, sz = 0.07 + rc() * 0.17, sh = 60 + rc() * 70, d = [Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az)];
+        const cc = toCam(B, add(cs.pos, mul(d, 1000))); if (cc[2] < NEAR) continue;
+        const sp = scr(B, cc), Rr = sz * B.focal * 1000 / cc[2], g = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, Rr);
+        g.addColorStop(0, `rgba(${sh},${sh + 6},${sh + 14},${0.2 * cl})`); g.addColorStop(1, `rgba(${sh},${sh + 6},${sh + 14},0)`);
+        ctx.fillStyle = g; ctx.fillRect(sp.x - Rr, sp.y - Rr * 0.7, Rr * 2, Rr * 1.4);
+      }
+    }
     const gc = [cs.pos[0], 0, cs.pos[2]], R = 400;
     const gq = polyScreen(B, [[gc[0]-R, 0, gc[2]-R], [gc[0]+R, 0, gc[2]-R], [gc[0]+R, 0, gc[2]+R], [gc[0]-R, 0, gc[2]+R]]);
     if (gq) { ctx.fillStyle = rgba(mul(floor, bright), 1); ctx.beginPath(); gq.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.fill(); }
@@ -414,7 +425,7 @@ const DATA = /*__DATA__*/null;
     }
     ctx.restore();
     if (S) drawScreen(S, f);
-    hud(f);
+    if (q.get('clean') !== '1') hud(f);
   }
 
 
@@ -692,7 +703,7 @@ const DATA = /*__DATA__*/null;
   function screenFx(sf, u, f) {
     const cx = (sf.focus ? sf.focus[0] : 0.5) * W, cy = (sf.focus ? sf.focus[1] : 0.5) * H, rnd = mulberry32((sf.seed || 1) * 97 + f * 17);
     if (sf.kind === 'black') { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); return; }
-    if (sf.kind === 'white') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); return; }
+    if (sf.kind === 'white') { ctx.save(); ctx.globalAlpha = sf.alpha == null ? 1 : sf.alpha; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); ctx.restore(); return; }
     if (sf.kind === 'glint') {
       ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); const R = H * (0.12 + 0.55 * ease('expo_out', u)) * (1 - 0.3 * u);
       ctx.beginPath(); ctx.moveTo(cx, cy - R); ctx.quadraticCurveTo(cx, cy, cx + R * 1.4, cy); ctx.quadraticCurveTo(cx, cy, cx, cy + R); ctx.quadraticCurveTo(cx, cy, cx - R * 1.4, cy); ctx.quadraticCurveTo(cx, cy, cx, cy - R); ctx.closePath();
@@ -707,7 +718,7 @@ const DATA = /*__DATA__*/null;
       ctx.restore(); return;
     }
     if (sf.kind === 'burst') {   // white comic spikes over the live frame
-      for (let k = 0; k < 2; k++) jagged(cx, cy, 14, H * 0.5, H * 1.0, rnd, k ? '#fff' : 'rgba(255,255,255,0.9)'); return;
+      jagged(cx - W * 0.15, cy, 9, H * 0.45, H * 1.1, rnd, 'rgba(206,214,222,0.82)'); jagged(cx + W * 0.2, cy + H * 0.2, 8, H * 0.3, H * 0.8, rnd, 'rgba(226,232,238,0.7)'); jagged(cx - W * 0.3, cy + H * 0.35, 7, H * 0.25, H * 0.7, rnd, 'rgba(10,10,14,0.85)'); return;
     }
     if (sf.kind === 'strokes') {   // the slash storm: a wall of huge white brush strokes with a cyan glow, re-rolled every frame (few layouts)
       const lay = Math.floor((f - sf.t0) / 2) % (sf.layouts || 5), r = mulberry32((sf.seed || 1) * 131 + lay * 7919);
@@ -727,8 +738,8 @@ const DATA = /*__DATA__*/null;
           L.push([p[0] - dy / dl * wd, p[1] + dx / dl * wd]); Rr.push([p[0] + dy / dl * wd, p[1] - dx / dl * wd]); });
         ctx.beginPath(); L.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); Rr.reverse().forEach(p => ctx.lineTo(p[0], p[1])); ctx.closePath(); };
       ctx.save(); ctx.globalAlpha = sf.alpha == null ? 1 : sf.alpha;
-      ctx.shadowColor = glow; ctx.shadowBlur = 30 * dpr; ctx.fillStyle = glow; for (const st of strokes) { shape(st, 1.09, true); ctx.fill(); }
-      ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; for (const st of strokes) { shape(st, 0.9, true); ctx.fill(); }
+      ctx.shadowColor = glow; ctx.shadowBlur = 12 * dpr; ctx.fillStyle = glow; for (const st of strokes) { shape(st, 1.05, true); ctx.fill(); }
+      ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; for (const st of strokes) { shape(st, 0.93, true); ctx.fill(); }
       ctx.restore(); return;
     }
     if (sf.kind === 'bw') {      // manga impact frame: hard threshold of the live frame + black shards (+ coloured hatching)
@@ -829,7 +840,9 @@ const DATA = /*__DATA__*/null;
     requestAnimationFrame(loop);
   }
 
+  if (CINE && CINE.aspect) { cv.style.aspectRatio = String(CINE.aspect); window.__aspect = CINE.aspect; }
   resize(); buildCine(); buildTicks(); buildFindings(); setPlaying(st.playing); draw();
+  window.__renderFrame = (f) => { st.frame = clamp(Math.round(f), 0, D.nFrames - 1); draw(); };   // for tools/render_video.js (one page load, many frames)
   loadSheets().then(() => { draw(); window.__ready = true; requestAnimationFrame(loop); });
 })();
 </script>

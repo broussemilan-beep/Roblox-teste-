@@ -71,6 +71,11 @@ Plain Roblox blocks are enough; the level comes from pace, camera, graphic fx an
   locks simulated as verlet ropes. They are **preview only**: not part of the exported KeyframeSequence.
 - `bw` impact frames and black frames exist in the reference, but the in-game constraint (no impact frame, no
   global hitstop) still holds: treat them as optional punctuation for cinematic cuts.
+- **Measure against the reference** (`tools/eyes.py`, needs `requirements-eyes.txt`): `ref VIDEO DIR` (screen recording -> 30 fps frames),
+  `film SCENE DIR` (render the film camera, clean), then `compare REF DIR OUT --anchors "ref:mine,..."` -> `diagnosis.txt` (LOW/HIGH numbers
+  with what to change), `beats.md` (per reference shot), `pairs.png` (ref above mine, shot by shot), `compare.png` (curves). Use it after every
+  restage; numbers catch scale/pace/coverage errors, `pairs.png` catches what numbers hide (an ink ring counted as "character size").
+  `trail` / `flow` show where things move (use windows of <= 10 frames).
 - Always run `keep_above_ground` on every character of a short (the linter's TSB001 catches sunken legs).
 - **Read the reference before building** (all frames at 30 fps, 12 per sheet, not a sparse overview): the first reading of the study clip was wrong
   on scale, staging and the avatar's design. `secondary.reference_outfit()` gives the round-brim hat, hair mass and flared coat;
