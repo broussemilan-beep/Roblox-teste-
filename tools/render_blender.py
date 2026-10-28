@@ -213,7 +213,7 @@ def build(scene_name: str, frames: range, width: int, samples: int):
     sc.render.use_motion_blur = True
     sc.render.motion_blur_shutter = 0.3
     sc.view_settings.view_transform = "Standard"
-    sc.view_settings.exposure = 0.3
+    sc.view_settings.exposure = 0.0
     sc.render.film_transparent = False
     sc.render.image_settings.file_format = "PNG"
 
@@ -291,7 +291,7 @@ def build(scene_name: str, frames: range, width: int, samples: int):
     sc.collection.objects.link(cam)
     sc.camera = cam
     sun_d = bpy.data.lights.new("sun", "SUN")
-    sun_d.energy = 2.2
+    sun_d.energy = 1.8
     sun_d.color = (1.0, 0.93, 0.86)
     sun_d.angle = math.radians(2.5)
     sun = bpy.data.objects.new("sun", sun_d)

@@ -232,11 +232,11 @@ def build() -> Scene:
     cine.shot(48, 52, tracking(hp, (3.6, 0.4, 8.5), look_dy=0.0, fov=32))
     cine.shot(53, 71, tracking(hp, (7.0, 1.6, 15.0), look_dy=0.2, fov=36, roll=(0, 6)))
     _, _, hdg = zigzag()
-    cine.shot(72, 148, chase_cam(hp, hdg, 72, 148, back=lambda f: 30.0 - 15.0 * min(1.0, (f - 72) / 26.0), side=3.2, up=1.5, ahead=9.0, lift=3.6, fov=40))
-    cine.shot(149, 183, chase_cam(hp, hdg, 149, 183, back=16.0, side=-4.0, up=1.6, ahead=9.0, lift=3.4, fov=42))
+    cine.shot(72, 148, chase_cam(hp, hdg, 72, 148, back=lambda f: 30.0 - 14.0 * min(1.0, (f - 72) / 26.0), side=-7.0, up=1.3, ahead=9.0, lift=3.0, fov=40, roll=5.0))
+    cine.shot(149, 183, chase_cam(hp, hdg, 149, 183, back=17.0, side=6.0, up=1.3, ahead=9.0, lift=3.0, fov=42, roll=5.0))
     for f0 in range(184, 240, 10):   # the low side travelling shot (the reference's 184-239): the roll still snaps at every turn
         sg = 1 if hdg(f0) >= 0 else -1
-        cine.shot(f0, min(239, f0 + 9), tracking(hp, (6.0, 1.0, -22.0), look_dy=0.8, fov=34, roll=(sg * 14, sg * 18)))
+        cine.shot(f0, min(239, f0 + 9), tracking(hp, (6.0, 1.0, -22.0), look_dy=0.8, fov=34, roll=(sg * 3, sg * 6)))
     cine.shot(240, 256, autoframe(both, 240, 256, azimuth=15, elevation=5, fov=36, fill=1.0, follow=0.25, min_radius=3.5))
     cine.shot(257, 264, autoframe(both, 257, 264, azimuth=40, elevation=8, fov=34, fill=0.95, follow=0.4, min_radius=2.6))
     cine.shot(265, 273, autoframe(both, 265, 273, azimuth=65, elevation=12, fov=38, fill=0.6, follow=0.2, min_radius=3.5))
