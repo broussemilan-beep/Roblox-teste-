@@ -306,12 +306,12 @@ def build(scene_name: str, frames: range, width: int, samples: int):
     sc.collection.objects.link(cam)
     sc.camera = cam
     sun_d = bpy.data.lights.new("sun", "SUN")
-    sun_d.energy = 1.8
+    sun_d.energy = 2.4 if (CINE or {}).get('look') == 'studio' else 1.8
     sun_d.color = (1.0, 0.93, 0.86)
     sun_d.angle = math.radians(2.5)
     sun = bpy.data.objects.new("sun", sun_d)
     sc.collection.objects.link(sun)
-    sun.rotation_euler = (math.radians(52), math.radians(8), math.radians(-38))
+    sun.rotation_euler = (math.radians(34), math.radians(0), math.radians(104)) if (CINE or {}).get('look') == 'studio' else (math.radians(52), math.radians(8), math.radians(-38))   # Studio: the sun is on the right, shadows fall left and a little toward the camera
     rim_d = bpy.data.lights.new("rim", "AREA")
     rim_d.energy = 800
     rim_d.color = (0.62, 0.74, 1.0)
