@@ -119,7 +119,11 @@ from the measurements alone. Protocol:
    (effects fire, nobody reacts) / a **camera move** (the whole background shifts consistently) / a **cut** (the background is replaced).
 4. Fill `OUT/reading.json` (`viewed`, `camera`, `punct`, `hits`, `vfx_multihit`, `victim`) and run `python tools/eyes.py check DIR OUT/reading.json`;
    re-open the frames behind every contradiction.
-5. Validate the tools themselves with `python tools/eyes_bench.py --reference DIR` after changing them (bench 28/30, reference 7/7 reliable checkpoints).
+5. To read **poses and hits** (what thresholds cannot): `python tools/eyes.py propose DIR FRAME OUT.png` -> look at the numbered candidates -> `python tools/eyes.py track DIR OUT --first A --last B --obj name=F:X,Y ...`
+   (F = frame index inside A..B, X,Y = a point on the object). It follows each object with SAM 2, reports track reliability (good >= 7 logit) and the motion kind:
+   `strobe` (flips between two extensions every image = ONE gesture + VFX / multi-hit illusion), `cycling`, `moving`, `steady` (held).
+   Trust the kind only when the track is `good` (8/8 on the bench); on `doubtful`/`lost` open `track.png`. Never use the masks' area/IoU (mean IoU 0.25 on the bench).
+6. Validate the tools themselves with `python tools/eyes_bench.py --reference DIR` after changing them (bench 28/30, reference 7/7 reliable checkpoints).
 
 ## Rules of engagement
 

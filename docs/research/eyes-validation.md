@@ -60,3 +60,39 @@ seuils de décision ont été calibrés **sur ce banc** : 28/30 est donc un scor
   problème noir sur noir ; non implémenté pour l'instant.
 * Un lecteur appris (suivi de points type CoTracker, segmentation SAM 2) pour séparer encre et membres : lourd, non essayé ici.
 * Plus de vidéos de référence annotées à la main : le seuil actuel repose sur une seule vidéo.
+
+
+---
+
+## Addendum (2026-10-28, v3): un modèle de vision appris, SAM 2.1, branché en « je désigne, il suit »
+
+Après le verdict ci-dessus (les seuils classiques ne lisent pas les poses noir sur noir), recherche d'un vrai modèle de vision :
+Hugging Face et PyPI sont accessibles depuis ce conteneur (pas le miroir PyTorch ni GitHub), 4 CPU / 15 Go. Retenu : **SAM 2.1 tiny** de Meta
+(`facebook/sam2.1-hiera-tiny`, segmentation promptable + suivi vidéo, via `transformers`), ~1-2 s par image sur CPU. Écartés : CoTracker
+(code sur GitHub, inaccessible), flux optique profond (inutile ici), VLM de description (non essayé : trop peu fiable pour des poses de blocs).
+
+### Principe
+`tools/eyes.py propose DIR FRAME OUT.png` numérote des objets candidats sur une image ; **je regarde l'image, je dis « le 5, c'est le mannequin, le 19, la
+jambe »**, puis `eyes.py track DIR OUT --obj nom=image:x,y ...` suit chaque objet sur toute la vidéo (masques exacts), mesure sa portée vers
+l'adversaire, juge la **fiabilité du suivi** (score d'existence de l'objet fourni par le modèle) et classe le mouvement :
+`strobe` (bascule entre deux extensions à chaque image : un seul geste + VFX), `cycling` (change sans cesse de pose), `moving` (balayage lisse),
+`steady` (tenu).
+
+### Mesures sur le banc (18 bras suivis, masque vrai fourni par le moteur)
+* IoU moyen **0,25** : le masque exact est souvent faux (petits membres noirs collés au corps, cuffs/manteau ajoutés par le modèle). À ne **pas** utiliser
+  pour des surfaces.
+* **Fiabilité** (médiane du score d'existence hors image du prompt) : bon suivi ≥ 7, perdu < 5. Le score s'effondre exactement quand l'IoU s'effondre
+  (bras gauche du combo : ~10 → ~2 à l'image 4).
+* **Type de mouvement** : sur les suivis jugés *fiables* (8 cas), le type mesuré = le type réel **8/8** (strobe retrouvé : 22 inversions sur 22 ;
+  coups en balayage ; bras tenus). Sur les suivis *douteux/perdus* (10 cas), 7/10 : à ne pas croire sans regarder la superposition.
+
+### Sur la vidéo de référence (jonglage 97-132, lu à l'œil avant)
+Le mannequin est suivi à travers toutes ses poses (debout, penché, horizontal, replié) : `cycling`. Cheveux/chapeau et jambe du héros : `steady`. C'est
+la lecture « héros tenu, victime en cycle » que les seuils classiques ratent. *Première version* du test de strobe (comptage d'inversions) a faussement
+annoncé un strobe sur la jambe tenue ; remplacée par un test de période 2 (|x[t]−x[t−2]| ≪ |x[t]−x[t−1]|), validé sur le banc et sur ce cas.
+
+### Limites restantes
+* Il faut **un point d'appui par objet, choisi par moi** ; l'extraction automatique (`propose`) donne des candidats bruités.
+* Un objet petit, noir, caché derrière le corps, ou foreshortené (bras qui pointe vers la caméra) n'est pas suivi : la mesure « portée » est alors vraie *et* nulle
+  (cas du banc : le strobe existe mais n'a aucune extension à l'écran).
+* Calibré sur 4 + 18 suivis du banc et un jonglage ; pas de statistique sur beaucoup de vidéos. Coût : ~3 min pour 30 images et 2-3 objets.

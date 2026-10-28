@@ -3,3 +3,6 @@ opencv-python-headless>=4.9
 numpy
 matplotlib
 scenedetect>=0.6   # optional cross-check for shot cuts (eyes.scenedetect_cuts)
+# SAM 2.1 object tracking (tsb_engine/tracker.py, tools/eyes.py propose/track, tools/track_bench.py) - optional, ~3 GB with CUDA wheels, runs on CPU
+torch
+transformers>=5
