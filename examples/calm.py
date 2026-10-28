@@ -33,6 +33,8 @@ FPS = 30
 DX = 125.0  # the mannequin for the first exchange (images 257-283)
 XD2 = DX + 22.0  # where he stands for the final blow (284-355)
 DRAW = (304, 345)  # the katana is drawn on image 304 and put away by 345
+POSES72 = Path(__file__).resolve().parent.parent / 'docs' / 'research' / 'reference-poses' / 'hero_72_148.json'
+POSES284 = Path(__file__).resolve().parent.parent / 'docs' / 'research' / 'reference-poses' / 'hero_284_299.json'
 TRACK72 = Path(__file__).resolve().parent.parent / 'docs' / 'research' / 'reference-tracks' / 'hero_72_148.json'
 TRACK284 = Path(__file__).resolve().parent.parent / 'docs' / 'research' / 'reference-tracks' / 'hero_284_299.json'
 INK = "#0b0b0f"
@@ -93,6 +95,29 @@ def cycle(a: Animation, f0: int, f1: int, xf, zf, ry, seed: int, every: int = 2)
         run_pose(a, f, xf(f), zf(f), ry(f) if callable(ry) else ry, idx, rng)
 
 
+def copied_poses(path: Path) -> dict[int, list[float]]:
+    """Joint angles copied from the reference (tools/copy_poses.py: the R6 rig fitted to the tracked hero's silhouette), lightly smoothed in time."""
+    if not path.exists():
+        return {}
+    d = json.loads(path.read_text())
+    frames = [(x["f"], x["angles"]) for x in d["frames"] if x["angles"] is not None]
+    if not frames:
+        return {}
+    fs = [f for f, _ in frames]
+    A = np.array([a for _, a in frames], float)
+    sm = A.copy()
+    for k in range(3, 16):   # not the heading (0, 1, 2 are view-dependent attitude: kept raw for pitch/roll, heading unused)
+        pad = np.pad(A[:, k], 1, mode="edge")
+        sm[:, k] = 0.25 * pad[:-2] + 0.5 * pad[1:-1] + 0.25 * pad[2:]
+    return {f: list(sm[i]) for i, f in enumerate(fs)}
+
+
+def key_copied(a: Animation, f: int, ang: list[float], x: float, z: float, ry: float) -> None:
+    """Key one image from copied angles: the body's own attitude (pitch, roll) and every joint from the fit; the heading and the position are ours (story and path)."""
+    K(a, f, "linear", R=root(x, 3.0, z, ang[1], ry, ang[2]), T=P((ang[3], ang[4], ang[5])), H=P((ang[6], ang[7], 0)),
+      RA=P((ang[8], 0, ang[9])), LA=P((ang[10], 0, ang[11])), RL=P((ang[12], 0, ang[13])), LL=P((ang[14], 0, ang[15])))
+
+
 def hero_anim(hero_char: Character) -> None:
     a = hero_char.anim
     stand = dict(T=tp(0, 0), H=P((0, 0, 0)), RA=P((4, 0, 6)), LA=P((4, 0, -6)), RL=P((0, 0, 3)), LL=P((0, 0, -3)))
@@ -118,10 +143,14 @@ def hero_anim(hero_char: Character) -> None:
     xf, zf, hdg = zigzag()
     # a real crouched gait (feet planted: the root height comes from the feet), with a stylised accent pose every ninth image pair so the silhouette still jumps
     run_keys(a, 72, 239, lambda f: (xf(f), zf(f), RUN_X - hdg(f)), period=8.0, amp=55.0, lean=32.0, arm=50.0)
-    accents = [f for f in range(72, 240) if (f - 72) % 9 in (7, 8)]
+    cp72 = copied_poses(POSES72)
+    copied = [f for f in range(72, 149) if f in cp72]
+    for f in copied:   # 72-148: the reference's own poses
+        key_copied(a, f, cp72[f], xf(f), zf(f), RUN_X - hdg(f))
+    accents = [f for f in range(149, 240) if (f - 149) % 9 in (7, 8)]
     run_frames = [f for f in range(72, 240) if f not in accents]
     rest_on_ground(hero_char, run_frames)
-    add_air(hero_char, run_frames, 72, 8.0, 0.5)
+    add_air(hero_char, [f for f in run_frames if f not in copied], 72, 8.0, 0.5)
     rng = random.Random(5)
     for f in accents:
         run_pose(a, f, xf(f), zf(f), RUN_X - hdg(f), rng.randrange(len(SPRINT_POSES)), rng)
@@ -148,9 +177,16 @@ def hero_anim(hero_char: Character) -> None:
     v = stride_speed(55.0, 8.0)
     x0 = XD2 - 22.5
     xrun = lambda f: x0 + v * (f - 284) if f <= 300 else x0 + v * 16 + 1.15 * v * (f - 300)
-    run_keys(a, 284, 303, lambda f: (xrun(f), 0.0, RUN_X), period=8.0, amp=55.0, lean=24.0, arm=50.0, sword_arm=True)
-    rest_on_ground(hero_char, range(284, 304))
-    add_air(hero_char, range(284, 304), 284, 8.0, 0.4)
+    cp = copied_poses(POSES284)
+    if cp:   # the reference's own run (the rig fitted to his silhouette), then the gait takes over for the last strides
+        for f in range(284, 300):
+            key_copied(a, f, cp[f], xrun(f), 0.0, RUN_X)
+        run_keys(a, 300, 303, lambda f: (xrun(f), 0.0, RUN_X), period=8.0, amp=55.0, lean=24.0, arm=50.0, sword_arm=True, phase0=2.0)
+        rest_on_ground(hero_char, range(284, 304))
+    else:
+        run_keys(a, 284, 303, lambda f: (xrun(f), 0.0, RUN_X), period=8.0, amp=55.0, lean=24.0, arm=50.0, sword_arm=True)
+        rest_on_ground(hero_char, range(284, 304))
+        add_air(hero_char, range(284, 304), 284, 8.0, 0.4)
     # 304-309 the strike: wind-up (304-305), the cut (306), held while the impact frames flash (307-309)
     K(a, 304, "quad_out", R=root(xrun(304), 2.7, 0.0, -20, RUN_X), T=tp(0.5, -26, -40), H=P((22, 0, 0)), RA=P((95, 0, 70)), LA=P((-50, 0, -25)), RL=P((70, 0, 4)), LL=P((-45, 0, -4)))
     K(a, 306, "cubic_out", R=root(xrun(305) + 0.5, 2.3, 0.0, -18, RUN_X), T=tp(0.7, -28, 50), H=P((20, 0, 0)), RA=P((95, 0, -25)), LA=P((-40, 0, -30)), RL=P((80, 0, 4)), LL=P((-50, 0, -4)))
