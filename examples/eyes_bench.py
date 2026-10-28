@@ -100,6 +100,7 @@ def build(seed: int = 5) -> tuple[Scene, list[dict]]:
         side = r.choice([-1, 1])  # which arm / direction
         if cls == "ghost_jab":
             arm = "RA" if side > 0 else "LA"
+            meta["arm"] = "Right Arm" if side > 0 else "Left Arm"
             yaw = -r.uniform(20, 45) * side
             amp = r.uniform(0.9, 1.5)
             for i, f in enumerate(range(f0, f1 + 1, 2)):
@@ -116,6 +117,7 @@ def build(seed: int = 5) -> tuple[Scene, list[dict]]:
         elif cls == "smear_single":
             arm = "RA" if side > 0 else "LA"
             part = "Right Arm" if side > 0 else "Left Arm"
+            meta["arm"] = part
             wind = {"T": tp(0.2, 8, 40 * side), arm: P((20, 0, 20 * side))}
             hit = {"T": tp(0.0, -10, -30 * side), arm: P((-88, 0, 10 * side))}
             _stand(ha, f0 + 1, "linear", **wind)

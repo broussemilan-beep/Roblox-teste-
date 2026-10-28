@@ -102,7 +102,9 @@ def _fill_poly(zbuf, ids, pts, pid, W, H):
 
 
 def render_ids(scene, f: int, W: int = 320, H: int = 180, only: tuple[int, int] | None = None) -> np.ndarray:
-    """Part-id image for frame ``f``. id = 1 + char_index * 6 + part_index. ``only`` restricts to one (char, part)."""
+    """Part-id image for frame ``f``. id = 1 + char_index * 6 + part_index. ``only`` restricts to one (char, part).
+
+    The picture is ``W x H``; give ``W = round(H * scene.cine.aspect)`` for films with a non-16:9 aspect."""
     pos, tgt, fov, roll = scene.cine.camera_state(f)
     o, fw, r, u = _basis(pos, tgt, roll)
     focal = (H / 2) / math.tan(math.radians(fov) / 2)
