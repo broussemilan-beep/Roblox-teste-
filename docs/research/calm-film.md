@@ -34,3 +34,26 @@
 `perception.perceive` sur nos 386 images trouve `PUNCT_NEGATIVE 63-65` (vrai) et `260-263` (décalé de 3 par rapport à 257-259) ; les négatifs de 149-150, 181-183 et 274-275 **ne sont pas vus** :
 quand l'image est déjà claire (diagonales blanches), l'inversion ne se distingue plus. Le rappel du détecteur de négatifs est donc limité (3 sur 5 retrouvés sur la vidéo réelle,
 2 sur 5 sur notre film), à ne pas surestimer.
+
+## v3 : corrections après le diagnostic externe (2026-10-28)
+
+Un diagnostic visuel externe a noté le rendu v2 à 2,5/10 en 6 points. Chaque point a été **vérifié contre les images de la référence** avant application :
+
+| Point du diagnostic | Vérifié contre la réf ? | Décision |
+|---|---|---|
+| Bulle : sphère lisse à bord lumineux, **sans pointillés**, orientée dans l'axe de la course ; pas de demi-dôme au sol ni de roue plate | oui (images 96-235 : ovale lisse, centre clair, bord blanc ; seules les images 68-72 ont des hachures radiales) | **appliqué** : `bubble` v2 (dégradé Fresnel, étirée dans la direction du cap, hachures seulement les 6 premières images), anneau fin perpendiculaire, plus de pointillés |
+| Aiguilles fines (30-45) derrière la bulle, pas de poutres | oui pour les aiguilles (éventail fin vers le coin bas-gauche) | **appliqué** : 35 aiguilles de 32 studs derrière la bulle ; diagonales fines |
+| Aucune ligne ne passe devant le visage | **non** : la réf a une ligne blanche qui traverse le corps en 116 et 130 | **partiellement** : les diagonales évitent le héros (zone de 22 % de la hauteur), sauf mention contraire elles ne le barrent plus ; la ligne blanche traversante de la réf n'est pas reproduite |
+| Caméra dans l'axe du déplacement, FOV 110-120° | **non** : toutes les images 68-252 de la réf sont des vues latérales / trois quarts bas, jamais dans l'axe | **refusé** ; la caméra reste latérale basse, mais le roll claque à chaque virage |
+| Zig-zag toutes les 8-10 images, ±45° et roll ±28° en 1 image | plausible (la réf montre des inclinaisons qui changent) ; non mesuré | **appliqué** : virage net toutes les 10 images, 8 paires ±35-45°, 162 studs parcourus, roll ±22→28° qui change de signe à chaque virage |
+| Leg smear au départ latéral (3 images) | non vérifié sur la réf | **appliqué** (traînée sombre + blanche sur les jambes, images 66-72) ; à contrôler |
+| Impact frame blanc / silhouettes noires / éclats cyan et jaunes sur 3 images | oui (réf 257-259 : flash blanc avec taches cyan/noir/jaune) | **appliqué** : image 257 en `bw` blanc + 12 prismes cyan/jaunes + 10 éclats noirs ; cône de souffle de 30 aiguilles (260-269) ; traits noirs et blancs sur les bords des gros plans |
+| Fin : dérapage 6 studs, bloc de débris, roll -22°, recul de 4 à 16-18 studs, roll 0 | oui, cohérent avec la réf 366-385 (héros qui arrive de loin, petit) | **appliqué** : 366-374 dérapage accroupi dissymétrique, bloc kické, poussière ; 375-385 il se redresse, la caméra recule de 20 à 24 studs et le roll revient à 0 |
+
+Les consignes « Blender / lens 14 mm / Emission = 10 » du diagnostic ne s'appliquent pas à ce viewer (canvas 2D) : traduites en effets équivalents, sans moteur 3D.
+
+### Ce qui reste faux (v3)
+* La macro du sabre (310-341) est toujours dominée par des blocs du mannequin ; le rendu est loin de la photo de la réf.
+* Pas de vrai flou de mouvement ni de ligne jaune au sol (la réf en a).
+* Les poses du sprint sont à peine lisibles à cette distance (le héros est petit, comme en réf, mais mes poses ne sont pas aussi nettes).
+* Contact du choc : toujours pas résolu avec `solver.reach_root`.

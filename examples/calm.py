@@ -11,6 +11,7 @@ copied from the reference's assets. Not done / approximations are listed in docs
 
 from __future__ import annotations
 
+import math
 import random
 
 from tsb_engine.authoring import K, P, char_points, keep_above_ground, tp
@@ -71,13 +72,29 @@ def run_pose(a: Animation, f: int, x: float, z: float, ry: float, idx: int, rng:
     K(a, f, "linear", R=root(x, h, z, rx + rng.uniform(-6, 6), ry + rng.uniform(-8, 8), rz), T=t, H=P(j(hd)), RA=P(j(ra)), LA=P(j(la)), RL=P(j(rl)), LL=P(j(ll)))
 
 
-def cycle(a: Animation, f0: int, f1: int, xf, zf, ry: float, seed: int, every: int = 2) -> None:
+def zigzag(f0: int = 72, f1: int = 239, seg: int = 10, x0: float = 3.0, z0: float = RUN_Z, x1: float = 162.0):
+    """Sprint path of the first run: a sharp change of heading (+-35..45 deg) every ``seg`` images, pairs of equal and opposite turns so the
+    lateral drift cancels, the speed scaled so that the hero covers ``x1 - x0`` studs along the grid. Returns (x(f), z(f), heading_deg(f))."""
+    rng = random.Random(3)
+    mags = [rng.choice([35, 40, 45]) for _ in range(8)]
+    heads = [h for m in mags for h in (m, -m)]
+    hd = lambda f: heads[(f - f0) // seg] if (f - f0) // seg < len(heads) else 0.0
+    cs = sum(math.cos(math.radians(hd(f))) for f in range(f0, f1 + 1))
+    spd = (x1 - x0) / cs
+    xs, zs = {f0 - 1: x0}, {f0 - 1: z0}
+    for f in range(f0, f1 + 1):
+        xs[f] = xs[f - 1] + spd * math.cos(math.radians(hd(f)))
+        zs[f] = zs[f - 1] + spd * math.sin(math.radians(hd(f)))
+    return (lambda f: xs[max(f0, min(f1, f))]), (lambda f: zs[max(f0, min(f1, f))]), hd
+
+
+def cycle(a: Animation, f0: int, f1: int, xf, zf, ry, seed: int, every: int = 2) -> None:
     rng = random.Random(seed)
     idx = rng.randrange(len(SPRINT_POSES))
     for f in range(f0, f1 + 1):
         if (f - f0) % every == 0:
             idx = (idx + 1 + rng.randrange(2)) % len(SPRINT_POSES)
-        run_pose(a, f, xf(f), zf(f), ry, idx, rng)
+        run_pose(a, f, xf(f), zf(f), ry(f) if callable(ry) else ry, idx, rng)
 
 
 def hero_anim(a: Animation) -> None:
@@ -101,9 +118,8 @@ def hero_anim(a: Animation) -> None:
     K(a, 68, "quad_out", R=root(0.5, 6.5, 3.6, -20, 225), T=tp(0.0, -10), H=P((10, 0, 0)), RA=P((120, 0, 30)), LA=P((-30, 0, -30)), RL=P((50, 0, 4)), LL=P((-20, 0, -4)))
     K(a, 71, "quad_in", R=root(2.5, 4.5, 3.6, -50, RUN_X), T=tp(0.2, -25), H=P((20, 0, 0)), RA=P((-60, 0, 20)), LA=P((120, 0, -20)), RL=P((70, 0, 4)), LL=P((-50, 0, -4)))
     # 72-239 the sprint: a new silhouette on every image
-    zf = lambda f: RUN_Z - 0.0 * f
-    xf = lambda f: 3.0 + 0.95 * (f - 72)
-    cycle(a, 72, 239, xf, zf, RUN_X, 5)
+    xf, zf, hdg = zigzag()
+    cycle(a, 72, 239, xf, zf, lambda f: RUN_X - hdg(f), 5)
     # 240-256 he slows, aims at the far mannequin and dives at it
     for f in range(240, 257):
         u = (f - 240) / 16
@@ -131,12 +147,16 @@ def hero_anim(a: Animation) -> None:
     K(a, 342, "linear", R=root(DX - 6.0, 1.8, -1.2, -6, 270.0), T=tp(1.0, -30), H=P((40, 0, 0)), RA=P((66, 0, 16)), LA=P((68, 0, -16)), RL=P((82, 0, 5)), LL=P((74, 0, -5)))
     K(a, 346, "cubic_out", R=root(DX - 4.5, 3.0, 0.0, -30, 90.0), T=tp(0.2, -20, 30), H=P((10, 0, 0)), RA=P((-80, 0, 20)), LA=P((60, 0, -30)), RL=P((60, 0, 4)), LL=P((-30, 0, -4)))
     cycle(a, 350, 359, lambda f: DX - 6.0 - 2.2 * (f - 350), lambda f: 1.0, 90.0, 17)
-    for f in range(360, 370):
-        u = (f - 360) / 9
+    for f in range(360, 366):
+        u = (f - 360) / 5
         K(a, f, "linear", R=root(DX - 27.0 - 2.5 * (f - 360), 2.2 + 0.6 * u, 1.0, 40 + 340 * u, 90.0), T=tp(0.8, -30), H=P((30, 0, 0)), RA=P((-80, 0, 12)), LA=P((-80, 0, -12)), RL=P((110, 0, 4)), LL=P((110, 0, -4)))
-    # 370-385 the opening hold again, seen from behind (he faces -Z, the camera is on +Z)
-    K(a, 370, "linear", R=root(0, 3.0, 0, 0, 0), **stand)
-    K(a, 385, "sine_inout", R=root(0, 2.97, 0, 0, 0), T=tp(0.03, 1), H=P((2, 0, 0)), RA=P((4, 0, 6)), LA=P((4, 0, -6)), RL=P((0, 0, 3)), LL=P((0, 0, -3)))
+    # 366-374 he skids in from behind, crouched and lopsided, 6 studs, leaning back to brake; 375-385 he stands up into the opening idle
+    brake = dict(T=tp(0.9, -25, 12), H=P((25, 0, 0)), RA=P((-40, 0, 50)), LA=P((40, 0, -20)), RL=P((95, 0, 6)), LL=P((-25, 0, -6)))
+    for f in range(366, 375):
+        u = (f - 366) / 8
+        K(a, f, "linear", R=root(0.4, 2.0, 7.0 - 6.0 * (1 - (1 - u) ** 2), 12, 0, 18), **brake)
+    K(a, 379, "quad_out", R=root(0.4, 2.6, 0.9, 4, 0, 6), T=tp(0.3, -10, 4), H=P((8, 0, 0)), RA=P((20, 0, 14)), LA=P((10, 0, -10)), RL=P((30, 0, 5)), LL=P((10, 0, -5)))
+    K(a, 385, "sine_inout", R=root(0, 2.97, 0.9, 0, 0, 0), **stand)
 
 
 BLOCKS = {  # the mannequin's blocks fly apart (offset in the part's parent frame, spin)
@@ -187,40 +207,55 @@ def build() -> Scene:
     cine.shot(37, 47, tracking(hp, (7.0, 1.6, 14.0), look_dy=-0.4, fov=34))
     cine.shot(48, 52, tracking(hp, (3.6, 0.4, 8.5), look_dy=0.0, fov=32))
     cine.shot(53, 71, tracking(hp, (7.0, 1.6, 15.0), look_dy=0.2, fov=36, roll=(0, 6)))
-    cine.shot(72, 110, tracking(hp, (-2.5, 1.5, -13.5), look_dy=0.2, fov=30, roll=(-6, 6)))
-    cine.shot(111, 148, tracking(hp, (-2.0, 2.4, -13.0), look_dy=0.2, fov=30, roll=(8, -8)))
-    cine.shot(149, 183, tracking(hp, (3.0, 1.6, -12.5), look_dy=0.2, fov=32, roll=(-10, 10)))
-    cine.shot(184, 239, tracking(hp, (4.0, 0.7, -13.0), look_dy=0.6, fov=34, roll=(0, 5)))
+    _, _, hdg = zigzag()
+    for f0 in range(72, 240, 10):   # a roll that snaps to the opposite side on every turn of the zig-zag
+        sg = 1 if hdg(f0) >= 0 else -1
+        f1 = min(239, f0 + 9)
+        off, fv, ly = ((-3.5, 2.4, -23.0), 30, 0.4) if f0 < 149 else ((4.5, 2.4, -21.0), 32, 0.4) if f0 < 184 else ((6.0, 1.0, -22.0), 34, 0.8)
+        cine.shot(f0, f1, tracking(hp, off, look_dy=ly, fov=fv, roll=(sg * 22, sg * 28)))
     cine.shot(240, 256, autoframe(both, 240, 256, azimuth=15, elevation=5, fov=36, fill=1.0, follow=0.25, min_radius=3.5))
     cine.shot(257, 264, autoframe(both, 257, 264, azimuth=40, elevation=8, fov=34, fill=0.95, follow=0.4, min_radius=2.6))
     cine.shot(265, 273, autoframe(both, 265, 273, azimuth=65, elevation=12, fov=38, fill=0.6, follow=0.2, min_radius=3.5))
     cine.shot(274, 281, autoframe(both, 274, 281, azimuth=30, elevation=8, fov=32, fill=0.8, follow=0.3, min_radius=2.6))
     cine.shot(282, 299, tracking(hp, (2.5, 1.5, 13.0), look_dy=0.2, fov=30, roll=(6, -6)))
-    cine.shot(300, 305, autoframe(both, 300, 305, azimuth=20, elevation=6, fov=34, fill=0.55, follow=0.2, min_radius=4))
+    cine.shot(300, 305, tracking(hp, (6.0, 1.2, 10.0), look_dy=0.4, fov=34, roll=(-4, 4)))
     cine.shot(306, 309, tracking(hd, (2.6, 0.2, 5.0), look_dy=0.2, fov=30))
     bx = DX - 5.5
     cine.shot(310, 341, dolly((bx - 1.0, 2.6, 7.0), (bx - 0.2, 2.7, 6.6), (bx + 1.2, 2.2, 0.0), (bx + 1.5, 2.3, 0.0), fov=30))
     cine.shot(342, 349, autoframe(both, 342, 349, azimuth=30, elevation=10, fov=36, fill=0.9, follow=0.3, min_radius=3.0))
     cine.shot(350, 359, tracking(hp, (-2.0, 1.5, 12.5), look_dy=0.2, fov=30, roll=(0, -8)))
     cine.shot(360, 369, tracking(hp, (9.0, 14.0, 10.0), fov=40))
-    cine.shot(370, N - 1, dolly((4.5, 2.2, 27), (4.5, 2.2, 27), (-0.6, 3.0, 0), (-0.6, 3.0, 0), fov=30))
+    cine.shot(366, 374, dolly((4.0, 2.0, 25.0), (3.4, 1.9, 20.0), (0.4, 1.8, 4.0), (0.4, 1.6, 1.5), fov=34, roll=-22))
+    cine.shot(375, N - 1, dolly((3.4, 2.0, 20.0), (4.5, 3.0, 24.0), (0.4, 2.4, 0.6), (-0.6, 3.0, 0.0), fov=(34, 30), roll=(-22, 0)))
 
-    # ---- speed bubble that follows him, ground speed lines, long diagonals
-    gp = lambda f: (hp(f)[0] + 0.8 * (1 if (f < 282 or 265 <= f <= 273) else -1), 0.0, hp(f)[2])
-    cine.bubble(66, 256, gp, 2.4, "#b9d2e4", 0.4, half=True)
-    cine.bubble(265, 273, gp, 2.4, "#b9d2e4", 0.4, half=True)
-    cine.bubble(282, 305, gp, 2.4, "#b9d2e4", 0.4, half=True)
-    cine.bubble(350, 369, gp, 2.4, "#b9d2e4", 0.4, half=True)
-    for f0, f1 in ((72, 239), (282, 305), (350, 369)):
-        for f in range(f0, f1, 6):
-            x = hp(f)[0]
-            sgn = 1 if f < 282 else -1
-            cine.streaks(f, 6, (x - sgn * 16, 0.06, hp(f)[2]), (x, 0.06, hp(f)[2]), n=16, r0=0.15, r1=2.8, w=0.05, color="#ffffff", seed=f)
-    for f0, f1 in ((72, 140), (150, 180), (184, 239), (282, 305), (350, 369)):
+    # ---- smooth speed shell around the torso (stretched along the heading), thin ring, needles behind it, thin diagonals that avoid him
+    dir_at = lambda f: (math.cos(math.radians(hdg(f))), 0.0, math.sin(math.radians(hdg(f)))) if 72 <= f <= 239 else ((1.0, 0.0, 0.0) if f < 282 else (-1.0, 0.0, 0.0))
+    cine.bubble(66, 256, hp, 2.5, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.35, hatch=6)
+    cine.bubble(265, 273, hp, 2.2, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.1)
+    cine.bubble(282, 305, hp, 2.5, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.35)
+    cine.bubble(350, 365, hp, 2.5, "#c4d8e8", 0.5, dir_at=dir_at, stretch=1.35)
+    for f in range(72, 240, 4):
+        d, c = dir_at(f), hp(f)
+        cine.ring(f, 5, c, 1.7, 2.0, 0.05, 0.03, "#ffffff", 0.8, 0.2, n=d, add=True, easing="linear")
+    for f0, f1 in ((72, 239), (282, 305), (350, 365)):
+        for f in range(f0, f1, 3):
+            d, c = dir_at(f), hp(f)
+            a_ = (c[0] - d[0] * 32, max(0.3, c[1] * 0.5), c[2] - d[2] * 32)
+            b_ = (c[0] - d[0] * 3.2, max(0.4, c[1] * 0.7), c[2] - d[2] * 3.2)
+            cine.streaks(f, 3, a_, b_, n=35, r0=0.1, r1=2.2, w=0.035, color="#f2f2f5", seed=f)
+    for f0, f1 in ((72, 140), (150, 180), (184, 239), (282, 305), (350, 365)):
         for f in range(f0, f1, 5):
-            cine.screen_fx("diag", f, 3, n=7, angle=-22, seed=f)
-    for f0, f1 in ((72, 239), (282, 305), (350, 369)):
-        cine.ink_trail(f0, f1, 0, "Torso", (0, 0, 0), 12, 2.2, 0.0, "#cfcfd4", rag=0.5, seed=21, alpha=0.45)
+            cine.screen_fx("diag", f, 3, n=8, angle=-22, seed=f, avoid=0, avoidR=0.22, thick=0.012)
+            if f % 10 == 0:
+                cine.screen_fx("diag", f, 3, n=2, angle=-26, seed=f + 1, avoid=0, avoidR=0.22)
+    # thin curved wakes off the feet, hands and shoulder (not one rigid tube), a faint wide one behind the torso
+    for f0, f1 in ((72, 239), (282, 305), (350, 365)):
+        for part, w, al in (("Right Leg", 0.3, 0.5), ("Left Leg", 0.3, 0.5)):
+            cine.ink_trail(f0, f1, 0, part, (0, -1.0, 0), 9, w, 0.0, "#f2f2f5", rag=0.25, seed=21, alpha=al)
+        cine.ink_trail(f0, f1, 0, "Torso", (0, 0, 0), 12, 0.7, 0.0, "#cfcfd4", rag=0.5, seed=22, alpha=0.16)
+    # leg smear on the sideways start (66-71): the planted leg is stretched toward where he is going
+    for part, col, al in (("Left Leg", "#16161a", 0.95), ("Right Leg", "#e9e9ee", 0.8)):
+        cine.ink_trail(66, 72, 0, part, (0, -1.0, 0), 4, 1.5, 0.1, col, rag=0.3, seed=30, alpha=al)
     # ---- the roll: thin white arcs; the landing dust; the dark smear before the first negative
     for k in range(3):
         cine.ring(22 + 4 * k, 12, (0, 2.0 + 0.2 * k, 2.0 + 0.5 * k), 1.2, 2.6, 0.06, 0.02, "#ffffff", 0.6, 0.0, n=(1, 0, 0), add=True, easing="quad_out")
@@ -233,8 +268,15 @@ def build() -> Scene:
         cine.ring(f, 12, (x - 3, 3.0, hp(f)[2]), 0.5, 5.0, 0.12, 0.03, "#ffffff", 0.7, 0.0, n=(1, 0, 0), add=True, easing="quad_out")
     cine.line(241, 15, (hp(241)[0], 3.0, hp(241)[2]), (DX, 3.0, 0.0), 0.06, 0.03, "#ffffff", 0.85, 0.2)
     # ---- negative impact frames, then the silhouette frames (black on white x3, black on red x1)
-    for t0, d in ((63, 3), (149, 2), (181, 3), (257, 3), (274, 2)):
+    for t0, d in ((63, 3), (149, 2), (181, 3), (274, 2)):
         cine.screen_fx("negative", t0, d, hue=150 + (t0 % 3) * 20)
+    cine.screen_fx("bw", 257, 3, contrast=24, bright=2.6, bfirst=True, shards=10, prisms=12, seed=5)   # impact frame: white world, black silhouettes, cyan/yellow shards
+    cine.streaks(260, 10, (DX + 1.5, 2.2, 0.7), (DX + 30.0, 2.6, 0.7), n=30, r0=0.2, r1=3.5, w=0.07, color="#ffffff", seed=9)   # the blast cone out of the cut
+    cine.screen_fx("edges", 274, 8, n=70, seed=2)
+    cine.screen_fx("edges", 310, 32, n=40, seed=3)
+    cine.screen_fx("edges", 342, 8, n=70, seed=4)
+    cine.debris_piece(369, (0.2, 0.3, 3.6), (0.02, 0.11, -0.08), (1.0, 0.6, 0.8), "#6c6a70", (4, 2, 1), g=0.02)   # the block his foot kicks up in the skid
+    cine.emit(366, 376, origin=(0.4, 0.2, 3.4), rate=3.0, vel=(0.04, 0.2), dir=(0, 1, 0), spread=1.3, life=(12, 24), size=(0.8, 1.8), color=("#8e8c93", "#5a585e"), alpha=(0.5, 0.0), add=False, seed=12, radius=1.8, shape="smoke")
     cine.screen_fx("bw", 306, 3, contrast=24, bright=2.6, bfirst=True, shards=0)
     cine.screen_fx("bw", 309, 1, contrast=24, bright=2.6, bfirst=True, shards=0, multiply="#d4221c")
     # ---- red sparks (the only warm colour), blade glints, the blocks

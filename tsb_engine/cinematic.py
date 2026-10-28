@@ -316,10 +316,13 @@ class Cinematic:
         self.fx.append({"type": "dome", "t0": t0, "dur": dur, "c": list(c), "r0": r0, "r1": r1, "color": color,
                         "a0": a0, "a1": a1, "add": add, "ease": easing})
 
-    def bubble(self, t0: int, t1: int, center_at: Callable[[int], Vec], r: float, color: str = "#bcd4e6", alpha: float = 0.5, half: bool = False) -> None:
-        """A translucent speed bubble (bright rim, hatched inner rings) that follows ``center_at(frame)``."""
+    def bubble(self, t0: int, t1: int, center_at: Callable[[int], Vec], r: float, color: str = "#bcd4e6", alpha: float = 0.5,
+               dir_at: Callable[[int], Vec] | None = None, stretch: float = 1.3, hatch: int = 0) -> None:
+        """A smooth translucent shell glued to ``center_at(frame)`` (clear centre, bright rim, no dashes), stretched along ``dir_at(frame)``;
+        ``hatch`` = number of first frames that show radial hatching on the rim (the reference's opening burst)."""
         self.fx.append({"type": "bubble", "t0": t0, "t1": t1, "pts": [[round(v, 3) for v in center_at(f)] for f in range(t0, t1 + 1)],
-                        "r": r, "color": color, "alpha": alpha, "half": half})
+                        "dirs": [[round(v, 3) for v in dir_at(f)] for f in range(t0, t1 + 1)] if dir_at else None,
+                        "r": r, "color": color, "alpha": alpha, "stretch": stretch, "hatch": hatch})
 
     def emit(self, t0: int, t1: int, origin: Vec | None = None, attach: dict | None = None, rate: float = 2.0,
              burst: int = 0, vel: tuple[float, float] = (0.05, 0.25), dir: Vec = (0, 1, 0), spread: float = 0.6,
