@@ -29,12 +29,13 @@ N = F1 - F0 + 1
 FPS = 30
 VIEW_W, VIEW_H = 1170.0, 686.0   # the Studio viewport in the recording (pixels)
 FOV, PITCH = 70.0, 28.0          # Studio default vertical FOV; the horizon sits ~83 px below the top of the viewport -> pitch 28 degrees
-CAM = (0.0, 15.4, 22.4)          # camera position: ~27 studs from the action, height such that the standing rig is 5.5 studs
+# camera: scaled by 0.711 so that the rig's apparent size (fitted: 29.7 px per stud) matches the unprojected depth (16.5 studs)
+CAM = (0.0, 15.4 * 0.711, 22.4 * 0.711)
 ASPECT = VIEW_W / VIEW_H
 FOCAL = (VIEW_H / 2.0) / math.tan(math.radians(FOV) / 2.0)
 FACES = {"front": "#e03a30", "back": "#2f56e0", "right": "#36b04a", "left": "#f0932a", "top": "#47c4f0", "bottom": "#f0d322"}
 COLORS = {p: "#cfd1d8" for p in ("Torso", "Head", "Right Arm", "Left Arm", "Right Leg", "Left Leg")}
-VIOLET, MAGENTA = ("#b07cff", "#4a2aa8"), "#d85cff"
+VIOLET, MAGENTA = ("#8a5cff", "#3a1c9a"), "#c64cff"
 
 
 def camera_basis():
@@ -65,7 +66,7 @@ def load_track():
     pix = np.full((N, 2), np.nan)
     for fr in d["frames"]:
         i = fr["f"] - F0
-        if 0 <= i < N and fr.get("angles"):
+        if 0 <= i < N and fr.get("angles") and fr.get("score", 0) >= 0.40:   # frames tinted or hidden by a fx fit badly: interpolate across them
             ang[i] = fr["angles"]
             x0, y0, side = fr["crop"]
             tx, ty, _ = fr["fit"]
@@ -118,7 +119,7 @@ def build() -> Scene:
     cine.emit(fr(16), fr(34), attach=foot, rate=2.0, vel=(0.01, 0.05), dir=(0, 1, 0), spread=1.2, life=(20, 38), size=(0.9, 2.6), color=("#8e9099", "#6b6d75"), alpha=(0.3, 0.0), add=False, seed=5, radius=0.6, shape="smoke")
     # the charge: a violet aura rising off the body, a soft glow
     cine.emit(fr(56), fr(66), attach=chest, rate=7.0, vel=(0.03, 0.16), dir=(0, 1, 0), spread=0.7, grav=-0.01, life=(10, 22), size=(0.7, 0.2), color=VIOLET, alpha=(0.9, 0.0), add=True, seed=6, radius=0.9, shape="soft")
-    cine.glow(fr(57), fr(65), attach=chest, r0=1.2, r1=2.4, color="#7a4cff", a0=0.6, a1=0.0)
+    cine.glow(fr(57), fr(65), attach=chest, r0=1.0, r1=2.0, color="#5a30d8", a0=0.35, a1=0.0)
     # the spin: thin white arcs circling the body
     for k in range(4):
         cine.ring(fr(74) + 2 * k, 8, torso(fr(76)), 1.7 + 0.2 * k, 2.6 + 0.2 * k, 0.05, 0.02, "#ffffff", 0.8, 0.0, n=(0, 1, 0), add=True, easing="quad_out")
