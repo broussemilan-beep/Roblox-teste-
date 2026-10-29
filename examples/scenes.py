@@ -148,10 +148,15 @@ def _run_test() -> Scene:
     return build()
 
 
+def _practice_mocap() -> Scene:
+    from .practice_mocap import build
+    return build()
+
+
 def _practice() -> Scene:
     from .practice import build
 
     return build()
 
 
-SCENES = {"practice": _practice, "run_test": _run_test, "calm": _calm, "ronin_showcase": _ronin, "heavy_punch_hit": heavy_punch_hit, "berserker_ultimate": _ultimate, "duel_short": _short, "eyes_bench": _eyes_bench}
+SCENES = {"practice": _practice, "practice_mocap": _practice_mocap, "run_test": _run_test, "calm": _calm, "ronin_showcase": _ronin, "heavy_punch_hit": heavy_punch_hit, "berserker_ultimate": _ultimate, "duel_short": _short, "eyes_bench": _eyes_bench}

@@ -212,10 +212,14 @@ def lowest(a: np.ndarray) -> float:
     return -float(world_corners(a, 0.0, 3.0, 0.0)[:, 1].min())
 
 
-def build() -> Scene:
+def build(motion=None) -> Scene:
+    """``motion`` = (angles (N, 16), X (N,), Z (N,), air (N,)) replaces the hand-authored keys (see ``practice_mocap.py``)."""
     hero = Character("rig", Animation("rig", fps=FPS, archetype="cinematic"), colors=COLORS, face_colors=FACES, head_shape="ball")
-    ang = keyed_angles()
-    X, Z, air = solve_track(ang)
+    if motion is None:
+        ang = keyed_angles()
+        X, Z, air = solve_track(ang)
+    else:
+        ang, X, Z, air = motion
     for i in range(N):
         a = ang[i]
         K(hero.anim, i, "linear", R=root_pose(float(X[i]), 3.0 + lowest(a) + float(air[i]), float(Z[i]), a[1], a[0], a[2]), T=P((a[3], a[4], a[5])), H=P((a[6], a[7], 0)),
