@@ -107,3 +107,18 @@ SHAKES = {108: 4.0, 137: 5.0}
 HITSTOP = {108: 3, 137: 3}
 HITSTOP_CATCHUP = 8
 
+
+# --- silhouette refinement (tools/practice_refine.py): the authored keys above are nudged toward the reference silhouettes (mean 6.6 degrees, 12 at most), blended
+# 80 % refined / 20 % authored to keep the motion smooth and the intent intact. Set PRACTICE_AUTHORED_ONLY=1 to read the authored keys alone (the refiner does).
+import json as _json
+import os as _os
+from pathlib import Path as _Path
+
+REFINED = _Path(__file__).resolve().parent.parent / "docs" / "research" / "reference-poses" / "practice_keys_refined.json"
+REFINE_BLEND = 0.8
+if REFINED.exists() and not _os.environ.get("PRACTICE_AUTHORED_ONLY"):
+    for _f, _v in _json.loads(REFINED.read_text()).items():
+        if int(_f) in KEYS:
+            for _n in NAMES:
+                KEYS[int(_f)][_n] = round((1 - REFINE_BLEND) * KEYS[int(_f)].get(_n, 0.0) + REFINE_BLEND * float(_v[_n]), 1)
+
