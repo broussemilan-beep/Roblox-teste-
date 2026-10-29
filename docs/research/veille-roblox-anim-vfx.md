@@ -99,3 +99,21 @@ Conclusion : le tableau est une description plausible mais inexacte ; seule la m
 - flash d'impact : durée de vie 0,1-0,2 s, éclats Speed 50 / Drag 3.
 Appliqué dans `examples/practice_keys.py` : décalage tête/bras de 2 images, Back Out sur le lancer, l'impact et l'atterrissage de la vrille, arrêt sur image de 3 images au lancer (108) et à l'impact (137) avec rattrapage de l'horloge de pose sur 8 images pour rester sur le minutage de la référence.
 Non appliqué : abaisser le torse en garde (les jambes R6 sont rigides, il faudrait enfoncer les pieds dans le sol), tremblement de caméra et FOV (la caméra de la référence est fixe), impact frames noir/blanc (absentes de la référence).
+
+## 6. Deuxième passe, mots-clés pointus (2026-10-29)
+
+Accès : je ne contourne pas les blocages anti-robot (CAPTCHA YouTube, 403 Reddit, protections TikTok). Voies légitimes : clé de l'API YouTube Data de l'utilisateur (titres, descriptions, chapitres, commentaires ; pas les sous-titres), application Reddit de l'utilisateur (OAuth), vidéos téléchargées par l'utilisateur sur son ordinateur, ou Gemini. X fonctionne avec `yt-dlp` (clips téléchargés en dossier temporaire, non versionnés).
+
+**Série « Creation Overview » de Pew (DevForum, avril-mai 2025)** [lu] : Part 1 (Stoic Bomb de KJ), Part 2 (VFX physiques, orbite de débris), Part 3 (Serious Punch, cinématique + mesh flipbooks), Part 4 (RUNUP). Points précis :
+- Tous les émetteurs de particules dans une seule pièce soudée à la racine par un Motor6D et animée comme un membre ; les effets sont déclenchés par des événements d'animation (`KeyframeReached`), pas par des délais.
+- Boucle de flipbook : `Duration = 1`, `Framerate = 60`, une attente de `Duration / Framerate` par image ; les images doivent rester chargées (decals sous une pièce) pour éviter le clignotement.
+- Orbite de débris : `dist = 10`, `speed = 10`, phase aléatoire entre −180° et 180°, position `sin(t·speed+phase)·dist`, `cos(...)·dist`, hauteur 2.
+- Caméra de cinématique : une pièce soudée animée comme caméra, ou l'export de rigs de Moon avec FOV ; remettre FOV à 70 à la fin.
+- Retours de la communauté sur son « Serious Punch » : « le coup pourrait avoir plus d'accélération en y entrant » (cela confirme l'usage d'un In sur l'élan) ; secousse de caméra suggérée à l'impact.
+- Il dit lui-même ne pas être bon en animation : sa série est surtout un modèle pour les VFX.
+
+**Autres pages lues** : fil sur les impact frames (plein écran ImageLabel, vidéo dans un ScreenGui, Krita ; « aucun jeu ne fait de vraies impact frames en temps réel » : elles sont déclenchées par script), fil « Drawn Impact Frames » (ImageLabel animé dans un BillboardGui car certains ColorCorrection cachent les particules), guide Moon Animator 2 non officiel de 2020 (touche + pour insérer une clé, regrouper des clés « pour faire une pause », Mirror, Looper, Time Stretch, Wiggler ; conseil R6 : ne pas lever trop haut un bras, descendre la pièce plutôt que « plier » le R6), rig Blender R6 IK/FK, pipeline Blender vers Roblox à 60 images/s (1 s = 60 images), réglages d'export FBX (Bake Animation, Add Leaf Bones désactivé, Apply Scalings = FBX Unit Scale).
+
+**Données de jeu TSB (site tiers seamou.studio, non vérifiable : le wiki Fandom répond 402)** : chaîne de 4 coups M1, les 3 premiers avec stun léger de 0,2 s, le 4e avec recul ou projection au sol ; recul d'un M1 raté de 0,2 s ; Side-Dash rechargé en 2 s, dash avant/arrière 5 s. Aucune page ne donne de nombre d'images de départ/actif/récupération pour un coup, ni d'angles R6 pour garde, élan, saut, atterrissage.
+
+**Conclusion honnête** : cette deuxième passe confirme les règles déjà appliquées (accélération vers le coup, arrêt net, suivi décalé, arrêt sur image, événements d'animation pour synchroniser les VFX) mais n'apporte pas de nouveaux chiffres de poses. Les chiffres de poses n'existent pas en public ; il faut les mesurer sur des clips.
