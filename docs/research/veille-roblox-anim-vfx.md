@@ -146,3 +146,12 @@ Clips publics de Veil, Ultik, Snaliel, Mr.Cool et Felku, gardés hors du dépôt
 - **Structure d'un impact lu image par image** (Veil, mise à jour TSB, 60 images/s, 15,2 à 16,0 s) : aura violet-noir pendant au moins 0,3 s (anticipation) → éclair blanc avec rayons sur quelques images (≈ 3 images) → cylindre blanc translucide qui s'étend puis s'efface en ≈ 0,1 à 0,2 s → gros blocs de débris et caméra qui s'enfonce parmi les blocs pendant ≈ 0,4 s. Cela correspond à la règle « anticipation, apogée, dissipation rapide » de Plebarae.
 - **Présentation d'Ultik** : chaque animation est montrée sur un rig en plein cadre sous Studio, avec filigrane, et les animations sont enchaînées par des coupes sèches (environ 26 coupes en 55 s).
 - **Ce que la mesure ne peut pas donner** : mes durées « anticipation / frappe / récupération » par clip sont inutilisables : l'énergie de mouvement de l'image entière mélange caméra, VFX et temps morts. Pour de vraies durées il faut suivre le personnage lui-même (SAM 2, `tools/eyes.py track`) et mesurer ses membres, clip par clip.
+
+### 8 bis. Durées du mouvement du corps seul (Ultik, atomic samurai, 30 images/s)
+
+Méthode : le rig blanc est isolé par couleur (faible saturation, forte luminosité) sur le sol bleu, dans la zone centrale ; l'énergie de mouvement est le nombre de pixels de masque qui changent d'une image à l'autre, divisé par la surface du rig ; 24 rafales de mouvement (fenêtres 15,2-33,5 s et 39,6-47,0 s, où le plan est fixe).
+- Partie rapide d'un mouvement (au-dessus de 50 % du pic de la rafale) : **médiane 7 images (0,23 s), de 2 à 15 images (0,07 à 0,5 s)** ; la moitié des mouvements tient entre 4 et 11 images.
+- Rafales entières : de 5 à 56 images (0,17 à 1,87 s) ; les plus longues contiennent des temps morts ou plusieurs gestes.
+- La montée lente (anticipation) passe sous le seuil de détection : sa durée n'est pas mesurable avec cette méthode (médiane mesurée 0,5 image, ce qui est un artefact, pas une mesure).
+- Limites : ce sont des animations d'épée d'un seul animateur, sans coup de poing ni saut ; échantillon de 24 gestes ; pas de séparation anticipation / frappe / récupération. À ne pas généraliser.
+- Comparaison avec la séquence de ta référence : mes phases explosives sont de 2 à 3 images (lancer 106→108, vrille 65→68, saut 121→124), donc au bas de cette fourchette ; la durée des gestes de TA référence se lit sur ta vidéo, pas sur ces épées.
