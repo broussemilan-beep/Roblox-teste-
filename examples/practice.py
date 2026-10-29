@@ -18,7 +18,7 @@ from pathlib import Path
 
 import numpy as np
 
-from examples.practice_keys import KEYS, LAG, NAMES
+from examples.practice_keys import EASE, KEYS, LAG, NAMES, SHAKES
 from tsb_engine.authoring import K, P, root_pose
 from tsb_engine.cinematic import Cinematic, dolly
 from tsb_engine.model import Animation
@@ -154,12 +154,22 @@ def keyed_angles() -> np.ndarray:
         for n, v in KEYS[int(t)].items():
             vals[j, (NAMES + ["air"]).index(n)] = v
 
+    def ease(u: float, style: str) -> float:
+        if style == "hold":
+            return 0.0
+        if style == "in":
+            return u**2.4
+        if style == "out":
+            return 1.0 - (1.0 - u) ** 2.4
+        if style == "lin":
+            return u
+        return 0.5 * (2 * u) ** 2.0 if u < 0.5 else 1.0 - 0.5 * (2 * (1 - u)) ** 2.0   # "io"
+
     def at(t: float) -> np.ndarray:
         t = float(np.clip(t, ts[0], ts[-1]))
         j = int(np.clip(np.searchsorted(ts, t, side="right") - 1, 0, len(ts) - 2))
-        p0, p1, p2, p3 = vals[max(j - 1, 0)], vals[j], vals[j + 1], vals[min(j + 2, len(ts) - 1)]
         u = (t - ts[j]) / (ts[j + 1] - ts[j])
-        return 0.5 * ((2 * p1) + (-p0 + p2) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u + (-p0 + 3 * p1 - 3 * p2 + p3) * u**3)
+        return vals[j] + (vals[j + 1] - vals[j]) * ease(u, EASE.get(int(ts[j]), "io"))
 
     out = np.zeros((N, 17))
     for i in range(N):
@@ -167,6 +177,12 @@ def keyed_angles() -> np.ndarray:
         out[i] = at(t)
         out[i, 6:8] = at(t - LAG["head"])[6:8]
         out[i, 8:12] = at(t - LAG["arms"])[8:12]
+        for t0, amp in SHAKES.items():   # impact stop: a short decaying shake of the whole body
+            if t0 <= t <= t0 + 5:
+                k = (1.0 - (t - t0) / 6.0) * amp
+                out[i, 2] += k * math.sin((t - t0) * 4.1)
+                out[i, 5] += 0.8 * k * math.sin((t - t0) * 5.3 + 0.7)
+                out[i, 3] += 0.6 * k * math.sin((t - t0) * 3.7)
         if 57 <= t <= 64:   # the charge: the whole body vibrates, harder as it fills
             k = (t - 56) / 8.0
             out[i, 2] += 2.6 * k * math.sin(t * 2.7)

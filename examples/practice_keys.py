@@ -86,3 +86,19 @@ KEYS: dict[int, dict] = {
     192: dict(ry=-528, rx=360, T_rx=-2, RA_rx=22, RA_rz=8, LA_rx=26, LA_rz=-8, RL_rz=12, LL_rz=-12),
     196: dict(ry=-528, rx=360, RA_rx=24, RA_rz=8, LA_rx=26, LA_rz=-8, RL_rz=12, LL_rz=-12),
 }
+
+# Easing of the segment that *leaves* each key (what the Animation Editor calls EasingStyle/Direction, set per keyframe):
+#   "in"  slow then fast  - into a strike, a take-off, a fall: the energy builds, the release is much quicker than the charge
+#   "out" fast then slow  - out of a strike, a landing, a skid: a sudden stop, the limbs settle
+#   "io"  both            - transitions between poses (default)
+#   "lin" constant speed  - a spin or a roll
+#   "hold" the pose is kept until the next key (stillness before the release)
+EASE: dict[int, str] = {
+    53: "in", 56: "io", 60: "io", 63: "out", 65: "in", 68: "lin", 72: "lin", 76: "lin", 79: "out", 82: "io", 85: "in", 88: "out", 91: "out", 94: "io",
+    97: "out", 100: "io", 103: "hold", 106: "in", 108: "out", 110: "io", 114: "io", 118: "io", 121: "in", 124: "out", 128: "io", 131: "in", 134: "in",
+    137: "out", 141: "io", 144: "io", 147: "in", 150: "out", 153: "io", 156: "out", 160: "io", 164: "lin", 168: "lin", 172: "out", 176: "io", 180: "io", 184: "io", 188: "io",
+}
+
+# Impact stops: the whole body shakes for a few images right after the throw (108) and the slam (137), decaying (amplitude in degrees)
+SHAKES = {108: 4.0, 137: 5.0}
+
