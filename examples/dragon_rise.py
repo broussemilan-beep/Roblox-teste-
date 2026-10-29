@@ -14,6 +14,7 @@ Time: ``tau`` is the animation clock, ``f`` the film image.  Both bodies are fro
 from __future__ import annotations
 
 import math
+import os
 from pathlib import Path
 
 import numpy as np
@@ -33,9 +34,10 @@ HIT1, HIT2 = 48, 78             # animation clock of the uppercut and of the axe
 G_AIR = 0.055                   # gravity of the anime world, studs per image^2
 LIB = Path(__file__).resolve().parent.parent / "docs" / "research" / "mocap-r6" / "clips.npz"
 
-HERO_COLORS = {"Torso": "#d9552b", "Head": "#f1c27d", "Right Arm": "#f1c27d", "Left Arm": "#f1c27d", "Right Leg": "#22252c", "Left Leg": "#22252c"}
-DUMMY_COLORS = {p: "#9aa4b5" for p in ("Torso", "Head", "Right Arm", "Left Arm", "Right Leg", "Left Leg")}
-DUMMY_COLORS["Torso"] = "#b9c2d3"
+HERO_Z = -1.5                   # the hero walks on this line; his near arm (+z) reaches the dummy's centre line
+HERO_COLORS = {"Torso": "#e2582a", "Head": "#f2c48a", "Right Arm": "#f2c48a", "Left Arm": "#f2c48a", "Right Leg": "#1c1f27", "Left Leg": "#1c1f27"}
+DUMMY_COLORS = {p: "#f3eee2" for p in ("Torso", "Head", "Right Arm", "Left Arm", "Right Leg", "Left Leg")}
+DUMMY_COLORS.update({"Torso": "#fbf7ee", "Head": "#e4dcc6", "Right Leg": "#d9d1bb", "Left Leg": "#d9d1bb"})
 
 # --------------------------------------------------------------------------------------------------------------------------------------------------------------
 # the two clocks
@@ -100,100 +102,128 @@ def plan_x(tau: float) -> float:
     return float(np.interp(tau, [p[0] for p in PLAN_X], [p[1] for p in PLAN_X]))
 
 
-def hero_track():
-    lib = mocap.load_library(LIB)
-    follow = np.array([[plan_x(t), -0.9] for t in range(M)])
-    A = [
-        dict(clip="144_20", t0=3.0, t1=3.8, n=24, yaw=-90),          # 0-24   guard, a little breathing
-        dict(clip="144_20", t0=8.7, t1=9.1, n=6),                    # 24-30  the load: sink
-        dict(clip="49_04", t0=0.3, t1=1.0, n=14),                    # 30-44  the dash
-        dict(clip="144_20", t0=2.0, t1=2.5, n=8),                    # 44-52  punch base (the arm is replaced below)
-    ]
-    aa, axz, aair = mocap.assemble(A, lib, follow=follow[:52], start_xz=(-8.0, -0.9))
-    Bsp = [
-        dict(clip="144_20", t0=8.8, t1=9.3, n=6, yaw=-90),           # 88-94  landing crouch
-        dict(clip="144_20", t0=3.0, t1=4.2, n=22),                   # 94-116 rise to the guard
-        dict(clip="07_01", t0=0.3, t1=2.3, n=28),                    # 116-144 walk away
-    ]
-    ba, bxz, bair = mocap.assemble(Bsp, lib, follow=follow[88:], start_xz=(float(follow[88][0]), -0.9))
-    return aa, axz, aair, ba, bxz, bair
-
-
-def author_keys():
-    """The aerial fight, pose by pose (animation clock 52..87).  Angles in degrees, slides = piston push-back in studs."""
-    base = dict(ry=-90, rx=0, rz=0, T_rx=0, T_ry=0, T_rz=0, H_rx=0, H_ry=0, RA_rx=0, RA_rz=8, LA_rx=0, LA_rz=-8, RL_rx=0, RL_rz=4, LL_rx=0, LL_rz=-4, RA_slide=0, LA_slide=0, RL_slide=0, LL_slide=0)
-    keys = {
-        51: dict(rx=-18, T_rx=-10, RA_rx=170, RA_rz=10, LA_rx=-50, LA_rz=-15, RL_rx=-35, RL_rz=6, LL_rx=40, LL_rz=-6, RL_slide=0.5, LL_slide=0.4),    # the uppercut's follow-through
-        54: dict(rx=-28, T_rx=-14, RA_rx=120, RA_rz=14, LA_rx=-20, LA_rz=-20, RL_rx=45, RL_rz=8, LL_rx=45, LL_rz=-8, RL_slide=1.3, LL_slide=1.3),      # gather: a deep squat before the jump
-        57: dict(rx=-6, T_rx=0, RA_rx=165, RA_rz=14, LA_rx=160, LA_rz=-14, RL_rx=-8, RL_rz=5, LL_rx=-10, LL_rz=-5),                                     # the take-off: stretch, arms up
-        62: dict(rx=4, T_rx=0, RA_rx=130, RA_rz=40, LA_rx=120, LA_rz=-40, RL_rx=60, RL_rz=6, LL_rx=-25, LL_rz=-8, RL_slide=0.5),                        # rising, the right knee comes up
-        68: dict(rx=16, T_rx=6, RA_rx=40, RA_rz=70, LA_rx=20, LA_rz=-70, RL_rx=130, RL_rz=6, LL_rx=-20, LL_rz=-6),                                      # leaning back, the leg is cocked
-        72: dict(rx=30, T_rx=10, H_rx=10, RA_rx=-30, RA_rz=60, LA_rx=-40, LA_rz=-50, RL_rx=172, RL_rz=4, LL_rx=-15, LL_rz=-5),                          # the apex: leg straight up, held
-        75: dict(rx=32, T_rx=10, H_rx=12, RA_rx=-34, RA_rz=62, LA_rx=-44, LA_rz=-52, RL_rx=176, RL_rz=4, LL_rx=-14, LL_rz=-5),                          # a breath at the top
-        77: dict(rx=6, T_rx=-6, RA_rx=30, RA_rz=44, LA_rx=40, LA_rz=-44, RL_rx=100, RL_rz=4, LL_rx=-10, LL_rz=-6),                                      # the leg drops
-        78: dict(rx=-32, T_rx=-24, H_rx=-12, RA_rx=70, RA_rz=30, LA_rx=80, LA_rz=-30, RL_rx=18, RL_rz=3, LL_rx=-12, LL_rz=-6),                          # CONTACT: the heel lands, the body folds over it
-        81: dict(rx=-36, T_rx=-20, RA_rx=60, RA_rz=36, LA_rx=70, LA_rz=-36, RL_rx=-6, RL_rz=3, LL_rx=-5, LL_rz=-6),                                     # through
-        85: dict(rx=-20, T_rx=-10, RA_rx=20, RA_rz=60, LA_rx=30, LA_rz=-60, RL_rx=12, RL_rz=6, LL_rx=18, LL_rz=-6),                                     # falling, arms out
-        88: dict(rx=-28, T_rx=-20, RA_rx=70, RA_rz=18, LA_rx=60, LA_rz=-18, RL_rx=30, RL_rz=8, LL_rx=26, LL_rz=-8, RL_slide=1.5, LL_slide=1.4),        # the landing squat
-    }
-    ease = {51: "io", 54: "in", 57: "out", 62: "io", 68: "io", 72: "hold", 75: "in", 77: "in", 78: "back", 81: "io", 85: "in"}
-    return base, keys, ease
-
-
+BASE = dict(ry=-90, rx=0, rz=0, T_rx=0, T_ry=0, T_rz=0, H_rx=0, H_ry=0, RA_rx=0, RA_rz=8, LA_rx=0, LA_rz=-8, RL_rx=0, RL_rz=4, LL_rx=0, LL_rz=-4,
+            RA_slide=0, LA_slide=0, RL_slide=0, LL_slide=0)
 NAMES20 = mocap.NAMES20
 
+# Everything is written for a SIDE view (the lens is on the +z side, the hero runs to +x): what reads there is the forward / back swing of limbs and the lean of the body.
+# The near arm (right, +z) is the striking arm; it is kept low and back until it swings, so it never hides his face and chest.
+GROUND_KEYS = {
+    0: dict(rx=-6, T_rx=-4, H_rx=2, RA_rx=-68, RA_rz=6, LA_rx=78, LA_rz=-10, RA_slide=0.4, LA_slide=0.9, RL_rx=-28, RL_rz=4, LL_rx=26, LL_rz=-4, RL_slide=0.35, LL_slide=0.45),     # guard: the far fist up by the chin, the near arm cocked back, feet apart
+    12: dict(rx=-10, T_rx=-6, H_rx=3, RA_rx=-72, RA_rz=6, LA_rx=84, LA_rz=-10, RA_slide=0.4, LA_slide=0.9, RL_rx=-30, RL_rz=4, LL_rx=28, LL_rz=-4, RL_slide=0.55, LL_slide=0.65),  # breathing in: a little lower
+    22: dict(rx=-8, T_rx=-5, H_rx=2, RA_rx=-70, RA_rz=6, LA_rx=80, LA_rz=-10, RA_slide=0.4, LA_slide=0.9, RL_rx=-29, RL_rz=4, LL_rx=27, LL_rz=-4, RL_slide=0.45, LL_slide=0.55),
+    29: dict(rx=-26, T_rx=-14, H_rx=8, RA_rx=-92, RA_rz=8, LA_rx=36, LA_rz=-12, RA_slide=0.1, LA_slide=0.7, RL_rx=-55, RL_rz=4, LL_rx=48, LL_rz=-4, RL_slide=1.3, LL_slide=1.3),       # the load: a deep sink, the arms thrown back
+}
+GROUND_EASE = {0: "io", 12: "io", 22: "in", 29: "hold"}
+STRIKE_KEYS = {
+    44: dict(rx=-16, T_rx=-8, H_rx=6, RA_rx=-96, RA_rz=8, LA_rx=58, LA_rz=-12, RA_slide=0.0, LA_slide=0.9, RL_rx=-42, RL_rz=4, LL_rx=44, LL_rz=-4, RL_slide=0.7, LL_slide=0.8),        # wind-up: the arm hauled back and low, the hips dropped
+    46: dict(rx=-20, T_rx=-10, H_rx=4, RA_rx=-18, RA_rz=8, LA_rx=40, LA_rz=-12, RA_slide=0.1, LA_slide=0.9, RL_rx=-46, RL_rz=4, LL_rx=48, LL_rz=-4, RL_slide=1.2, LL_slide=1.2),       # the arm sweeps through low
+    47: dict(rx=-6, T_rx=0, H_rx=0, RA_rx=84, RA_rz=8, LA_rx=-10, LA_rz=-12, RA_slide=0.2, LA_slide=0.5, RL_rx=-38, RL_rz=4, LL_rx=52, LL_rz=-4, RL_slide=0.7, LL_slide=1.0),
+    48: dict(rx=4, T_rx=8, H_rx=-6, RA_rx=128, RA_rz=8, LA_rx=-46, LA_rz=-12, RA_slide=0.0, LA_slide=0.2, RL_rx=-32, RL_rz=4, LL_rx=54, LL_rz=-4, RL_slide=0.3, LL_slide=0.8),           # CONTACT: the fist is up and forward, the body is stretched, the back foot driving
+    51: dict(rx=8, T_rx=10, H_rx=-6, RA_rx=172, RA_rz=8, LA_rx=-60, LA_rz=-14, RA_slide=0.0, LA_slide=0.0, RL_rx=-24, RL_rz=4, LL_rx=40, LL_rz=-4, RL_slide=0.2, LL_slide=0.5),       # follow-through, held
+}
+STRIKE_EASE = {44: "in", 46: "in", 47: "in", 48: "out", 51: "io"}
+LAND_KEYS = {
+    88: dict(rx=-30, T_rx=-20, RA_rx=70, RA_rz=18, LA_rx=60, LA_rz=-18, RL_rx=30, RL_rz=8, LL_rx=26, LL_rz=-8, RL_slide=1.5, LL_slide=1.4),        # the touchdown squat
+    92: dict(rx=-38, T_rx=-24, RA_rx=42, RA_rz=22, LA_rx=30, LA_rz=-22, RL_rx=34, RL_rz=8, LL_rx=30, LL_rz=-8, RL_slide=1.65, LL_slide=1.55),      # absorbing
+    98: dict(rx=-16, T_rx=-8, RA_rx=14, RA_rz=14, LA_rx=6, LA_rz=-14, RL_rx=12, RL_rz=6, LL_rx=10, LL_rz=-6, RL_slide=0.8, LL_slide=0.8),            # rising
+    105: dict(rx=0, T_rx=0, RA_rx=-6, RA_rz=8, LA_rx=6, LA_rz=-8, RL_rx=0, RL_rz=4, LL_rx=0, LL_rz=-4),                                              # upright, the arms hang
+}
+LAND_EASE = {88: "out", 92: "io", 98: "io"}
 
-def authored(tau0: int, tau1: int) -> np.ndarray:
-    base, keys, ease = author_keys()
+
+def authored_from(keys: dict, ease: dict, t0: int, t1: int) -> np.ndarray:
+    """Interpolate the 20 angles between keys (a key only has to say what changes: the rest is carried forward from the previous key)."""
     ks = sorted(keys)
-    full = {k: {**base, **keys[k]} for k in ks}
-    # carry the unspecified values forward so a key only has to say what changes
-    prev = dict(base)
+    full, prev = {}, dict(BASE)
     for k in ks:
         d = dict(prev)
         d.update(keys[k])
         full[k] = d
         prev = d
-    out = np.zeros((tau1 - tau0 + 1, 20))
-    for i, t in enumerate(range(tau0, tau1 + 1)):
+    out = np.zeros((t1 - t0 + 1, 20))
+    for i, t in enumerate(range(t0, t1 + 1)):
         j = max(0, min(len(ks) - 2, int(np.searchsorted(ks, t, side="right")) - 1))
         a, b = ks[j], ks[j + 1]
-        u = ease_fn(ease.get(a, "io"), (t - a) / (b - a))
+        u = ease_fn(ease.get(a, "io"), (t - a) / (b - a)) if b > a else 0.0
         for c, n in enumerate(NAMES20):
             out[i, c] = full[a][n] + (full[b][n] - full[a][n]) * u
     return out
 
 
+def hero_track():
+    """Mocap only where a human does the work better than I can draw it: the run (dash) and the walk away."""
+    lib = mocap.load_library(LIB)
+    dash, dxz, dair = mocap.assemble([dict(clip="49_04", t0=0.3, t1=1.0, n=14, yaw=-90)], lib, follow=np.array([[plan_x(30 + t), HERO_Z] for t in range(14)]),
+                                      start_xz=(plan_x(30), HERO_Z))
+    walk, wxz, wair = mocap.assemble([dict(clip="07_01", t0=0.3, t1=1.9, n=38, yaw=-90)], lib, follow=np.array([[plan_x(106 + t), HERO_Z] for t in range(38)]),
+                                      start_xz=(plan_x(106), HERO_Z))
+    return dash, dxz, dair, walk, wxz, wair
+
+
+def author_keys():
+    """The aerial fight, pose by pose (animation clock 52..87)."""
+    keys = {
+        51: dict(rx=8, T_rx=10, RA_rx=172, RA_rz=8, LA_rx=-60, LA_rz=-14, RL_rx=-24, RL_rz=4, LL_rx=40, LL_rz=-4, RL_slide=0.2, LL_slide=0.5),                        # the uppercut's follow-through
+        54: dict(rx=-30, T_rx=-16, RA_rx=-64, RA_rz=10, LA_rx=-48, LA_rz=-12, RL_rx=45, RL_rz=8, LL_rx=45, LL_rz=-8, RL_slide=1.4, LL_slide=1.4),                   # gather: a deep squat, the arms thrown back
+        57: dict(rx=-4, T_rx=0, RA_rx=165, RA_rz=14, LA_rx=160, LA_rz=-14, RL_rx=-6, RL_rz=5, LL_rx=-8, LL_rz=-5, RL_slide=0.0, LL_slide=0.0),                       # the take-off: stretched, arms up
+        62: dict(rx=6, T_rx=0, RA_rx=125, RA_rz=22, LA_rx=110, LA_rz=-22, RL_rx=70, RL_rz=6, LL_rx=-28, LL_rz=-8, RL_slide=0.9, LL_slide=0.5),                      # rising, the right knee comes up
+        68: dict(rx=18, T_rx=6, RA_rx=-55, RA_rz=14, LA_rx=140, LA_rz=-14, RL_rx=118, RL_rz=6, LL_rx=-26, LL_rz=-6, RL_slide=0.4, LL_slide=0.2),                    # leaning back, the leg is cocked, the arms opposed
+        72: dict(rx=32, T_rx=10, H_rx=10, RA_rx=-62, RA_rz=14, LA_rx=146, LA_rz=-14, RL_rx=172, RL_rz=4, LL_rx=-20, LL_rz=-5, RL_slide=0.0, LL_slide=0.0),          # the apex: the leg straight up, held
+        75: dict(rx=34, T_rx=10, H_rx=12, RA_rx=-66, RA_rz=14, LA_rx=150, LA_rz=-14, RL_rx=176, RL_rz=4, LL_rx=-22, LL_rz=-5),                                       # a breath at the top
+        77: dict(rx=6, T_rx=-6, RA_rx=-20, RA_rz=14, LA_rx=100, LA_rz=-14, RL_rx=100, RL_rz=4, LL_rx=-12, LL_rz=-6),                                                 # the leg drops
+        78: dict(rx=-6, T_rx=-6, H_rx=-6, RA_rx=70, RA_rz=14, LA_rx=-30, LA_rz=-14, RL_rx=44, RL_rz=3, LL_rx=-16, LL_rz=-6),                                      # CONTACT: the heel lands, the body folds over it
+        81: dict(rx=-14, T_rx=-10, RA_rx=84, RA_rz=18, LA_rx=-40, LA_rz=-18, RL_rx=20, RL_rz=3, LL_rx=-10, LL_rz=-6),                                                # through
+        85: dict(rx=-20, T_rx=-10, RA_rx=30, RA_rz=44, LA_rx=40, LA_rz=-44, RL_rx=14, RL_rz=6, LL_rx=22, LL_rz=-6),                                                 # falling, arms out for balance
+    }
+    ease = {51: "io", 54: "in", 57: "out", 62: "io", 68: "io", 72: "hold", 75: "in", 77: "in", 78: "back", 81: "io", 85: "in"}
+    return BASE, keys, ease
+
+
+def authored(tau0: int, tau1: int) -> np.ndarray:
+    _, keys, ease = author_keys()
+    # the landing key 88 closes the aerial span so that the last frames fall into the squat
+    keys = {**keys, 88: LAND_KEYS[88]}
+    return authored_from(keys, {**ease, 85: "in"}, tau0, tau1)
+
+
 def hero_angles():
     """The hero's 20 angles, his planar path and his height over the whole animation clock."""
-    aa, axz, aair, ba, bxz, bair = hero_track()
+    dash, dxz, dair, walk, wxz, wair = hero_track()
+    # 0-29 the guard and the load (written), 30-43 the dash (capture), 44-51 the uppercut (written), 52-87 the aerial fight (written), 88-105 landing and rising (written), 106-143 the walk (capture)
+    g = authored_from(GROUND_KEYS, GROUND_EASE, 0, 29)
+    st = authored_from(STRIKE_KEYS, STRIKE_EASE, 44, 51)
     mid = authored(52, 87)
-    n_mid = len(mid)
-    # path and height of the aerial part: a flight of my own (ballistic: up to the apex at 72, then pulled down by the kick)
-    mx = np.array([plan_x(t) for t in range(52, 88)])
-    mz = np.full(n_mid, -0.9)
-    air_mid = np.zeros(n_mid)
-    for i, t in enumerate(range(52, 88)):
-        if t < 55:
-            air_mid[i] = 0.0
-        elif t <= 72:
-            u = (t - 55) / 17.0
-            air_mid[i] = 8.6 * (1 - (1 - u) ** 2)                       # up, decelerating
-        elif t <= 78:
-            air_mid[i] = 8.6 - 0.9 * ((t - 72) / 6.0) ** 2
-        else:
-            u = (t - 78) / 9.0
-            air_mid[i] = (8.6 - 0.9) * (1 - u ** 1.8)                   # the kick drives him down
-    air_mid = np.clip(air_mid, 0, None)
-    # splice the three parts; the wrapping angles are put on the branch nearest to the previous part, then cross-fade 3 images over each join
-    parts = [aa.copy(), mid.copy(), ba.copy()]
-    for k in (1, 2):
+    ld = authored_from(LAND_KEYS, LAND_EASE, 88, 105)
+    seg = {"g": g, "dash": dash, "st": st, "mid": mid, "ld": ld, "walk": walk}
+    parts = [g, dash, st, mid, ld, walk]
+    # breathing in the guard
+    for i in range(len(g)):
+        g[i, 1] += 1.2 * math.sin(i * 0.5)
+    for k in range(1, len(parts)):
         for c in range(0, 16):
             parts[k][:, c] += 360.0 * np.round((parts[k - 1][-1, c] - parts[k][0, c]) / 360.0)
     ang = np.vstack(parts)
-    xz = np.vstack([axz, np.stack([mx, mz], 1), bxz])
-    air = np.concatenate([aair, air_mid, bair])
-    for j in (52, 88):
+    assert len(ang) == M, (len(ang), M)
+    xz = np.array([[plan_x(t), HERO_Z] for t in range(M)])
+    xz[30:44] = dxz
+    xz[106:] = wxz
+    air = np.zeros(M)
+    air[30:44] = dair
+    air[106:] = wair
+    for t in range(52, 88):          # a flight of my own: up to the apex at 72, then pulled down by the kick
+        if t < 55:
+            air[t] = 0.0
+        elif t <= 72:
+            u = (t - 55) / 17.0
+            air[t] = 8.6 * (1 - (1 - u) ** 2)
+        elif t <= 78:
+            air[t] = 8.6 - 0.9 * ((t - 72) / 6.0) ** 2
+        else:
+            u = (t - 78) / 9.0
+            air[t] = (8.6 - 0.9) * (1 - u ** 1.8)
+    # cross-fade 3 images over each join so that nothing pops
+    for j in (30, 44, 52, 88, 106):
         prev = ang[j - 1].copy()
         for i in range(3):
             w = (i + 1) / 4.0
@@ -204,11 +234,11 @@ def hero_angles():
 # --------------------------------------------------------------------------------------------------------------------------------------------------------------
 # the dummy: a ballistic flight solved to pass through the fist and then the heel
 
-def dummy_motion(fist: np.ndarray, heel: np.ndarray):
+def dummy_motion(fist: np.ndarray, heel: np.ndarray, hero_x48: float):
     """Positions (x, torso height, z) and the 16 angles of the dummy over the animation clock."""
     pos = np.zeros((M, 3))
     ang = np.zeros((M, 16))
-    x0 = fist[0] + 0.55
+    x0 = hero_x48 + 1.95
     base = np.array([x0, 3.0, fist[2] - 0.15])
     pos[:] = base
     p0 = np.array([x0, max(fist[1], 3.0), base[2]])
@@ -294,54 +324,114 @@ def key_dummy(dummy: Character, pos: np.ndarray, ang: np.ndarray):
           RA=P((a[8], 0, a[9])), LA=P((a[10], 0, a[11])), RL=P((a[12], 0, a[13])), LL=P((a[14], 0, a[15])))
 
 
+def orbit_pos(tgt, yaw: float, el: float, dist: float):
+    """Lens position ``dist`` studs from ``tgt``: yaw 0 = on the +z side, positive yaw swings it toward +x (in front of the hero), elevation in degrees."""
+    y, e = math.radians(yaw), math.radians(el)
+    return (tgt[0] + dist * math.sin(y) * math.cos(e), tgt[1] + dist * math.sin(e), tgt[2] + dist * math.cos(y) * math.cos(e))
+
+
+def dress(cine: Cinematic):
+    """The arena: a back wall with pillars and steps, far towers in the haze, broken blocks near the ring for scale (static boxes)."""
+    stone, dark, warm = "#98a3b7", "#626e86", "#aab5c8"
+    cine.prop((0, 3.0, -24), (70, 6.0, 2.4), stone)
+    cine.prop((0, 6.5, -24), (70, 0.9, 3.0), dark)
+    for x in (-27, -18, -9, 0, 9, 18, 27):
+        cine.prop((x, 7.0, -21.5), (2.6, 14.0, 2.6), warm)
+        cine.prop((x, 14.4, -21.5), (3.6, 0.9, 3.6), dark)
+        cine.prop((x, 0.5, -21.5), (3.6, 1.0, 3.6), dark)
+    for i in range(4):
+        cine.prop((0, 0.35 + 0.7 * i, -17.0 + 1.1 * i), (16.0 - 2.0 * i, 0.7, 2.2), stone)
+    for k, (x, h, c) in enumerate([(-46, 26, "#8e9cba"), (-34, 38, "#8392b2"), (-18, 22, "#93a1be"), (12, 30, "#8796b6"), (30, 42, "#7a89ab"), (48, 24, "#8e9cb9")]):
+        cine.prop((x, h / 2, -70 - 6 * (k % 3)), (9 + (k % 3) * 3, h, 9), c)
+    for x, z, s_, yaw in [(-12.0, -8.5, (2.2, 1.4, 1.8), 20), (-4.0, -11.0, (1.6, 2.6, 1.6), -12), (9.5, -9.0, (2.6, 1.0, 2.0), 35), (16.0, -6.0, (1.4, 1.8, 1.4), 8), (-17.0, -3.0, (1.8, 0.9, 1.5), -25)]:
+        cine.prop((x, s_[1] / 2, z), s_, "#8995ab", yaw)
+
+
+def screen_report(cine: Cinematic, hero: Character, dummy: Character):
+    """Objective check of the shot sizes: how much of the frame height each body takes, and whether it stays in frame."""
+    rows = []
+    for f in range(0, N, 6):
+        pos, tgt, fov, roll = cine.camera_state(f)
+        fwd = np.array(tgt) - np.array(pos)
+        fwd /= np.linalg.norm(fwd)
+        right = np.cross(fwd, (0, 1, 0))
+        right /= np.linalg.norm(right)
+        up = np.cross(right, fwd)
+        out = [f]
+        for ch in (hero, dummy):
+            c = np.array(ch.world_parts(f)["Torso"][1])
+            pts = [c + np.array((0, 2.75, 0)), c + np.array((0, -2.75, 0)), c + np.array((1.6, 0, 0)), c + np.array((-1.6, 0, 0))]
+            ys, xs = [], []
+            for q in pts:
+                d = q - np.array(pos)
+                z = float(d @ fwd)
+                if z <= 0.1:
+                    ys.append(9.0); xs.append(9.0)
+                    continue
+                t = math.tan(math.radians(fov) / 2)
+                ys.append(float(d @ up) / (z * t))
+                xs.append(float(d @ right) / (z * t * 16 / 9))
+            out += [round((max(ys) - min(ys)) / 2.0, 2), round(max(abs(min(xs)), abs(max(xs))), 2), round(max(abs(min(ys)), abs(max(ys))), 2)]
+        rows.append(out)
+    return rows
+
+
 def build() -> Scene:
     ang, xz, air = hero_angles()
     hero = Character("hero", Animation("hero", fps=FPS, archetype="cinematic"), colors=HERO_COLORS)
     key_hero(hero, ang, xz, air)
     fist = np.array(hero.limb_tip("Right Arm", HIT1))                 # where the uppercut lands, film image 48
+    hero_c_x48 = float(hero.world_parts(HIT1)["Torso"][1][0])
     heel = np.array(hero.limb_tip("Right Leg", film_of(HIT2)))        # where the axe kick lands
-    pos, dang, v0, (p_g, TG) = dummy_motion(fist, heel)
+    pos, dang, v0, (p_g, TG) = dummy_motion(fist, heel, hero_c_x48)
     dummy = Character("dummy", Animation("dummy", fps=FPS, archetype="cinematic"), colors=DUMMY_COLORS)
     key_dummy(dummy, pos, dang)
 
     cine = Cinematic(N, fps=FPS)
-    cine.look = "studio"
-    cine.sky_color, cine.floor_color = "#9fb0c8", "#43464e"
+    cine.look = "arena"
+    cine.sky_color, cine.horizon_color, cine.floor_color = "#3d68b6", "#f5d2a8", "#a3a9b6"
+    dress(cine)
     f1, f2, fg = film_of(HIT1), film_of(HIT2), film_of(TG)
     hero_c = lambda f: tuple(float(v) for v in hero.world_parts(int(f))["Torso"][1])
     dum_c = lambda f: tuple(float(v) for v in dummy.world_parts(int(f))["Torso"][1])
+    mid = lambda a_, b_: tuple((u + v) / 2 for u, v in zip(a_, b_))
 
-    # ---- camera (world: the hero starts at x = -8 and meets the dummy near x = 3; both rise to about 12 studs; the lens sits on the +z side)
-    cine.shot(0, 28, dolly((-13.0, 2.2, 13.5), (-11.0, 2.6, 12.0), (-2.5, 3.0, -0.4), (-2.0, 3.0, -0.4), fov=44, easing="sine_inout"))
-    cine.shot(28, f1 - 6, tracking(hero_c, (3.0, 1.0, 12.5), look_dy=0.3, fov=(44, 38)))
-    cine.shot(f1 - 6, f1 + 4, dolly((0.5, 2.6, 12.0), (1.5, 3.0, 10.8), (3.3, 3.5, 0.0), (3.3, 3.6, 0.0), fov=(36, 30), easing="expo_out"))
-    cine.shot(f1 + 4, f2 - 5, autoframe(lambda f: [hero_c(f), dum_c(f)], f1 + 4, f2 - 5, azimuth=14, elevation=3.0, fov=40.0, fill=0.75, min_radius=5.0, follow=0.18, lift=0.0))
-    cine.shot(f2 - 5, f2 + 8, dolly((11.0, 7.5, 17.0), (10.0, 8.0, 15.0), (4.8, 8.0, 0.0), (4.8, 7.4, 0.0), fov=(40, 34), easing="expo_out"))
-    cine.shot(f2 + 8, fg + 4, dolly((11.0, 6.0, 16.5), (12.5, 2.4, 14.0), (5.3, 4.0, 0.0), (5.9, 1.3, 0.0), fov=(38, 38), roll=(0.0, -2.5), easing="expo_out"))
-    cine.shot(fg + 4, N + 1, dolly((12.5, 2.4, 14.0), (19.0, 7.0, 20.0), (5.9, 1.3, 0.0), (9.0, 2.6, 0.0), fov=(38, 44), roll=(-2.5, 0.0), easing="sine_inout"))
+    # ---- camera: fixed shot sizes, each one computed from a distance (fov and distance give the frame height: 2 d tan(fov/2)), hard cuts at the impacts
+    t0 = (-2.4, 3.0, -0.6)
+    cine.shot(0, 26, dolly(orbit_pos(t0, -14, 3, 27), orbit_pos(t0, -9, 3, 23), t0, (-2.0, 3.0, -0.6), fov=30, easing="sine_inout"))               # establishing: both in frame, hero ~45 % high
+    cine.shot(26, f1 - 8, tracking(hero_c, (6.0, 1.4, 14.5), look_dy=0.2, fov=(32, 30), offset_end=(4.6, 1.2, 12.5)))                              # the dash seen from the front quarter, he runs toward the lens' right
+    tg1 = (3.9, 3.7, -0.2)
+    cine.shot(f1 - 8, f1 + 4, dolly(orbit_pos(tg1, -10, 3, 21.0), orbit_pos(tg1, -5, 3, 17.5), tg1, (4.0, 3.9, -0.2), fov=(30, 26), easing="expo_out"))   # the hit, over the hero's shoulder, the whole hero in frame
+    cine.shot(f1 + 4, f2 - 8, autoframe(lambda f: [hero_c(f), dum_c(f)], f1 + 4, f2 - 8, azimuth=-10, elevation=6.0, fov=34.0, fill=0.8, min_radius=3.0, follow=0.45, lift=0.6, pad=1.0))
+    tg2 = (4.8, 9.0, -0.2)
+    cine.shot(f2 - 8, f2 + 6, dolly(orbit_pos(tg2, 30, -5, 21.0), orbit_pos(tg2, 24, -4, 17.5), tg2, (4.8, 8.4, -0.2), fov=(32, 28), easing="expo_out"))  # the kick, from below, hero and dummy both in frame
+    tg3 = (5.9, 2.4, -0.2)
+    cine.shot(f2 + 6, fg + 8, dolly(orbit_pos(tg3, 30, 3, 21.0), orbit_pos(tg3, 38, 3, 16.0), (5.6, 5.5, -0.2), tg3, fov=(32, 30), roll=(0.0, -2.0), easing="expo_out"))   # down with the dummy, to the floor
+    tg4 = (7.0, 2.0, -0.4)
+    cine.shot(fg + 8, N + 1, dolly(orbit_pos(tg4, 34, 3, 16.0), orbit_pos((9.5, 2.6, -0.4), 14, 12, 27.0), tg4, (9.5, 2.6, -0.4), fov=(30, 36), roll=(-2.0, 0.0), easing="sine_inout"))  # the pull-back
 
     # ---- hit 1: the uppercut
     cine.punch_in(f1, 0.13, 9)
     cine.shake(f1, 9, 0.5)
     cine.screen_fx("white", f1, 2, alpha=0.85)
     cine.screen_fx("bw", f1 + 2, 3, seed=5, accent=True, focus=(0.55, 0.5), shards=16, bright=1.6)
-    cine.ring(f1, 10, tuple(fist), 0.3, 3.4, 0.35, 0.05, "#ffffff", 0.95, 0.0, n=(1, 0, 0))
-    cine.ring(f1, 8, (fist[0], 0.1, fist[2]), 0.6, 3.6, 0.3, 0.04, "#cfe9ff", 0.8, 0.0)
+    cine.ring(f1, 10, tuple(fist), 0.3, 3.4, 0.35, 0.05, "#ffffff", 0.95, 0.0, n=(0, 0, 1))
+    cine.ring(f1, 8, (fist[0], 0.1, fist[2]), 0.6, 3.6, 0.3, 0.04, "#fff2d6", 0.8, 0.0)
     cine.burst(f1, 8, tuple(fist), 0.4, 3.0, "#ffd27a", "#ffffff")
     cine.emit(f1, f1 + 6, origin=(fist[0], 0.3, fist[2]), rate=0, burst=26, vel=(0.2, 0.5), dir=(0, 1, 0), spread=1.1, grav=0.02, life=(14, 26), size=(0.5, 0.15),
-              color=("#c9c2b2", "#8f897c"), alpha=(0.7, 0.0), add=False, shape="smoke", seed=3, radius=0.7)
-    cine.trail(f1 - 8, f1 + 5, 0, "Right Arm", (0.0, -1.0, 0.0), 8, 0.5, 0.0, "#fff4d1", 0.9)
+              color=("#d8cdb4", "#9a9078"), alpha=(0.7, 0.0), add=False, shape="smoke", seed=3, radius=0.7)
+    sh = (hero_c(f1)[0] + 0.3, hero_c(f1)[1] + 0.5, hero_c(f1)[2])
+    cine.slash(f1 - 5, 7, sh, (0, 0, 1), 3.0, -140, 20, 0.5, "#fff1c9", "#ffffff")                # the arc of the uppercut: low-back to high-front
 
     # ---- dash: dust, speed lines
     d0, d1 = film_of(30), film_of(44)
     cine.emit(d0, d1, attach={"char": 0, "part": "Right Leg", "off": [0, -1.0, 0]}, rate=2.6, vel=(0.02, 0.12), dir=(-1, 0.3, 0), spread=0.7, life=(16, 32), size=(0.9, 2.6),
-              color=("#a8a49a", "#7a766c"), alpha=(0.4, 0.0), add=False, shape="smoke", seed=2, radius=0.4)
-    cine.streaks(d0 + 2, d1 - d0, (-9.0, 2.6, -0.4), (-5.0, 3.0, -0.4), n=12, r0=0.4, r1=2.2, w=0.05, color="#ffffff", seed=4)
+              color=("#c9b998", "#9d8d6c"), alpha=(0.45, 0.0), add=False, shape="smoke", seed=2, radius=0.4)
+    cine.streaks(d0 + 2, d1 - d0, (-10.0, 2.6, HERO_Z + 0.4), (-5.0, 3.0, HERO_Z + 0.4), n=12, r0=0.4, r1=2.2, w=0.05, color="#ffffff", seed=4)
 
-    # ---- the flight: a trail on the dummy, a pull on the camera
+    # ---- the flight: a soft trail on the dummy
     cine.emit(f1 + 2, f2, attach={"char": 1, "part": "Torso", "off": [0, 0, 0]}, rate=1.6, vel=(0.01, 0.05), dir=(0, 1, 0), spread=0.9, life=(14, 24), size=(0.6, 0.15),
-              color=("#e8edf7", "#9aa4b5"), alpha=(0.35, 0.0), add=True, shape="soft", seed=6, radius=0.5)
-    cine.trail(film_of(66), f2 - 1, 0, "Right Leg", (0.0, -1.0, 0.0), 9, 0.7, 0.0, "#ff8a3a", 0.85)
+              color=("#fff3da", "#d6c39a"), alpha=(0.35, 0.0), add=True, shape="soft", seed=6, radius=0.5)
 
     # ---- hit 2: the axe kick
     cine.punch_in(f2, 0.16, 10)
@@ -350,25 +440,30 @@ def build() -> Scene:
     cine.screen_fx("bw", f2 + 1, 4, seed=9, accent=True, focus=(0.5, 0.45), shards=18, bright=1.8)
     cine.flash(f2 + 5, 3, "#ffffff", 0.5)
     hp = tuple(float(v) for v in heel)
-    cine.ring(f2, 12, hp, 0.4, 4.2, 0.4, 0.05, "#ffe2b0", 0.95, 0.0, n=(0, 1, 0))
+    cine.ring(f2, 12, hp, 0.4, 4.2, 0.4, 0.05, "#ffe2b0", 0.95, 0.0, n=(0, 0, 1))
     cine.dome(f2, 9, hp, 0.4, 3.0, "#ffd9a0", 0.55, 0.0)
-    cine.slash(f2 - 4, 7, (heel[0], heel[1] + 1.6, heel[2]), (0, 0, 1), 2.4, 160, 20, 0.55, "#ffb86b", "#ffffff")
+    cine.slash(f2 - 5, 7, (heel[0] - 0.6, heel[1] + 2.2, heel[2]), (0, 0, 1), 2.8, 150, 10, 0.55, "#ffb86b", "#ffffff")
 
     # ---- the ground: the slam
     gp = (float(p_g[0]), 0.05, float(p_g[2]))
     cine.shake(fg, 20, 1.3)
     cine.punch_in(fg, 0.2, 12)
-    cine.flash(fg, 3, "#ffffff", 0.55)
-    for k, (r1, col) in enumerate(((5.5, "#ffffff"), (8.0, "#ffd9a0"), (11.0, "#9fb0c8"))):
+    cine.flash(fg, 3, "#ffffff", 0.45)
+    for k, (r1, col) in enumerate(((5.5, "#ffffff"), (8.0, "#ffe3b0"), (11.0, "#bcd0f0"))):
         cine.ring(fg + 2 * k, 16 + 3 * k, gp, 0.5, r1, 0.5 - 0.1 * k, 0.04, col, 0.9 - 0.15 * k, 0.0)
-    cine.cracks(fg, 20, gp, 6.5, 9, "#1c1d22", glow="#ffc477", width=0.14, seed=2, fade=(60, 40))
-    cine.burst_debris(fg, gp, 38, 0.32, 0.55, (0.18, 0.5), ["#6d6f78", "#8a8d96", "#53555d"], seed=3, g=0.03)
-    cine.emit(fg, fg + 14, origin=gp, rate=0, burst=60, vel=(0.28, 0.4), dir=(0, 1, 0), spread=1.6, grav=0.01, life=(24, 50), size=(1.2, 3.4), color=("#bdb9ae", "#8a8679"),
-              alpha=(0.6, 0.0), add=False, shape="smoke", seed=5, radius=1.4)
+    cine.cracks(fg, 20, gp, 6.5, 9, "#2a241c", glow="#ffc477", width=0.1, seed=2, fade=(60, 40))
+    cine.burst_debris(fg, gp, 38, 0.32, 0.55, (0.18, 0.5), ["#7d6f58", "#96876b", "#6a5e49"], seed=3, g=0.03)
+    cine.emit(fg, fg + 14, origin=gp, rate=0, burst=44, vel=(0.26, 0.4), dir=(0, 1, 0), spread=1.6, grav=0.01, life=(22, 44), size=(1.0, 2.8), color=("#d9ccb0", "#a39878"),
+              alpha=(0.42, 0.0), add=False, shape="smoke", seed=5, radius=1.4)
 
     # ---- the landing, the walk away
     l0 = film_of(88)
-    cine.emit(l0, l0 + 8, attach={"char": 0, "part": "Right Leg", "off": [0, -1.0, 0]}, rate=0, burst=26, vel=(0.2, 0.2), dir=(0, 1, 0), spread=1.4, life=(16, 30), size=(0.8, 2.0),
-              color=("#a8a49a", "#7a766c"), alpha=(0.45, 0.0), add=False, shape="smoke", seed=8, radius=0.8)
-    cine.vignette.key(0, 0.15).key(f1, 0.15).key(f1 + 2, 0.4).key(f1 + 14, 0.15).key(N, 0.25)
-    return Scene("Dragon montant", [hero, dummy], fps=FPS, cine=cine)
+    cine.emit(l0, l0 + 8, attach={"char": 0, "part": "Right Leg", "off": [0, -1.0, 0]}, rate=0, burst=24, vel=(0.2, 0.2), dir=(0, 1, 0), spread=1.4, life=(16, 30), size=(0.8, 2.0),
+              color=("#c9b998", "#9d8d6c"), alpha=(0.4, 0.0), add=False, shape="smoke", seed=8, radius=0.8)
+    cine.vignette.key(0, 0.18).key(f1, 0.18).key(f1 + 2, 0.4).key(f1 + 14, 0.18).key(N, 0.28)
+    if os.environ.get("DR_POSELAB"):     # pose lab: only the hero, big, in profile, to judge his poses
+        cine.shots = []
+        cine.shot(0, N + 1, tracking(hero_c, (1.5, 1.2, 15.0), look_dy=0.2, fov=30))
+    scene = Scene("Dragon montant", [hero, dummy], fps=FPS, cine=cine)
+    scene.report = screen_report(cine, hero, dummy)
+    return scene

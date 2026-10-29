@@ -200,9 +200,10 @@ class Cinematic:
     tint_color: str = "#ff5a1f"
     floor_color: str = "#d8dce3"
     sky_color: str = "#c9d3e3"
+    horizon_color: str | None = None  # warm band at the horizon (look "arena")
     seed: int = 7
     sheets: dict = field(default_factory=dict)
-    look: str = "film"  # "film" (grid floor, dark) | "studio" (the Roblox Studio viewport: plain grey baseplate, light haze)
+    look: str = "film"  # "film" (grid floor, dark) | "studio" (the Roblox Studio viewport: plain grey baseplate, light haze) | "arena" (warm stone tiles, graded sky, depth of field)
     aspect: float = 16 / 9  # picture aspect ratio (width / height) of the film camera, e.g. 2.45 for the study reel
 
     # --- camera
@@ -487,5 +488,5 @@ class Cinematic:
                 "tint": [round(self.tint.at(f), 3) for f in rng],
                 "tintColor": self.tint_color, "flashes": self.flashes, "fx": self.screenfx,
             },
-            "floorColor": self.floor_color, "skyColor": self.sky_color, "look": self.look, "sheets": self.sheets, "aspect": round(self.aspect, 4),
+            "floorColor": self.floor_color, "skyColor": self.sky_color, "horizonColor": self.horizon_color, "look": self.look, "sheets": self.sheets, "aspect": round(self.aspect, 4),
         }
