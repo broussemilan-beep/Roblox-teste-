@@ -171,7 +171,7 @@ def _limb_angles(d: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 def retarget(b: Bvh, pos: np.ndarray, rot: np.ndarray, leg_scale: float | None = None, name: str = "") -> Clip:
     ix = {n: i for i, n in enumerate(b.names)}
     P = pos @ _K.T                                                # engine world
-    Rm = np.einsum("ij,fnjk->fnik", _K, rot)                        # world rotation of every joint, engine world
+    Rm = np.einsum("ij,fnjk,lk->fnil", _K, rot, _K)                 # world rotation of every joint, engine world (conjugated by the half turn)
     hips = (P[:, ix["LeftUpLeg"]] + P[:, ix["RightUpLeg"]]) / 2
     up = _unit(P[:, ix["Neck"]] - hips)
     lat = _unit(P[:, ix["RightArm"]] - P[:, ix["LeftArm"]])
@@ -187,8 +187,20 @@ def retarget(b: Bvh, pos: np.ndarray, rot: np.ndarray, leg_scale: float | None =
     s = (2.0 / leg_len) if leg_scale is None else leg_scale      # horizontal scale that keeps an R6 foot planted when the human foot is planted
     ra_rx, ra_rz = _limb_angles(loc(P[:, ix["RightHand"]] - P[:, ix["RightArm"]]))
     la_rx, la_rz = _limb_angles(loc(P[:, ix["LeftHand"]] - P[:, ix["LeftArm"]]))
-    rl_rx, rl_rz = _limb_angles(loc(P[:, ix["RightFoot"]] - P[:, ix["RightUpLeg"]]))
-    ll_rx, ll_rz = _limb_angles(loc(P[:, ix["LeftFoot"]] - P[:, ix["LeftUpLeg"]]))
+    def leg(side: str) -> np.ndarray:
+        """R6 legs cannot bend: keep the height the human hip really has above the ankle by tilting the rigid leg more (a crouch becomes a splayed stance)."""
+        hip, knee, ank = P[:, ix[side + "UpLeg"]], P[:, ix[side + "Leg"]], P[:, ix[side + "Foot"]]
+        drop = (hip[:, 1] - ank[:, 1]) * s                                    # vertical drop hip -> ankle, in studs
+        cos_t = np.clip(drop / 2.0, -1.0, 1.0)
+        sin_t = np.sqrt(1.0 - cos_t ** 2)
+        h = (ank - hip)[:, [0, 2]] + 0.6 * (knee - hip)[:, [0, 2]]            # which way the leg leans: the foot, and where the knee points
+        hn = np.linalg.norm(h, axis=1, keepdims=True)
+        fwd_h = -back[:, [0, 2]]
+        h = np.where(hn > 1e-6, h / np.maximum(hn, 1e-9), fwd_h / np.maximum(np.linalg.norm(fwd_h, axis=1, keepdims=True), 1e-9))
+        return np.stack([sin_t * h[:, 0], -cos_t, sin_t * h[:, 1]], 1)
+
+    rl_rx, rl_rz = _limb_angles(loc(leg("Right")))
+    ll_rx, ll_rz = _limb_angles(loc(leg("Left")))
     # head: its own forward (CMU +Z at rest -> engine -Z) and up, in torso-local coordinates
     Rh = Rm[:, ix["Head"]]
     f_loc = loc(np.einsum("fij,j->fi", Rh, np.array([0.0, 0.0, -1.0])))
