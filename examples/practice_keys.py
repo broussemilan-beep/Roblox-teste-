@@ -21,7 +21,7 @@ from __future__ import annotations
 NAMES = ["ry", "rx", "rz", "T_rx", "T_ry", "T_rz", "H_rx", "H_ry", "RA_rx", "RA_rz", "LA_rx", "LA_rz", "RL_rx", "RL_rz", "LL_rx", "LL_rz"]
 
 # seconds-of-animator-sense: the head trails the torso by 1 image, the arms by 2, the legs lead
-LAG = {"head": 1.0, "arms": 2.0, "legs": 0.0}
+LAG = {"head": 2.0, "arms": 2.0, "legs": 0.0}   # tutorials: arms and head drag 2-5 images (60 fps) behind the torso
 
 GUARD = dict(RA_rx=80, RA_rz=8, LA_rx=80, LA_rz=-8, RL_rz=8, LL_rz=-8)   # arms pointing at the camera (hands up by the shoulders), feet wide and parallel
 
@@ -94,11 +94,16 @@ KEYS: dict[int, dict] = {
 #   "lin" constant speed  - a spin or a roll
 #   "hold" the pose is kept until the next key (stillness before the release)
 EASE: dict[int, str] = {
-    53: "in", 56: "io", 60: "io", 63: "out", 65: "in", 68: "lin", 72: "lin", 76: "lin", 79: "out", 82: "io", 85: "in", 88: "out", 91: "out", 94: "io",
-    97: "out", 100: "io", 103: "hold", 106: "in", 108: "out", 110: "io", 114: "io", 118: "io", 121: "in", 124: "out", 128: "io", 131: "in", 134: "in",
-    137: "out", 141: "io", 144: "io", 147: "in", 150: "out", 153: "io", 156: "out", 160: "io", 164: "lin", 168: "lin", 172: "out", 176: "io", 180: "io", 184: "io", 188: "io",
+    53: "in", 56: "io", 60: "io", 63: "out", 65: "in", 68: "lin", 72: "lin", 76: "lin", 79: "out", 82: "back", 85: "in", 88: "out", 91: "out", 94: "io",
+    97: "out", 100: "io", 103: "hold", 106: "in", 108: "back", 110: "io", 114: "io", 118: "io", 121: "in", 124: "out", 128: "io", 131: "in", 134: "in",
+    137: "back", 141: "io", 144: "io", 147: "in", 150: "out", 153: "io", 156: "out", 160: "io", 164: "lin", 168: "lin", 172: "out", 176: "io", 180: "io", 184: "io", 188: "io",
 }
 
 # Impact stops: the whole body shakes for a few images right after the throw (108) and the slam (137), decaying (amplitude in degrees)
 SHAKES = {108: 4.0, 137: 5.0}
+
+# Hit-stop (tutorials: freeze the impact pose 2-4 images and add a tiny torso twist so the tension vibrates): frame -> number of frozen images.
+# The pose clock then catches up over ``HITSTOP_CATCHUP`` images so the rest of the combo stays on the reference timing.
+HITSTOP = {108: 3, 137: 3}
+HITSTOP_CATCHUP = 8
 

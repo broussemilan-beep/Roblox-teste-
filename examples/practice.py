@@ -18,7 +18,7 @@ from pathlib import Path
 
 import numpy as np
 
-from examples.practice_keys import EASE, KEYS, LAG, NAMES, SHAKES
+from examples.practice_keys import EASE, HITSTOP, HITSTOP_CATCHUP, KEYS, LAG, NAMES, SHAKES
 from tsb_engine.authoring import K, P, root_pose
 from tsb_engine.cinematic import Cinematic, dolly
 from tsb_engine.model import Animation
@@ -163,6 +163,9 @@ def keyed_angles() -> np.ndarray:
             return 1.0 - (1.0 - u) ** 2.4
         if style == "lin":
             return u
+        if style == "back":   # Back Out: overshoots the target by ~10% then settles (the tutorials' overshoot after an impact)
+            c1 = 1.70158
+            return 1.0 + (c1 + 1.0) * (u - 1.0) ** 3 + c1 * (u - 1.0) ** 2
         return 0.5 * (2 * u) ** 2.0 if u < 0.5 else 1.0 - 0.5 * (2 * (1 - u)) ** 2.0   # "io"
 
     def at(t: float) -> np.ndarray:
@@ -171,12 +174,25 @@ def keyed_angles() -> np.ndarray:
         u = (t - ts[j]) / (ts[j + 1] - ts[j])
         return vals[j] + (vals[j + 1] - vals[j]) * ease(u, EASE.get(int(ts[j]), "io"))
 
+    def clock(t: float) -> float:
+        """Pose clock with the hit-stops: it stands still for ``n`` images at the impact, then runs a little faster until it is back on the real time."""
+        for t0, n in HITSTOP.items():
+            if t0 <= t < t0 + n:
+                return float(t0)
+            if t0 + n <= t < t0 + n + HITSTOP_CATCHUP:
+                return t0 + (t - t0 - n) * (n + HITSTOP_CATCHUP) / HITSTOP_CATCHUP
+        return t
+
     out = np.zeros((N, 17))
     for i in range(N):
         t = F0 + i
-        out[i] = at(t)
-        out[i, 6:8] = at(t - LAG["head"])[6:8]
-        out[i, 8:12] = at(t - LAG["arms"])[8:12]
+        tc = clock(float(t))
+        out[i] = at(tc)
+        out[i, 6:8] = at(clock(t - LAG["head"]))[6:8]
+        out[i, 8:12] = at(clock(t - LAG["arms"]))[8:12]
+        for t0, n in HITSTOP.items():   # the tiny twist that keeps the frozen pose alive
+            if t0 <= t < t0 + n:
+                out[i, 5] += 2.0 * (1 if (t - t0) % 2 == 0 else -1)
         for t0, amp in SHAKES.items():   # impact stop: a short decaying shake of the whole body
             if t0 <= t <= t0 + 5:
                 k = (1.0 - (t - t0) / 6.0) * amp

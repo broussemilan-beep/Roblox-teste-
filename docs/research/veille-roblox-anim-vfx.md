@@ -80,3 +80,22 @@ Pas encore appliqué (à faire selon ton feu vert) :
 - Chaînes YouTube : Alrech (« ROBLOX VFX Tutorial »), Kyuzu (« The Strongest Battlegrounds Trailer Animation | Raw ver. »), nateyox (« SCRAPPED MOVES, VFX & MORE! »), LanceStuffs (« The Best ANIMATIONs in The Strongest Battlegrounds »), tutoriels Moon Animator : « Learning IMPACT FRAMES In Roblox Moon Animator! » (A_1uFlVrumM), « (Moon Animator) Impact Frames: Advanced Tutorial Part 1 » (tTCPbe9jQn8), « How to make Smear Frames (Moon Animator tutorial) » (Gxt-JFnB1ic), « Moon Animator Tutorial! General Keyframes, and Easing! » (gG3HFjnExqw).
 - À corriger : l'identifiant YouTube 1VWTLn_7hPA correspond à « Inside The World of Roblox Animation » (PurpleFloplop), pas à « The Truth About Roblox Animation YouTubers ».
 - Fils DevForum riches : devforum.roblox.com/t/runup-vfx-breakdown-part-4/3669430, …/serious-punch-recreation-creation-overview-part-3/3630207, …/mesh-flipbooks-particle-flipbooks-animations-and-movesets/2204359, …/advanced-impact-frames/2468478, …/open-source-impactframe-module/2963136.
+
+## 5. Réponses de Gemini (reçues le 2026-10-29) et leur vérification
+
+**Tableau « 0,1 s » de la vidéo de référence : non utilisé.** Vérifié contre ma mesure de la trajectoire réelle (`tools/measure_track.py`, `docs/research/reference-poses/practice_track.json`) :
+- Gemini décrit des courses en arc, un « dash vers la gauche » à 1,9 s et plusieurs retours au centre. Mesuré : le personnage avance vers la droite presque tout le temps (+609 px au total, 14 images seulement vers la gauche).
+- Gemini place le grand saut à 3,3–4,1 s, haut de « 2,5 corps ». Mesuré : le grand saut est à 2,7 s et monte à 2,5 studs (moins d'un demi-corps).
+- Les anneaux magenta sont à 2,0 s mesurés contre 2,4–2,5 s annoncés ; l'impact au sol est à 3,0 s mesuré contre 4,1 s annoncé.
+Conclusion : le tableau est une description plausible mais inexacte ; seule la mesure fait foi.
+
+**Les 7 tutoriels et les 15 règles : utilisés** (cohérents avec les fils DevForum et les tutoriels lus par ailleurs). Je n'ai pas pu regarder les vidéos moi-même ; les chiffres sont ceux de Gemini :
+- timeline en paliers de 5 images (60 fps) : départ, anticipation, drag, milieu de frappe, exagération, amorti (« wiggle ») ;
+- ratio anticipation:frappe:récupération de 3:1:2, soit 10-15 / 2-4 / 8-12 images à 60 fps ;
+- drag des bras et de la tête de 2 à 5 images ; dépassement de 10 à 15° après l'impact (ou Back Out) ;
+- arrêt sur image de 2 à 4 images (copier la pose d'impact quelques images plus loin, ou clé en Constant) avec une micro-torsion d'environ 2° ;
+- In sur les élans et chutes, Out sur les atterrissages et freinages ;
+- anneau de choc : deux beams, CurveSize = rayon × 4/3 (une approximation de Bézier d'un demi-cercle, ce qui est mathématiquement juste) ;
+- flash d'impact : durée de vie 0,1-0,2 s, éclats Speed 50 / Drag 3.
+Appliqué dans `examples/practice_keys.py` : décalage tête/bras de 2 images, Back Out sur le lancer, l'impact et l'atterrissage de la vrille, arrêt sur image de 3 images au lancer (108) et à l'impact (137) avec rattrapage de l'horloge de pose sur 8 images pour rester sur le minutage de la référence.
+Non appliqué : abaisser le torse en garde (les jambes R6 sont rigides, il faudrait enfoncer les pieds dans le sol), tremblement de caméra et FOV (la caméra de la référence est fixe), impact frames noir/blanc (absentes de la référence).
