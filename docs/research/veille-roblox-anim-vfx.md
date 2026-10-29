@@ -137,3 +137,12 @@ Accès : je ne contourne pas les blocages anti-robot (CAPTCHA YouTube, 403 Reddi
 - Autres dépôts repérés, non lus : `VirtualButFake/vfx-editor`, `Mqxsyy/Lumina` (particules), `Srcrix/TweenPlus`, `g1mmethemoney/WCS` (cadre de combat), `Cautioned/Blender-Animations-Plugin`, `dextermorganfan/Blender-OAE`, `stardustdtm/combo`.
 
 **Ce qui n'existe pas en public, malgré tout** : des angles de poses R6 ou des durées en images par coup. Seule la mesure sur de vrais clips peut les donner.
+
+## 8. Analyse mesurée des 11 clips X téléchargés (2026-10-29)
+
+Clips publics de Veil, Ultik, Snaliel, Mr.Cool et Felku, gardés hors du dépôt. Mesures faites par script (cv2) sur chaque image native ; lecture visuelle de trois fenêtres.
+
+- **Cadence réelle** : 9 clips sur 11 mettent le contenu à jour à chaque image native (96 à 99 % d'images nouvelles) : 30 images/s (Mr.Cool, Ultik atomic samurai, Ultik « autres animations ») ou 60 images/s (Veil, Snaliel, Felku). Aucun n'est animé « sur 2 » ou « sur 3 » : l'animation de combat de TSB postée par ces artistes est lisse à la cadence native. Exception : « Omni-Directional Serious Punch » d'Ultik (60 images/s, 63 % d'images répétées, intervalles de 1 à 4 images). Sur la fenêtre regardée (24,3 s), c'est un survol caméra avec débris : je l'attribue à la capture ou à l'encodage, pas à un style, donc je n'en tire aucune règle.
+- **Structure d'un impact lu image par image** (Veil, mise à jour TSB, 60 images/s, 15,2 à 16,0 s) : aura violet-noir pendant au moins 0,3 s (anticipation) → éclair blanc avec rayons sur quelques images (≈ 3 images) → cylindre blanc translucide qui s'étend puis s'efface en ≈ 0,1 à 0,2 s → gros blocs de débris et caméra qui s'enfonce parmi les blocs pendant ≈ 0,4 s. Cela correspond à la règle « anticipation, apogée, dissipation rapide » de Plebarae.
+- **Présentation d'Ultik** : chaque animation est montrée sur un rig en plein cadre sous Studio, avec filigrane, et les animations sont enchaînées par des coupes sèches (environ 26 coupes en 55 s).
+- **Ce que la mesure ne peut pas donner** : mes durées « anticipation / frappe / récupération » par clip sont inutilisables : l'énergie de mouvement de l'image entière mélange caméra, VFX et temps morts. Pour de vraies durées il faut suivre le personnage lui-même (SAM 2, `tools/eyes.py track`) et mesurer ses membres, clip par clip.
