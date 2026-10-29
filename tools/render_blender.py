@@ -26,6 +26,8 @@ import numpy as np  # noqa: E402
 
 from examples.scenes import SCENES  # noqa: E402
 from tsb_engine import modeling as M  # noqa: E402
+from tsb_engine.kinematics import JOINTS, ROOT_REST_Y, part_transforms, pose_transform  # noqa: E402
+from tsb_engine.mathutil import compose, translate  # noqa: E402
 from tsb_engine.scene import export_viewer_data  # noqa: E402
 
 C3 = mathutils.Matrix(((1, 0, 0), (0, 0, -1), (0, 1, 0)))  # engine -> blender (rotation)
@@ -102,6 +104,95 @@ class Keyer:
         ob.location, ob.rotation_quaternion = loc, rot
         ob.keyframe_insert("location", frame=frame)
         ob.keyframe_insert("rotation_quaternion", frame=frame)
+
+
+# --------------------------------------------------------------------------------------------------------------------------------------------------------------
+# a real rig: one armature per character, one bone per R6 part (Motor6D-like pivots), the parts are skinned meshes (one vertex group at weight 1 + an Armature modifier)
+
+RIG_BONES = ["HumanoidRootPart", "Torso", "Head", "Right Arm", "Left Arm", "Right Leg", "Left Leg"]
+BONE_PARENT = {"HumanoidRootPart": None, "Torso": "HumanoidRootPart", "Head": "Torso", "Right Arm": "Torso", "Left Arm": "Torso", "Right Leg": "Torso", "Left Leg": "Torso"}
+BONE_LEN = {"HumanoidRootPart": 0.6, "Torso": 1.0, "Head": 1.0, "Right Arm": 1.5, "Left Arm": 1.5, "Right Leg": 2.0, "Left Leg": 2.0}
+POINTS_DOWN = {"Right Arm", "Left Arm", "Right Leg", "Left Leg"}      # these bones run down the limb: their frame is flipped (half turn about X) so Y goes from the joint to the foot / hand
+FLIP = mathutils.Matrix.Rotation(math.pi, 4, "X")
+
+
+def eng4(t) -> mathutils.Matrix:
+    """An engine transform ((3x3 rows), (x, y, z)) as a 4x4 matrix, still in engine axes."""
+    r, p = t
+    return mathutils.Matrix(((r[0][0], r[0][1], r[0][2], p[0]), (r[1][0], r[1][1], r[1][2], p[1]), (r[2][0], r[2][1], r[2][2], p[2]), (0, 0, 0, 1)))
+
+
+def bone_frame(part_world: mathutils.Matrix, part: str) -> mathutils.Matrix:
+    """Armature-space matrix of a part's bone from the part's world matrix (already in Blender axes): the pivot frame (joint) of the Motor6D, flipped for limb bones."""
+    m = part_world
+    if part in JOINTS:
+        m = m @ mathutils.Matrix.Translation(JOINTS[part][1])      # the part's centre sits at pivot - c1 in its own frame
+    if part in POINTS_DOWN:
+        m = m @ FLIP
+    return m
+
+
+def make_rig(ch: dict, faces: list, objs: list, parts: list[str]) -> dict:
+    name = ch["name"]
+    ad = bpy.data.armatures.new(f"{name}_rig")
+    arm = bpy.data.objects.new(f"{name}_rig", ad)
+    bpy.context.scene.collection.objects.link(arm)
+    arm.show_in_front = True
+    rest = part_transforms({}, root=translate((0.0, ROOT_REST_Y, 0.0)))
+    bone_rest = {"HumanoidRootPart": C4 @ mathutils.Matrix.Translation((0.0, ROOT_REST_Y, 0.0))}
+    for part in parts:
+        bone_rest[part] = bone_frame(C4 @ eng4(rest[part]), part)
+    bpy.context.view_layer.objects.active = arm
+    bpy.ops.object.mode_set(mode="EDIT")
+    ebs = {}
+    for nm in RIG_BONES:
+        eb = ad.edit_bones.new(nm)
+        eb.head, eb.tail = (0, 0, 0), (0, 0, 1)
+        eb.matrix = bone_rest[nm]
+        eb.length = BONE_LEN[nm]
+        if BONE_PARENT[nm]:
+            eb.parent = ebs[BONE_PARENT[nm]]
+        ebs[nm] = eb
+    bpy.ops.object.mode_set(mode="OBJECT")
+    for pb in arm.pose.bones:
+        pb.rotation_mode = "QUATERNION"
+
+    def skin(ob, bone: str, to_rest: mathutils.Matrix):
+        ob.data.transform(to_rest)                                  # mesh vertices into armature space, at the rest pose
+        ob.parent = arm
+        vg = ob.vertex_groups.new(name=bone)
+        vg.add(list(range(len(ob.data.vertices))), 1.0, "REPLACE")
+        mod = ob.modifiers.new("Armature", "ARMATURE")
+        mod.object = arm
+
+    for pi, part in enumerate(parts):
+        if objs[pi] is not None:
+            skin(objs[pi], part, C4 @ eng4(rest[part]))
+    for _ci, _kind, fo, off in faces:
+        skin(fo, "Head", C4 @ eng4(rest["Head"]) @ off)
+    return {"arm": arm, "name": name}
+
+
+def pose_rig(rig: dict, chd: dict, char, f: int, hold: int, keyer, parts: list[str]):
+    """Key the bones of a character for frame ``f`` from the engine's world transforms."""
+    arm = rig["arm"]
+    root = compose(char.base_transform(), compose(translate((0.0, ROOT_REST_Y, 0.0)), pose_transform(char.anim.sample_root(f - f % hold))))
+    target = {"HumanoidRootPart": C4 @ eng4(root)}
+    for pi, part in enumerate(parts):
+        target[part] = bone_frame(mat4(chd["frames"][f][pi]), part)
+    for nm in RIG_BONES:                                           # parents first
+        pb = arm.pose.bones[nm]
+        pb.matrix = target[nm]
+        bpy.context.view_layer.update()
+        loc, rot = pb.location.copy(), pb.rotation_quaternion.copy()
+        prev = keyer.last.get(f"{arm.name}:{nm}")
+        if prev is not None and prev.dot(rot) < 0:
+            rot = mathutils.Quaternion((-rot.w, -rot.x, -rot.y, -rot.z))
+        keyer.last[f"{arm.name}:{nm}"] = rot
+        pb.rotation_quaternion = rot
+        pb.keyframe_insert("location", frame=f)
+        pb.keyframe_insert("rotation_quaternion", frame=f)
+
 
 
 def make_ground(far_color: str, floor: str, style: str = "film"):
@@ -195,7 +286,7 @@ def make_world(sky_top: str, sky_horizon: str):
     nt.links.new(bg.outputs["Background"], out.inputs["Surface"])
 
 
-def build(scene_name: str, frames: range, width: int, samples: int):
+def build(scene_name: str, frames: range, width: int, samples: int, rig: bool = True):
     sc = bpy.context.scene
     scene = SCENES[scene_name]()
     D = export_viewer_data(scene)
@@ -238,6 +329,7 @@ def build(scene_name: str, frames: range, width: int, samples: int):
     char_objs = []
     for ci, ch in enumerate(D["characters"]):
         objs = []
+        faces = []
         for pi, part in enumerate(D["parts"]):
             if part in ch.get("hide", []):
                 objs.append(None)
@@ -254,7 +346,7 @@ def build(scene_name: str, frames: range, width: int, samples: int):
                 for fx_, (ex, ey, ew, eh) in enumerate([(-0.28, 0.12, 0.12, 0.17), (0.28, 0.12, 0.12, 0.17), (0.0, -0.2, 0.36, 0.05)]):
                     fo = obj_from_mesh(f"{ch['name']}_face{fx_}", M.bevel_box((ew, eh, 0.04), 0.01, "#101012", "face"), None, rough=0.9)
                     # a face piece rides on the head with a fixed offset in the head's (engine-local) frame
-                    char_objs.append((ci, "face", fo, mathutils.Matrix.Translation((ex, ey, -0.51))))
+                    faces.append((ci, "face", fo, mathutils.Matrix.Translation((ex, ey, -0.51))))
         ex_objs = []
         for ex in ch.get("extras", []):
             shape = ex["shape"]
@@ -269,7 +361,11 @@ def build(scene_name: str, frames: range, width: int, samples: int):
             else:
                 ob = obj_from_mesh(f"{ch['name']}_{ex['name']}", M.bevel_box(tuple(ex["size"]), 0.04, ex["color"]), 35.0)
             ex_objs.append(ob)
-        char_objs.append((ci, "__parts__", objs, ex_objs))
+        if rig and not ch.get("extras"):
+            char_objs.append((ci, "__rig__", make_rig(ch, faces, objs, D["parts"]), scene.characters[ci]))
+        else:
+            char_objs.extend(faces)
+            char_objs.append((ci, "__parts__", objs, ex_objs))
 
     # ---- props + debris (static boxes with a visibility window / ballistic path)
     props = []
@@ -330,7 +426,9 @@ def build(scene_name: str, frames: range, width: int, samples: int):
         # characters
         for item in char_objs:
             ci = item[0]
-            if item[1] == "__parts__":
+            if item[1] == "__rig__":
+                pose_rig(item[2], D["characters"][ci], item[3], f, scene.hold, keyer, D["parts"])
+            elif item[1] == "__parts__":
                 ch = D["characters"][ci]
                 for pi, ob in enumerate(item[2]):
                     if ob is not None:
@@ -396,6 +494,10 @@ def main():
     ap.add_argument("--still", type=int, default=None)
     ap.add_argument("--samples", type=int, default=20)
     ap.add_argument("--width", type=int, default=737)
+    ap.add_argument("--no-rig", action="store_true", help="old behaviour: every part is a separate object keyed by its own matrix")
+    ap.add_argument("--blend", default=None, help="save the .blend (armatures, skinned meshes, bone keyframes, camera) here")
+    ap.add_argument("--fbx", default=None, help="also export armatures + meshes + the baked bone animation as FBX")
+    ap.add_argument("--no-render", action="store_true", help="only build, key and save (no images)")
     a = ap.parse_args()
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = SCENES[a.scene]()
@@ -407,7 +509,7 @@ def main():
         frames = range(int(s), int(e) + 1)
     else:
         frames = range(nfr)
-    D = build(a.scene, frames, a.width, a.samples)
+    D = build(a.scene, frames, a.width, a.samples, rig=not a.no_rig)
     cuts = set()   # motion blur must not smear a cut: the interpolation between two shots is not a movement
     cams, tors = (D["cine"]["camera"] if D.get("cine") else []), [[ch["frames"][f][D["parts"].index("Torso")][9:12] for f in range(D["nFrames"])] for ch in D["characters"]]
     for f in range(1, D["nFrames"]):
@@ -419,6 +521,17 @@ def main():
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     sc = bpy.context.scene
+    if a.blend:
+        bpy.ops.wm.save_as_mainfile(filepath=a.blend, compress=True)
+        print("saved", a.blend, flush=True)
+    if a.fbx:
+        try:
+            bpy.ops.export_scene.fbx(filepath=a.fbx, object_types={"ARMATURE", "MESH"}, bake_anim=True, bake_anim_use_all_bones=True, add_leaf_bones=False, apply_scale_options="FBX_SCALE_ALL")
+            print("exported", a.fbx, flush=True)
+        except Exception as e:  # noqa: BLE001
+            print("fbx export failed:", e, flush=True)
+    if a.no_render:
+        return
     if a.still is not None:
         sc.frame_set(a.still)
         sc.render.filepath = str(out / f"b_{a.still:04d}.png")
