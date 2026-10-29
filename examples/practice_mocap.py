@@ -29,7 +29,8 @@ SPEC = [
     dict(clip="105_39", t0=1.0, t1=2.2, n=14),                          # 76-90   the leap, landing at 90
     dict(clip="144_20", t0=8.5, t1=9.4, n=12, yaw=-90),                 # 90-102  deep lunge
     dict(clip="144_20", t0=6.3, t1=7.0, n=10),                          # 102-112 the beam: arm thrown out
-    dict(clip="144_20", t0=3.0, t1=4.5, n=37, yaw=180),                 # 112-149 recover to the guard
+    dict(clip="144_01", t0=1.75, t1=3.3, n=22, align=True),             # 112-134 a cartwheel to the right (the reference tumbles and slides)
+    dict(clip="144_20", t0=3.0, t1=4.0, n=15, yaw=180),                 # 134-149 back up into the guard (the loop closes)
 ]
 
 

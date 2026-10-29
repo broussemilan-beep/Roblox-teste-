@@ -211,7 +211,7 @@ def retarget(b: Bvh, pos: np.ndarray, rot: np.ndarray, leg_scale: float | None =
     ang[:, 6], ang[:, 7] = h_rx, np.clip(h_ry, -70, 70)
     ang[:, 8], ang[:, 9], ang[:, 10], ang[:, 11] = ra_rx, ra_rz, la_rx, la_rz
     ang[:, 12], ang[:, 13], ang[:, 14], ang[:, 15] = rl_rx, rl_rz, ll_rx, ll_rz
-    foot_low = np.minimum(P[:, ix["LeftFoot"], 1], P[:, ix["RightFoot"], 1])
+    foot_low = np.min(np.stack([P[:, ix[n], 1] for n in ("LeftFoot", "RightFoot", "LeftHand", "RightHand", "Head")], 0), axis=0)   # the lowest part: feet, or hands / head in a cartwheel or a roll
     air = np.maximum(foot_low - np.percentile(foot_low, 2), 0.0) * s
     return Clip(ang, hips[:, [0, 2]] * s, air, b.fps, name)
 
@@ -293,10 +293,16 @@ def assemble(spec: list[dict], lib: dict[str, Clip], blend: int = 3, follow: np.
         # heading: the gesture's own turning is kept, its starting heading is ours
         ry0 = a[0, 0]
         start = sp["yaw"] if sp.get("yaw") is not None else (heading if heading is not None else 0.0)
-        a[:, 0] = a[:, 0] - ry0 + start
         d = p - p[0]
         d3 = np.stack([d[:, 0], np.zeros(len(d)), d[:, 1]], 1)
-        d3 = d3 @ _ry_matrix(-ry0).T @ _ry_matrix(start).T      # undo the clip's heading, apply ours
+        d3l = d3 @ _ry_matrix(-ry0).T                           # the gesture's travel in its own heading frame
+        if sp.get("align") and follow is not None and np.linalg.norm(d3l[-1]) > 0.4:
+            cum_end = min(sum(int(x["n"]) for x in spec[: k + 1]) - 1, len(follow) - 1)
+            want = np.asarray(follow[cum_end], float) - last_pos
+            if np.linalg.norm(want) > 0.4:                      # turn the whole gesture so that its travel points where the reference goes
+                start = math.degrees(math.atan2(d3l[-1][2], d3l[-1][0]) - math.atan2(want[1], want[0]))
+        a[:, 0] = a[:, 0] - ry0 + start
+        d3 = d3l @ _ry_matrix(start).T                          # undo the clip's heading, apply ours
         p = np.stack([d3[:, 0], d3[:, 2]], 1) * sp.get("path", 1.0)
         cum += int(sp["n"])
         if follow is not None:
