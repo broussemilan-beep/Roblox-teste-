@@ -139,6 +139,7 @@ def _unit(v: np.ndarray) -> np.ndarray:
 
 
 _K = np.diag([-1.0, 1.0, -1.0])   # CMU world (character faces +Z, its left is +X) -> engine world (character faces -Z, its right is +X): a half turn about Y
+NAMES20 = ["ry", "rx", "rz", "T_rx", "T_ry", "T_rz", "H_rx", "H_ry", "RA_rx", "RA_rz", "LA_rx", "LA_rz", "RL_rx", "RL_rz", "LL_rx", "LL_rz", "RA_slide", "LA_slide", "RL_slide", "LL_slide"]
 NAMES16 = ["ry", "rx", "rz", "T_rx", "T_ry", "T_rz", "H_rx", "H_ry", "RA_rx", "RA_rz", "LA_rx", "LA_rz", "RL_rx", "RL_rz", "LL_rx", "LL_rz"]
 
 
@@ -185,32 +186,33 @@ def retarget(b: Bvh, pos: np.ndarray, rot: np.ndarray, leg_scale: float | None =
     loc = lambda v: np.einsum("fij,fj->fi", inv, v)               # world vector -> torso-local
     leg_len = np.linalg.norm(P[:, ix["RightFoot"]] - P[:, ix["RightUpLeg"]], axis=1).max()
     s = (2.0 / leg_len) if leg_scale is None else leg_scale      # horizontal scale that keeps an R6 foot planted when the human foot is planted
-    ra_rx, ra_rz = _limb_angles(loc(P[:, ix["RightHand"]] - P[:, ix["RightArm"]]))
-    la_rx, la_rz = _limb_angles(loc(P[:, ix["LeftHand"]] - P[:, ix["LeftArm"]]))
-    def leg(side: str) -> np.ndarray:
-        """R6 legs cannot bend: keep the height the human hip really has above the ankle by tilting the rigid leg more (a crouch becomes a splayed stance)."""
-        hip, knee, ank = P[:, ix[side + "UpLeg"]], P[:, ix[side + "Leg"]], P[:, ix[side + "Foot"]]
-        drop = (hip[:, 1] - ank[:, 1]) * s                                    # vertical drop hip -> ankle, in studs
-        cos_t = np.clip(drop / 2.0, -1.0, 1.0)
-        sin_t = np.sqrt(1.0 - cos_t ** 2)
-        h = (ank - hip)[:, [0, 2]] + 0.6 * (knee - hip)[:, [0, 2]]            # which way the leg leans: the foot, and where the knee points
-        hn = np.linalg.norm(h, axis=1, keepdims=True)
-        fwd_h = -back[:, [0, 2]]
-        h = np.where(hn > 1e-6, h / np.maximum(hn, 1e-9), fwd_h / np.maximum(np.linalg.norm(fwd_h, axis=1, keepdims=True), 1e-9))
-        return np.stack([sin_t * h[:, 0], -cos_t, sin_t * h[:, 1]], 1)
+    # ---- R6 has no knees or elbows: the limb keeps its TRUE direction and is "disjointed" (slid along its own axis like a piston) so that its hand / foot lands where the
+    # human's does.  ``slide`` is how far the rigid limb is pushed back toward its joint; the scene turns it into a position offset of the part.
+    arm_len = np.linalg.norm(P[:, ix["RightHand"]] - P[:, ix["RightArm"]], axis=1).max()
+    s_arm = 1.5 / arm_len                                         # R6: 1.5 studs of arm hang below the shoulder joint, 2.0 of leg below the hip joint
 
-    rl_rx, rl_rz = _limb_angles(loc(leg("Right")))
-    ll_rx, ll_rz = _limb_angles(loc(leg("Left")))
+    def limb(a_name: str, b_name: str, scale: float, full: float, cap: float):
+        d = P[:, ix[b_name]] - P[:, ix[a_name]]
+        reach = np.linalg.norm(d, axis=1) * scale
+        rx_, rz_ = _limb_angles(loc(d))
+        return rx_, rz_, np.clip(full - reach, 0.0, cap)
+
+    ra_rx, ra_rz, ra_sl = limb("RightArm", "RightHand", s_arm, 1.5, 1.0)
+    la_rx, la_rz, la_sl = limb("LeftArm", "LeftHand", s_arm, 1.5, 1.0)
+    rl_rx, rl_rz, rl_sl = limb("RightUpLeg", "RightFoot", s, 2.0, 1.6)
+    ll_rx, ll_rz, ll_sl = limb("LeftUpLeg", "LeftFoot", s, 2.0, 1.6)
+
     # head: its own forward (CMU +Z at rest -> engine -Z) and up, in torso-local coordinates
     Rh = Rm[:, ix["Head"]]
     f_loc = loc(np.einsum("fij,j->fi", Rh, np.array([0.0, 0.0, -1.0])))
     h_ry = np.degrees(np.arctan2(-f_loc[:, 0], -f_loc[:, 2]))
     h_rx = np.degrees(np.arcsin(np.clip(f_loc[:, 1], -1, 1)))
-    ang = np.zeros((len(P), 16))
+    ang = np.zeros((len(P), 20))
     ang[:, 0], ang[:, 1], ang[:, 2] = ry, rx, rz
     ang[:, 6], ang[:, 7] = h_rx, np.clip(h_ry, -70, 70)
     ang[:, 8], ang[:, 9], ang[:, 10], ang[:, 11] = ra_rx, ra_rz, la_rx, la_rz
     ang[:, 12], ang[:, 13], ang[:, 14], ang[:, 15] = rl_rx, rl_rz, ll_rx, ll_rz
+    ang[:, 16], ang[:, 17], ang[:, 18], ang[:, 19] = ra_sl, la_sl, rl_sl, ll_sl   # piston slides (studs): right arm, left arm, right leg, left leg
     foot_low = np.min(np.stack([P[:, ix[n], 1] for n in ("LeftFoot", "RightFoot", "LeftHand", "RightHand", "Head")], 0), axis=0)   # the lowest part: feet, or hands / head in a cartwheel or a roll
     air = np.maximum(foot_low - np.percentile(foot_low, 2), 0.0) * s
     return Clip(ang, hips[:, [0, 2]] * s, air, b.fps, name)

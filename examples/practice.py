@@ -96,6 +96,16 @@ def ground_baseline(foot: np.ndarray) -> np.ndarray:
     return base
 
 
+def limb_pos(a: np.ndarray, k: int) -> tuple[float, float, float]:
+    """Position offset (torso-local) of limb ``k`` (0 right arm, 1 left arm, 2 right leg, 3 left leg): the piston slide pushes the rigid limb back toward its joint along its own axis."""
+    if len(a) < 20:
+        return (0.0, 0.0, 0.0)
+    rx, rz = math.radians(a[[8, 10, 12, 14][k]]), math.radians(a[[9, 11, 13, 15][k]])
+    d = (math.sin(rz), -math.cos(rz) * math.cos(rx), -math.cos(rz) * math.sin(rx))
+    sl = float(a[16 + k])
+    return (-sl * d[0], -sl * d[1], -sl * d[2])
+
+
 def world_corners(a: np.ndarray, X: float, h: float, Z: float) -> np.ndarray:
     """The 48 corners of the posed rig in the world (root: torso-centre height ``h``)."""
     from tsb_engine.kinematics import corners, part_transforms, pose_transform
@@ -104,8 +114,8 @@ def world_corners(a: np.ndarray, X: float, h: float, Z: float) -> np.ndarray:
 
     v = [float(t) for t in a[:16]]
     root = compose(translate((0.0, 3.0, 0.0)), pose_transform(root_pose(X, h, Z, v[1], v[0], v[2])))
-    pose = {"Torso": Pose((0, 0, 0), (v[3], v[4], v[5])), "Head": Pose((0, 0, 0), (v[6], v[7], 0)), "Right Arm": Pose((0, 0, 0), (v[8], 0, v[9])),
-            "Left Arm": Pose((0, 0, 0), (v[10], 0, v[11])), "Right Leg": Pose((0, 0, 0), (v[12], 0, v[13])), "Left Leg": Pose((0, 0, 0), (v[14], 0, v[15]))}
+    pose = {"Torso": Pose((0, 0, 0), (v[3], v[4], v[5])), "Head": Pose((0, 0, 0), (v[6], v[7], 0)), "Right Arm": Pose(limb_pos(a, 0), (v[8], 0, v[9])),
+            "Left Arm": Pose(limb_pos(a, 1), (v[10], 0, v[11])), "Right Leg": Pose(limb_pos(a, 2), (v[12], 0, v[13])), "Left Leg": Pose(limb_pos(a, 3), (v[14], 0, v[15]))}
     tf = part_transforms(pose, root=root)
     return np.array([c for p in PARTS for c in corners(p, tf[p])], float)
 
@@ -223,7 +233,7 @@ def build(motion=None) -> Scene:
     for i in range(N):
         a = ang[i]
         K(hero.anim, i, "linear", R=root_pose(float(X[i]), 3.0 + lowest(a) + float(air[i]), float(Z[i]), a[1], a[0], a[2]), T=P((a[3], a[4], a[5])), H=P((a[6], a[7], 0)),
-          RA=P((a[8], 0, a[9])), LA=P((a[10], 0, a[11])), RL=P((a[12], 0, a[13])), LL=P((a[14], 0, a[15])))
+          RA=P((a[8], 0, a[9]), limb_pos(a, 0)), LA=P((a[10], 0, a[11]), limb_pos(a, 1)), RL=P((a[12], 0, a[13]), limb_pos(a, 2)), LL=P((a[14], 0, a[15]), limb_pos(a, 3)))
     cine = Cinematic(N, fps=FPS)
     cine.look = "studio"
     cine.aspect = ASPECT
