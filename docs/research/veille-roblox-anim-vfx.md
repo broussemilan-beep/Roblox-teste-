@@ -174,3 +174,27 @@ Méthode : `WebSearch` limité à x.com/twitter.com (requêtes niche : R6, Moon 
 Lu dans les résultats texte (pas de vidéo) : un animateur dit qu'il n'existe « aucun tuto Roblox sur les smear frames » ; un fil dit que sans genou, rendre les jambes naturelles passe par l'inclinaison vers l'avant du segment ; la conversion R15 → R6 automatique donne de mauvais bras/jambes (conversion manuelle préférée). Aucun de ces posts n'explique le « piston/dislocation » en détail.
 
 **Bilan honnête** : X donne des exemples de moves et quelques démos d'outils, mais **peu de vrais cours d'animation R6** ; les meilleures explications restent les fils DevForum (§2, §6). Je n'ai pas fait de mesure image par image de ces 9 clips (planches seulement).
+
+## 10. Cinquième passe sur X (mots-clés élargis : easing, smear, impact frames, hitstop, walk/run cycle, cutscene, camera shake, WIP)
+
+Même méthode qu'au §9. ~12 requêtes de plus, 16 posts tentés, **12 vidéos récupérées** (4 sans vidéo : texte seul ou lien YouTube non téléchargeable). Planches seulement, pas de mesure image par image.
+
+| Clip | Contenu [observé] | Utilité |
+|---|---|---|
+| doublecats, « breakdown of impact frame » (3,8 s, ralenti ×0,2) | Recette en couches, montrée étape par étape : impact frame de base (noir/blanc très contrasté) → + lignes radiales → + onde de choc (anneau) → + flou radial → version finale colorée (éclairs bleus). | **Haute** : la liste d'étapes est exactement ce que `screen_fx` doit empiler. |
+| aschao, impact frames GPO Fishman V2 (19 s) | Capture d'écran Photoshop : cadres manga noir/blanc, rayons, étoiles à 4 branches, taches d'encre ; plusieurs variantes alternées. | Moyenne : vocabulaire visuel (étoiles à 4 branches, encre). |
+| DeCoil, « sword animation, frame by frame » (9,6 s, 20 fps, Moon Animator) | Personnage R6 à tête-tonneau, genou au sol, grandes poses de lame, arcs blancs fins de smear, flou de fin en noir/blanc. 20 fps : animation volontairement saccadée. | Haute pour le style « pose to pose » ; confirme l'emploi de smears en arcs fins. |
+| DeCoil, impact frames pour Roblox (35 s) | Pas ouverte en détail. | À regarder si besoin. |
+| Chrollo / DiabloSmooth, Isagi U-20 (Blue Lock Rivals, 17 s) | Plans très proches, caméra au ras du sol, ballon énorme au premier plan, ambiance qui s'assombrit, puzzle « LUCK » : la mise en scène (cadrage) porte le coup, pas l'amplitude du corps. | Moyenne : distances caméra extrêmes. |
+| Madooxs, walk cycle omnidirectionnel (22 s) | Caméra 3ᵉ personne, personnage ~15 % du cadre, démarche de jeu. | Faible. |
+| TheGh0stRunner, cutscene temps réel mocap (48 s, 2020) | Personnages en armure, caméra bas/arrière, mouvement capturé, brume. | Faible à moyenne (mocap, mais pas R6). |
+| sazy, « run cycle from reference, 24 fps » (3 s) | **Pas Roblox** : rig Maya, référence de course avec obstacles. | Faible. |
+| sleitnick, module Shake (23 s) ; xsixx, 7 styles d'easing (17 s) ; fabuss254, plugin VFXObject (15 s) | Démos d'outil : tremblement de caméra dont l'intensité dépend de la distance à l'explosion ; easing disponibles dans Moon Animation Suite ; VFX pilotés comme une animation. | Moyenne : la règle « intensité du tremblement ∝ distance » est exploitable. |
+| Erythia, idle (7 s, 2018) | Animation idle simple. | Faible. |
+
+**Ce qu'on retient** [inféré, plusieurs clips concordants] :
+1. L'impact frame se construit **par couches** (base contrastée, lignes radiales, onde de choc, flou radial, puis recolorisation), pas comme un simple flash.
+2. Certains animateurs R6 travaillent **à 20 fps pose à pose** avec arcs de smear fins : la saccade est un choix de style, pas un défaut.
+3. La mise en scène (distance caméra, cadrage sol) fait une grande partie du ressenti.
+
+Aucun post n'explique la technique piston/dislocation, ni les nombres d'images pour l'hitstop sur Roblox. Le post de MartinG sur l'hitstop est une réflexion de game design générale, pas Roblox.
