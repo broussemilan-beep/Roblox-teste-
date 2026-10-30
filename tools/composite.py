@@ -105,6 +105,7 @@ def main():
     first = int(sys.argv[5]) if len(sys.argv) > 5 else 0
     last = int(sys.argv[6]) if len(sys.argv) > 6 else n - 1
     fxs = D["cine"]["screen"]["fx"]
+    arena = D["cine"].get("look") == "arena"   # a bright daylight scene: a restrained bloom and a little contrast, not the night-time setting
     Path(odir).mkdir(parents=True, exist_ok=True)
     rng = np.random.RandomState(4)
     for f in range(first, last + 1):
@@ -113,7 +114,9 @@ def main():
             print("missing blender frame", f)
             continue
         img = b.astype(np.float32) / 255.0
-        img = bloom(img)
+        img = bloom(img, 0.86, 0.28) if arena else bloom(img)
+        if arena:
+            img = np.clip((img - 0.5) * 1.12 + 0.46, 0.0, 1.0)
         img = over(img, Path(ldir) / f"world_{f:04d}.png")
         for sf in fxs:
             if sf["t0"] <= f < sf["t0"] + sf["dur"]:

@@ -451,7 +451,7 @@ def build() -> Scene:
     cine.flash(fg, 3, "#ffffff", 0.45)
     for k, (r1, col) in enumerate(((5.5, "#ffffff"), (8.0, "#ffe3b0"), (11.0, "#bcd0f0"))):
         cine.ring(fg + 2 * k, 16 + 3 * k, gp, 0.5, r1, 0.5 - 0.1 * k, 0.04, col, 0.9 - 0.15 * k, 0.0)
-    cine.cracks(fg, 20, gp, 6.5, 9, "#2a241c", glow="#ffc477", width=0.1, seed=2, fade=(60, 40))
+    cine.cracks(fg, 20, gp, 7.5, 13, "#2b2822", glow=None, width=0.07, seed=2, fade=(70, 40))
     cine.burst_debris(fg, gp, 38, 0.32, 0.55, (0.18, 0.5), ["#7d6f58", "#96876b", "#6a5e49"], seed=3, g=0.03)
     cine.emit(fg, fg + 14, origin=gp, rate=0, burst=44, vel=(0.26, 0.4), dir=(0, 1, 0), spread=1.6, grav=0.01, life=(22, 44), size=(1.0, 2.8), color=("#d9ccb0", "#a39878"),
               alpha=(0.42, 0.0), add=False, shape="smoke", seed=5, radius=1.4)
