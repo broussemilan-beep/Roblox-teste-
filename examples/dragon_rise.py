@@ -165,18 +165,17 @@ def author_keys():
     """The aerial fight, pose by pose (animation clock 52..87)."""
     keys = {
         51: dict(rx=8, T_rx=10, RA_rx=172, RA_rz=8, LA_rx=-60, LA_rz=-14, RL_rx=-24, RL_rz=4, LL_rx=40, LL_rz=-4, RL_slide=0.2, LL_slide=0.5),                        # the uppercut's follow-through
-        54: dict(rx=-30, T_rx=-16, RA_rx=-64, RA_rz=10, LA_rx=-48, LA_rz=-12, RL_rx=45, RL_rz=8, LL_rx=45, LL_rz=-8, RL_slide=1.4, LL_slide=1.4),                   # gather: a deep squat, the arms thrown back
-        57: dict(rx=-4, T_rx=0, RA_rx=165, RA_rz=14, LA_rx=160, LA_rz=-14, RL_rx=-6, RL_rz=5, LL_rx=-8, LL_rz=-5, RL_slide=0.0, LL_slide=0.0),                       # the take-off: stretched, arms up
+        56: dict(rx=12, T_rx=8, H_rx=-4, RA_rx=140, RA_rz=10, LA_rx=-20, LA_rz=-14, RL_rx=14, RL_rz=6, LL_rx=34, LL_rz=-6, RL_slide=0.3, LL_slide=0.4),                       # rising on the strike: the arm drifts down behind the fist, legs trail
         62: dict(rx=6, T_rx=0, RA_rx=125, RA_rz=22, LA_rx=110, LA_rz=-22, RL_rx=70, RL_rz=6, LL_rx=-28, LL_rz=-8, RL_slide=0.9, LL_slide=0.5),                      # rising, the right knee comes up
         68: dict(rx=18, T_rx=6, RA_rx=-55, RA_rz=14, LA_rx=140, LA_rz=-14, RL_rx=118, RL_rz=6, LL_rx=-26, LL_rz=-6, RL_slide=0.4, LL_slide=0.2),                    # leaning back, the leg is cocked, the arms opposed
         72: dict(rx=32, T_rx=10, H_rx=10, RA_rx=-62, RA_rz=14, LA_rx=146, LA_rz=-14, RL_rx=172, RL_rz=4, LL_rx=-20, LL_rz=-5, RL_slide=0.0, LL_slide=0.0),          # the apex: the leg straight up, held
         75: dict(rx=34, T_rx=10, H_rx=12, RA_rx=-66, RA_rz=14, LA_rx=150, LA_rz=-14, RL_rx=176, RL_rz=4, LL_rx=-22, LL_rz=-5),                                       # a breath at the top
-        77: dict(rx=6, T_rx=-6, RA_rx=-20, RA_rz=14, LA_rx=100, LA_rz=-14, RL_rx=100, RL_rz=4, LL_rx=-12, LL_rz=-6),                                                 # the leg drops
+        77: dict(rx=6, T_rx=-6, RA_rx=-20, RA_rz=14, LA_rx=40, LA_rz=-14, RL_rx=100, RL_rz=4, LL_rx=-12, LL_rz=-6),                                                 # the leg drops
         78: dict(rx=-6, T_rx=-6, H_rx=-6, RA_rx=70, RA_rz=14, LA_rx=-30, LA_rz=-14, RL_rx=44, RL_rz=3, LL_rx=-16, LL_rz=-6),                                      # CONTACT: the heel lands, the body folds over it
         81: dict(rx=-14, T_rx=-10, RA_rx=84, RA_rz=18, LA_rx=-40, LA_rz=-18, RL_rx=20, RL_rz=3, LL_rx=-10, LL_rz=-6),                                                # through
         85: dict(rx=-20, T_rx=-10, RA_rx=30, RA_rz=44, LA_rx=40, LA_rz=-44, RL_rx=14, RL_rz=6, LL_rx=22, LL_rz=-6),                                                 # falling, arms out for balance
     }
-    ease = {51: "io", 54: "in", 57: "out", 62: "io", 68: "io", 72: "hold", 75: "in", 77: "in", 78: "back", 81: "io", 85: "in"}
+    ease = {51: "io", 56: "io", 62: "io", 68: "io", 72: "hold", 75: "in", 77: "in", 78: "back", 81: "io", 85: "in"}
     return BASE, keys, ease
 
 
@@ -211,11 +210,11 @@ def hero_angles():
     air = np.zeros(M)
     air[30:44] = dair
     air[106:] = wair
-    for t in range(52, 88):          # a flight of my own: up to the apex at 72, then pulled down by the kick
-        if t < 55:
+    for t in range(47, 88):          # the flight starts with the strike (47): up to the apex at 72, then pulled down by the kick
+        if t < 47:
             air[t] = 0.0
         elif t <= 72:
-            u = (t - 55) / 17.0
+            u = (t - 47) / 25.0
             air[t] = 8.6 * (1 - (1 - u) ** 2)
         elif t <= 78:
             air[t] = 8.6 - 0.9 * ((t - 72) / 6.0) ** 2
@@ -239,12 +238,12 @@ def dummy_motion(fist: np.ndarray, heel: np.ndarray, hero_x48: float):
     pos = np.zeros((M, 3))
     ang = np.zeros((M, 16))
     x0 = hero_x48 + 1.95
-    base = np.array([x0, 3.0, fist[2] - 0.15])
+    base = np.array([x0, 3.0, HERO_Z + 0.5])      # same depth plane as the hero (side view): the fist lands on its near flank, it never flies in front of him
     pos[:] = base
     p0 = np.array([x0, max(fist[1], 3.0), base[2]])
     T1 = HIT2 - HIT1
     a = np.array([0.0, -G_AIR, 0.0])
-    tgt = np.array([heel[0] + 0.15, heel[1] + 0.1, heel[2] * 0.4])
+    tgt = np.array([heel[0] + 0.15, heel[1] + 0.1, heel[2] - 0.1])
     v0 = (tgt - p0 - 0.5 * a * T1 * T1) / T1
     TG = HIT2 + 6                                    # the heel drives it into the floor
     ground = 0.55
@@ -271,12 +270,12 @@ def dummy_motion(fist: np.ndarray, heel: np.ndarray, hero_x48: float):
             vy = -v_g[1] * 0.30
             pos[t] = np.array([p_g[0] + 0.18 * (1 - 0.82 ** s) / (1 - 0.82), max(ground, ground + vy * s - 0.5 * 0.085 * s * s), p_g[2]])
     # orientation: a backward tumble that eases out, then it lies flat on its back
-    r_hit2 = 5.8 / 0.04 * (1 - math.exp(-0.04 * (HIT2 - HIT1)))
+    r_hit2 = 2.2 / 0.04 * (1 - math.exp(-0.04 * (HIT2 - HIT1)))      # it stays nearly upright until the heel: lying flat it would cut through the hero
     for t in range(M):
         if t <= HIT1:
             rx = 2.0 * math.sin(0.18 * t)
         elif t <= HIT2:
-            rx = 5.8 / 0.04 * (1 - math.exp(-0.04 * (t - HIT1)))
+            rx = 2.2 / 0.04 * (1 - math.exp(-0.04 * (t - HIT1)))
         elif t <= TG:
             rx = r_hit2 + (92.0 - r_hit2) * ease_fn("in", (t - HIT2) / (TG - HIT2))
         else:
@@ -400,11 +399,11 @@ def build() -> Scene:
     t0 = (-2.4, 3.0, -0.6)
     cine.shot(0, 26, dolly(orbit_pos(t0, -14, 3, 27), orbit_pos(t0, -9, 3, 23), t0, (-2.0, 3.0, -0.6), fov=30, easing="sine_inout"))               # establishing: both in frame, hero ~45 % high
     cine.shot(26, f1 - 8, tracking(hero_c, (6.0, 1.4, 14.5), look_dy=0.2, fov=(32, 30), offset_end=(4.6, 1.2, 12.5)))                              # the dash seen from the front quarter, he runs toward the lens' right
-    tg1 = (3.9, 3.7, -0.2)
-    cine.shot(f1 - 8, f1 + 4, dolly(orbit_pos(tg1, -10, 3, 21.0), orbit_pos(tg1, -5, 3, 17.5), tg1, (4.0, 3.9, -0.2), fov=(30, 26), easing="expo_out"))   # the hit, over the hero's shoulder, the whole hero in frame
+    tg1 = (3.9, 3.7, -1.0)
+    cine.shot(f1 - 8, f1 + 4, dolly(orbit_pos(tg1, -10, 3, 21.0), orbit_pos(tg1, -5, 3, 17.5), tg1, (4.0, 3.9, -1.0), fov=(30, 26), easing="expo_out"))   # the hit, over the hero's shoulder, the whole hero in frame
     cine.shot(f1 + 4, f2 - 8, autoframe(lambda f: [hero_c(f), dum_c(f)], f1 + 4, f2 - 8, azimuth=-10, elevation=6.0, fov=34.0, fill=0.8, min_radius=3.0, follow=0.45, lift=0.6, pad=1.0))
-    tg2 = (4.8, 9.0, -0.2)
-    cine.shot(f2 - 8, f2 + 6, dolly(orbit_pos(tg2, 30, -5, 21.0), orbit_pos(tg2, 24, -4, 17.5), tg2, (4.8, 8.4, -0.2), fov=(32, 28), easing="expo_out"))  # the kick, from below, hero and dummy both in frame
+    tg2 = (4.8, 9.0, -1.0)
+    cine.shot(f2 - 8, f2 + 6, dolly(orbit_pos(tg2, 30, -5, 21.0), orbit_pos(tg2, 24, -4, 17.5), tg2, (4.8, 8.4, -1.0), fov=(32, 28), easing="expo_out"))  # the kick, from below, hero and dummy both in frame
     tg3 = (5.9, 2.4, -0.2)
     cine.shot(f2 + 6, fg + 8, dolly(orbit_pos(tg3, 30, 3, 21.0), orbit_pos(tg3, 38, 3, 16.0), (5.6, 5.5, -0.2), tg3, fov=(32, 30), roll=(0.0, -2.0), easing="expo_out"))   # down with the dummy, to the floor
     tg4 = (7.0, 2.0, -0.4)
