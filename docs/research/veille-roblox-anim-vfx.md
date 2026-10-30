@@ -155,3 +155,22 @@ Méthode : le rig blanc est isolé par couleur (faible saturation, forte luminos
 - La montée lente (anticipation) passe sous le seuil de détection : sa durée n'est pas mesurable avec cette méthode (médiane mesurée 0,5 image, ce qui est un artefact, pas une mesure).
 - Limites : ce sont des animations d'épée d'un seul animateur, sans coup de poing ni saut ; échantillon de 24 gestes ; pas de séparation anticipation / frappe / récupération. À ne pas généraliser.
 - Comparaison avec la séquence de ta référence : mes phases explosives sont de 2 à 3 images (lancer 106→108, vrille 65→68, saut 121→124), donc au bas de cette fourchette ; la durée des gestes de TA référence se lit sur ta vidéo, pas sur ces épées.
+
+## 9. Quatrième passe sur X (clips + tutoriels)
+
+Méthode : `WebSearch` limité à x.com/twitter.com (requêtes niche : R6, Moon Animator, TSB, Blox Fruits, piston/dislocation), puis `yt-dlp` sur les URL de posts publics. X n'a pas de recherche sans compte : je ne trouve que ce que le moteur de recherche web indexe. Clips non versionnés (dossier temporaire). 16 posts tentés, **9 vidéos récupérées**, 7 sans vidéo (texte seul).
+
+| Clip | Contenu [observé] |
+|---|---|
+| Veil, mise à jour TSB (oct. 2023, 19 s, 60 fps) | Moves complets en vue de jeu : le personnage fait ~10 % de la hauteur d'image, les VFX (slashes bleus, flashs blancs) dominent. |
+| Mr.Cool, « atomic sword » (3,3 s, 60 fps) | Découpe mesurée à l'œil sur planche à 10 i/s : accroupi/enroulé ≈ 0,6 s → vrille avec fumée au sol ≈ 0,6 s → flash blanc plein écran + arc ≈ 0,3 s → 2ᵉ flash → retour debout lent ≈ 1,5 s. Anticipation : frappe : retombée ≈ 2 : 1 : 5 [inféré, un seul clip]. |
+| Snaliel, « suiryu » (17 s) | Fumée volumique, anneaux blancs/violets, fissures noires au sol, débris plats, colonne de lumière verticale. |
+| AltiWyre, dash R6 en rig FK (5,8 s, 30 fps, 2020) | Fond neutre, caméra de profil fixe : l'animation est un enchaînement roulade → course penchée → glissade, le torse mène, les membres suivent. Utile pour la lisibilité de profil. |
+| oreI_orL, Goku SSJ « r6 » (18 s) | Modèle 3D détaillé : c'est du rendu, pas du R6 au sens animation du jeu. Peu utile. |
+| xsixx (créateur de Moon Animator), Wiggler (78 s) et Mirror (17 s) | Démos d'outil : le Wiggler ajoute du bruit entre clés (frisson, tremblement caméra) ; le miroir exige les noms « Left/Right ». |
+| subcycled, tuto « Face Animations » (113 s) | Tuto Moon Animator pour les visages, hors sujet combat. |
+| RoReddo, plugin RoRigged (95 s) | Démo de rigging (joints, chaînes de parties) dans Studio. |
+
+Lu dans les résultats texte (pas de vidéo) : un animateur dit qu'il n'existe « aucun tuto Roblox sur les smear frames » ; un fil dit que sans genou, rendre les jambes naturelles passe par l'inclinaison vers l'avant du segment ; la conversion R15 → R6 automatique donne de mauvais bras/jambes (conversion manuelle préférée). Aucun de ces posts n'explique le « piston/dislocation » en détail.
+
+**Bilan honnête** : X donne des exemples de moves et quelques démos d'outils, mais **peu de vrais cours d'animation R6** ; les meilleures explications restent les fils DevForum (§2, §6). Je n'ai pas fait de mesure image par image de ces 9 clips (planches seulement).
