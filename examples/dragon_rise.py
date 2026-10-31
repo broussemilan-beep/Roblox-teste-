@@ -124,10 +124,10 @@ STRIKE_KEYS = {
 }
 STRIKE_EASE = {44: "in", 46: "in", 47: "in", 48: "out", 51: "io"}
 LAND_KEYS = {
-    88: dict(rx=-30, T_rx=-20, RA_rx=70, RA_rz=18, LA_rx=60, LA_rz=-18, RL_rx=30, RL_rz=8, LL_rx=26, LL_rz=-8, RL_slide=1.5, LL_slide=1.4),        # the touchdown squat
-    92: dict(rx=-38, T_rx=-24, RA_rx=42, RA_rz=22, LA_rx=30, LA_rz=-22, RL_rx=34, RL_rz=8, LL_rx=30, LL_rz=-8, RL_slide=1.65, LL_slide=1.55),      # absorbing
-    98: dict(rx=-16, T_rx=-8, RA_rx=14, RA_rz=14, LA_rx=6, LA_rz=-14, RL_rx=12, RL_rz=6, LL_rx=10, LL_rz=-6, RL_slide=0.8, LL_slide=0.8),            # rising
-    105: dict(rx=0, T_rx=0, RA_rx=-6, RA_rz=8, LA_rx=6, LA_rz=-8, RL_rx=0, RL_rz=4, LL_rx=0, LL_rz=-4),                                              # upright, the arms hang
+    88: dict(ry=-98, T_ry=-14, T_rz=-4, H_ry=10, rx=-30, T_rx=-20, RA_rx=70, RA_rz=18, LA_rx=60, LA_rz=-18, RL_rx=30, RL_rz=8, LL_rx=26, LL_rz=-8, RL_slide=1.5, LL_slide=1.4),        # the touchdown squat
+    92: dict(ry=-100, T_ry=-16, T_rz=-5, H_ry=12, rx=-38, T_rx=-24, RA_rx=42, RA_rz=22, LA_rx=30, LA_rz=-22, RL_rx=34, RL_rz=8, LL_rx=30, LL_rz=-8, RL_slide=1.65, LL_slide=1.55),      # absorbing
+    98: dict(ry=-94, T_ry=-6, T_rz=-2, H_ry=4, rx=-16, T_rx=-8, RA_rx=14, RA_rz=14, LA_rx=6, LA_rz=-14, RL_rx=12, RL_rz=6, LL_rx=10, LL_rz=-6, RL_slide=0.8, LL_slide=0.8),            # rising
+    105: dict(ry=-90, T_ry=0, T_rz=0, H_ry=0, rx=0, T_rx=0, RA_rx=-6, RA_rz=8, LA_rx=6, LA_rz=-8, RL_rx=0, RL_rz=4, LL_rx=0, LL_rz=-4),                                              # upright, the arms hang
 }
 LAND_EASE = {88: "out", 92: "io", 98: "io"}
 
@@ -261,6 +261,7 @@ def dummy_motion(fist: np.ndarray, heel: np.ndarray, hero_x48: float):
         elif t <= HIT2:
             s = t - HIT1
             pos[t] = p0 + v0 * s + 0.5 * a * s * s
+            pos[t, 0] += 1.7 * math.sin(math.pi * s / T1)      # knocked forward as well as up: it stays clear of the hero until the heel brings it back
         elif t <= TG:
             s = t - HIT2
             pos[t] = p_k + vs * s + 0.5 * aS * s * s
