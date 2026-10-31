@@ -247,7 +247,7 @@ def dummy_motion(fist: np.ndarray, heel: np.ndarray, hero_x48: float):
     v0 = (tgt - p0 - 0.5 * a * T1 * T1) / T1
     TG = HIT2 + 6                                    # the heel drives it into the floor
     ground = 0.55
-    vs = np.array([0.18, -0.42, 0.0])
+    vs = np.array([0.45, -0.42, -0.5])                 # the heel sends it forward and back into the scene: it lies behind the line the hero walks on
     aS = np.array([0.0, -0.085, 0.0])
     tg = TG - HIT2
     p_k = tgt
