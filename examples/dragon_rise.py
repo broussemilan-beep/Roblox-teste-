@@ -109,18 +109,18 @@ NAMES20 = mocap.NAMES20
 # Everything is written for a SIDE view (the lens is on the +z side, the hero runs to +x): what reads there is the forward / back swing of limbs and the lean of the body.
 # The near arm (right, +z) is the striking arm; it is kept low and back until it swings, so it never hides his face and chest.
 GROUND_KEYS = {
-    0: dict(rx=-6, T_rx=-4, H_rx=2, RA_rx=-68, RA_rz=6, LA_rx=78, LA_rz=-10, RA_slide=0.4, LA_slide=0.9, RL_rx=-28, RL_rz=4, LL_rx=26, LL_rz=-4, RL_slide=0.35, LL_slide=0.45),     # guard: the far fist up by the chin, the near arm cocked back, feet apart
-    12: dict(rx=-10, T_rx=-6, H_rx=3, RA_rx=-72, RA_rz=6, LA_rx=84, LA_rz=-10, RA_slide=0.4, LA_slide=0.9, RL_rx=-30, RL_rz=4, LL_rx=28, LL_rz=-4, RL_slide=0.55, LL_slide=0.65),  # breathing in: a little lower
-    22: dict(rx=-8, T_rx=-5, H_rx=2, RA_rx=-70, RA_rz=6, LA_rx=80, LA_rz=-10, RA_slide=0.4, LA_slide=0.9, RL_rx=-29, RL_rz=4, LL_rx=27, LL_rz=-4, RL_slide=0.45, LL_slide=0.55),
-    29: dict(rx=-26, T_rx=-14, H_rx=8, RA_rx=-92, RA_rz=8, LA_rx=36, LA_rz=-12, RA_slide=0.1, LA_slide=0.7, RL_rx=-55, RL_rz=4, LL_rx=48, LL_rz=-4, RL_slide=1.3, LL_slide=1.3),       # the load: a deep sink, the arms thrown back
+    0: dict(ry=-84, T_ry=-8, T_rz=-3, H_ry=10, rx=-6, T_rx=-4, H_rx=2, RA_rx=-68, RA_rz=6, LA_rx=78, LA_rz=-10, RA_slide=0.4, LA_slide=0.9, RL_rx=-28, RL_rz=4, LL_rx=26, LL_rz=-4, RL_slide=0.35, LL_slide=0.45),     # guard: the far fist up by the chin, the near arm cocked back, feet apart
+    12: dict(ry=-86, T_ry=-10, T_rz=-4, H_ry=12, rx=-10, T_rx=-6, H_rx=3, RA_rx=-72, RA_rz=6, LA_rx=84, LA_rz=-10, RA_slide=0.4, LA_slide=0.9, RL_rx=-30, RL_rz=4, LL_rx=28, LL_rz=-4, RL_slide=0.55, LL_slide=0.65),  # breathing in: a little lower
+    22: dict(ry=-93, T_ry=-14, T_rz=-5, H_ry=18, rx=-8, T_rx=-5, H_rx=2, RA_rx=-70, RA_rz=6, LA_rx=80, LA_rz=-10, RA_slide=0.4, LA_slide=0.9, RL_rx=-29, RL_rz=4, LL_rx=27, LL_rz=-4, RL_slide=0.45, LL_slide=0.55),
+    29: dict(ry=-106, T_ry=-26, T_rz=-8, H_ry=30, rx=-26, T_rx=-14, H_rx=8, RA_rx=-92, RA_rz=8, LA_rx=36, LA_rz=-12, RA_slide=0.1, LA_slide=0.7, RL_rx=-55, RL_rz=4, LL_rx=48, LL_rz=-4, RL_slide=1.3, LL_slide=1.3),       # the load: a deep sink, the arms thrown back
 }
 GROUND_EASE = {0: "io", 12: "io", 22: "in", 29: "hold"}
 STRIKE_KEYS = {
-    44: dict(rx=-16, T_rx=-8, H_rx=6, RA_rx=-96, RA_rz=8, LA_rx=58, LA_rz=-12, RA_slide=0.0, LA_slide=0.9, RL_rx=-42, RL_rz=4, LL_rx=44, LL_rz=-4, RL_slide=0.7, LL_slide=0.8),        # wind-up: the arm hauled back and low, the hips dropped
-    46: dict(rx=-20, T_rx=-10, H_rx=4, RA_rx=-18, RA_rz=8, LA_rx=40, LA_rz=-12, RA_slide=0.1, LA_slide=0.9, RL_rx=-46, RL_rz=4, LL_rx=48, LL_rz=-4, RL_slide=1.2, LL_slide=1.2),       # the arm sweeps through low
-    47: dict(rx=-6, T_rx=0, H_rx=0, RA_rx=84, RA_rz=8, LA_rx=-10, LA_rz=-12, RA_slide=0.2, LA_slide=0.5, RL_rx=-38, RL_rz=4, LL_rx=52, LL_rz=-4, RL_slide=0.7, LL_slide=1.0),
-    48: dict(rx=4, T_rx=8, H_rx=-6, RA_rx=128, RA_rz=8, LA_rx=-46, LA_rz=-12, RA_slide=0.0, LA_slide=0.2, RL_rx=-32, RL_rz=4, LL_rx=54, LL_rz=-4, RL_slide=0.3, LL_slide=0.8),           # CONTACT: the fist is up and forward, the body is stretched, the back foot driving
-    51: dict(rx=8, T_rx=10, H_rx=-6, RA_rx=172, RA_rz=8, LA_rx=-60, LA_rz=-14, RA_slide=0.0, LA_slide=0.0, RL_rx=-24, RL_rz=4, LL_rx=40, LL_rz=-4, RL_slide=0.2, LL_slide=0.5),       # follow-through, held
+    44: dict(ry=-110, T_ry=-32, T_rz=-8, H_ry=34, rx=-16, T_rx=-8, H_rx=6, RA_rx=-96, RA_rz=8, LA_rx=58, LA_rz=-12, RA_slide=0.0, LA_slide=0.9, RL_rx=-42, RL_rz=4, LL_rx=44, LL_rz=-4, RL_slide=0.7, LL_slide=0.8),        # wind-up: the arm hauled back and low, the hips dropped
+    46: dict(ry=-98, T_ry=-34, T_rz=-6, H_ry=26, rx=-20, T_rx=-10, H_rx=4, RA_rx=-18, RA_rz=8, LA_rx=40, LA_rz=-12, RA_slide=0.1, LA_slide=0.9, RL_rx=-46, RL_rz=4, LL_rx=48, LL_rz=-4, RL_slide=1.2, LL_slide=1.2),       # the arm sweeps through low
+    47: dict(ry=-80, T_ry=-10, T_rz=2, H_ry=6, rx=-6, T_rx=0, H_rx=0, RA_rx=84, RA_rz=8, LA_rx=-10, LA_rz=-12, RA_slide=0.2, LA_slide=0.5, RL_rx=-38, RL_rz=4, LL_rx=52, LL_rz=-4, RL_slide=0.7, LL_slide=1.0),
+    48: dict(ry=-70, T_ry=22, T_rz=9, H_ry=-22, rx=4, T_rx=8, H_rx=-6, RA_rx=128, RA_rz=8, LA_rx=-46, LA_rz=-12, RA_slide=0.0, LA_slide=0.2, RL_rx=-32, RL_rz=4, LL_rx=54, LL_rz=-4, RL_slide=0.3, LL_slide=0.8),           # CONTACT: the fist is up and forward, the body is stretched, the back foot driving
+    51: dict(ry=-78, T_ry=10, T_rz=6, H_ry=-8, rx=8, T_rx=10, H_rx=-6, RA_rx=172, RA_rz=8, LA_rx=-60, LA_rz=-14, RA_slide=0.0, LA_slide=0.0, RL_rx=-24, RL_rz=4, LL_rx=40, LL_rz=-4, RL_slide=0.2, LL_slide=0.5),       # follow-through, held
 }
 STRIKE_EASE = {44: "in", 46: "in", 47: "in", 48: "out", 51: "io"}
 LAND_KEYS = {
@@ -164,16 +164,16 @@ def hero_track():
 def author_keys():
     """The aerial fight, pose by pose (animation clock 52..87)."""
     keys = {
-        51: dict(rx=8, T_rx=10, RA_rx=172, RA_rz=8, LA_rx=-60, LA_rz=-14, RL_rx=-24, RL_rz=4, LL_rx=40, LL_rz=-4, RL_slide=0.2, LL_slide=0.5),                        # the uppercut's follow-through
-        56: dict(rx=12, T_rx=8, H_rx=-4, RA_rx=140, RA_rz=10, LA_rx=-20, LA_rz=-14, RL_rx=14, RL_rz=6, LL_rx=34, LL_rz=-6, RL_slide=0.3, LL_slide=0.4),                       # rising on the strike: the arm drifts down behind the fist, legs trail
-        62: dict(rx=6, T_rx=0, RA_rx=125, RA_rz=22, LA_rx=110, LA_rz=-22, RL_rx=70, RL_rz=6, LL_rx=-28, LL_rz=-8, RL_slide=0.9, LL_slide=0.5),                      # rising, the right knee comes up
-        68: dict(rx=18, T_rx=6, RA_rx=-55, RA_rz=14, LA_rx=140, LA_rz=-14, RL_rx=118, RL_rz=6, LL_rx=-26, LL_rz=-6, RL_slide=0.4, LL_slide=0.2),                    # leaning back, the leg is cocked, the arms opposed
-        72: dict(rx=32, T_rx=10, H_rx=10, RA_rx=-62, RA_rz=14, LA_rx=146, LA_rz=-14, RL_rx=172, RL_rz=4, LL_rx=-20, LL_rz=-5, RL_slide=0.0, LL_slide=0.0),          # the apex: the leg straight up, held
-        75: dict(rx=34, T_rx=10, H_rx=12, RA_rx=-66, RA_rz=14, LA_rx=150, LA_rz=-14, RL_rx=176, RL_rz=4, LL_rx=-22, LL_rz=-5),                                       # a breath at the top
-        77: dict(rx=6, T_rx=-6, RA_rx=-20, RA_rz=14, LA_rx=40, LA_rz=-14, RL_rx=100, RL_rz=4, LL_rx=-12, LL_rz=-6),                                                 # the leg drops
-        78: dict(rx=-6, T_rx=-6, H_rx=-6, RA_rx=70, RA_rz=14, LA_rx=-30, LA_rz=-14, RL_rx=44, RL_rz=3, LL_rx=-16, LL_rz=-6),                                      # CONTACT: the heel lands, the body folds over it
-        81: dict(rx=-14, T_rx=-10, RA_rx=84, RA_rz=18, LA_rx=-40, LA_rz=-18, RL_rx=20, RL_rz=3, LL_rx=-10, LL_rz=-6),                                                # through
-        85: dict(rx=-20, T_rx=-10, RA_rx=30, RA_rz=44, LA_rx=40, LA_rz=-44, RL_rx=14, RL_rz=6, LL_rx=22, LL_rz=-6),                                                 # falling, arms out for balance
+        51: dict(ry=-78, T_ry=10, T_rz=6, H_ry=-8, rx=8, T_rx=10, RA_rx=172, RA_rz=8, LA_rx=-60, LA_rz=-14, RL_rx=-24, RL_rz=4, LL_rx=40, LL_rz=-4, RL_slide=0.2, LL_slide=0.5),                        # the uppercut's follow-through
+        56: dict(ry=-66, T_ry=0, T_rz=4, H_ry=0, rx=12, T_rx=8, H_rx=-4, RA_rx=140, RA_rz=10, LA_rx=-20, LA_rz=-14, RL_rx=14, RL_rz=6, LL_rx=34, LL_rz=-6, RL_slide=0.3, LL_slide=0.4),                       # rising on the strike: the arm drifts down behind the fist, legs trail
+        62: dict(ry=-46, T_ry=-10, T_rz=0, H_ry=14, rx=6, T_rx=0, RA_rx=125, RA_rz=22, LA_rx=110, LA_rz=-22, RL_rx=70, RL_rz=6, LL_rx=-28, LL_rz=-8, RL_slide=0.9, LL_slide=0.5),                      # rising, the right knee comes up
+        68: dict(ry=-72, T_ry=-14, T_rz=-4, H_ry=18, rx=18, T_rx=6, RA_rx=-55, RA_rz=14, LA_rx=140, LA_rz=-14, RL_rx=118, RL_rz=6, LL_rx=-26, LL_rz=-6, RL_slide=0.4, LL_slide=0.2),                    # leaning back, the leg is cocked, the arms opposed
+        72: dict(ry=-92, T_ry=-8, T_rz=-6, H_ry=8, rx=32, T_rx=10, H_rx=10, RA_rx=-62, RA_rz=14, LA_rx=146, LA_rz=-14, RL_rx=172, RL_rz=4, LL_rx=-20, LL_rz=-5, RL_slide=0.0, LL_slide=0.0),          # the apex: the leg straight up, held
+        75: dict(ry=-94, T_ry=-6, T_rz=-6, H_ry=6, rx=34, T_rx=10, H_rx=12, RA_rx=-66, RA_rz=14, LA_rx=150, LA_rz=-14, RL_rx=176, RL_rz=4, LL_rx=-22, LL_rz=-5),                                       # a breath at the top
+        77: dict(ry=-84, T_ry=8, T_rz=2, H_ry=-4, rx=6, T_rx=-6, RA_rx=-20, RA_rz=14, LA_rx=40, LA_rz=-14, RL_rx=100, RL_rz=4, LL_rx=-12, LL_rz=-6),                                                 # the leg drops
+        78: dict(ry=-74, T_ry=18, T_rz=6, H_ry=-14, rx=-6, T_rx=-6, H_rx=-6, RA_rx=70, RA_rz=14, LA_rx=-30, LA_rz=-14, RL_rx=44, RL_rz=3, LL_rx=-16, LL_rz=-6),                                      # CONTACT: the heel lands, the body folds over it
+        81: dict(ry=-80, T_ry=10, T_rz=4, H_ry=-8, rx=-14, T_rx=-10, RA_rx=84, RA_rz=18, LA_rx=-40, LA_rz=-18, RL_rx=20, RL_rz=3, LL_rx=-10, LL_rz=-6),                                                # through
+        85: dict(ry=-86, T_ry=0, T_rz=0, H_ry=0, rx=-20, T_rx=-10, RA_rx=30, RA_rz=44, LA_rx=40, LA_rz=-44, RL_rx=14, RL_rz=6, LL_rx=22, LL_rz=-6),                                                 # falling, arms out for balance
     }
     ease = {51: "io", 56: "io", 62: "io", 68: "io", 72: "hold", 75: "in", 77: "in", 78: "back", 81: "io", 85: "in"}
     return BASE, keys, ease
