@@ -470,7 +470,7 @@ def build() -> Scene:
         cine.ring(fg + 2 * k, 18 + 3 * k, gp, 0.6, r1, w1, 0.08, col, 0.95 - 0.12 * k, 0.0)
     for k in range(4):                                                                                                      # wind arcs spiralling out of the impact
         cine.slash(fg + k, 13, (gp[0], 0.4 + 0.5 * k, gp[2]), (0, 1, 0), 3.0 + 1.5 * k, 20 + 85 * k, 190 + 85 * k, 0.45, "#dcecff", "#ffffff")
-    cine.cracks(fg, 22, gp, 9.0, 16, "#1d1b19", glow="#ffb060", width=0.12, seed=2, fade=(75, 45))
+    cine.cracks(fg, 22, gp, 7.5, 22, "#2a2a33", glow=None, width=0.045, seed=2, fade=(80, 50))        # like the references: thin, dark, flush with the floor
     cine.burst_debris(fg, gp, 50, 0.34, 0.6, (0.4, 1.1), ["#7f8696", "#99a0ae", "#656c7b"], seed=3, g=0.03)
     cine.emit(fg, fg + 10, origin=gp, rate=0, burst=46, vel=(0.16, 0.5), dir=(0, 1, 0), spread=1.0, grav=-0.004, life=(36, 70), size=(1.8, 4.4), color=("#c7d0da", "#7f8b99"),
               alpha=(0.5, 0.0), add=False, shape="smoke", seed=5, radius=2.0)
