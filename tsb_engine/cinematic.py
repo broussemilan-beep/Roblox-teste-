@@ -406,6 +406,14 @@ class Cinematic:
                         "attachA": attach_a, "attachB": attach_b, "w": width, "color": color, "core": core, "segs": segs,
                         "jitter": jitter, "branch": branch, "flicker": flicker, "seed": self.seed * 100 + seed})
 
+    def mesh(self, kind: str, t0: int, dur: int, c: Vec, **kw) -> None:
+        """A modelled, textured VFX mesh for the Blender renderer (the 2D viewer skips it): ``star`` (billboard), ``dome``, ``blades``, ``wind``, ``pillar``.
+
+        ``r0``/``r1`` size at the start / end, ``color``/``edge`` hex tints, ``a`` peak brightness, ``strength`` emission, ``rot`` (rx, ry, rz) radians, ``spin``, ``n`` blades,
+        ``height`` (dome stretch / pillar length), ``seed``. See ``tools/vfx_mesh.py``.
+        """
+        self.fx.append({"type": "mesh", "kind": kind, "t0": t0, "dur": dur, "c": list(c), **kw})
+
     def slash(self, t0: int, dur: int, c: Vec, n: Vec, r: float, a0: float, a1: float, w: float = 0.7,
               color: str = "#ffb43a", core: str = "#ffffff") -> None:
         """Crescent smear that sweeps from angle a0 to a1 (degrees) in the plane with normal n (a thick tapered Trail)."""

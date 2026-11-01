@@ -25,6 +25,8 @@ import mathutils  # noqa: E402
 import numpy as np  # noqa: E402
 
 from examples.scenes import SCENES  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import vfx_mesh  # noqa: E402
 from tsb_engine import modeling as M  # noqa: E402
 from tsb_engine.kinematics import JOINTS, ROOT_REST_Y, part_transforms, pose_transform  # noqa: E402
 from tsb_engine.mathutil import compose, translate  # noqa: E402
@@ -439,6 +441,10 @@ def build(scene_name: str, frames: range, width: int, samples: int, rig: bool = 
     rim = bpy.data.objects.new("rim", rim_d)
     sc.collection.objects.link(rim)
 
+    # ---- modelled VFX (textured emissive meshes: stars, domes, blades, wind bands, pillars)
+    base_exposure = sc.view_settings.exposure
+    fxm = [vfx_mesh.make(e, C3, cam) for e in (CINE or {}).get("fx", []) if e.get("type") == "mesh"]
+
     def look_matrix(pos, forward, up_hint=(0, 1, 0)):
         f = mathutils.Vector(forward).normalized()
         r = f.cross(mathutils.Vector(up_hint)).normalized()
@@ -478,6 +484,10 @@ def build(scene_name: str, frames: range, width: int, samples: int, rig: bool = 
                 eu = mathutils.Euler((rx, ry, rz), "XYZ").to_matrix().to_4x4()
                 eu.translation = e[0]
                 keyer.key(ob, C4 @ eu, f)
+        for it in fxm:
+            it.key(f)
+        sc.view_settings.exposure = base_exposure - max([it.dim_at(f) for it in fxm] + [0.0])
+        sc.view_settings.keyframe_insert("exposure", frame=f)
         # camera: engine basis -> blender
         c = CINE["camera"][f] if CINE else [8, 4, 10, 0, 3, 0, 40, 0]
         pos, tgt, fov, roll = mathutils.Vector(c[:3]), mathutils.Vector(c[3:6]), c[6], c[7]
