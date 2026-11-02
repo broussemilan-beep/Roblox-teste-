@@ -396,19 +396,37 @@ def build() -> Scene:
     dum_c = lambda f: tuple(float(v) for v in dummy.world_parts(int(f))["Torso"][1])
     mid = lambda a_, b_: tuple((u + v) / 2 for u, v in zip(a_, b_))
 
-    # ---- camera: fixed shot sizes, each one computed from a distance (fov and distance give the frame height: 2 d tan(fov/2)), hard cuts at the impacts
-    t0 = (-2.4, 3.0, -0.6)
-    cine.shot(0, 26, dolly(orbit_pos(t0, -14, 3, 27), orbit_pos(t0, -9, 3, 23), t0, (-2.0, 3.0, -0.6), fov=30, easing="sine_inout"))               # establishing: both in frame, hero ~45 % high
-    cine.shot(26, f1 - 8, tracking(hero_c, (6.0, 1.4, 14.5), look_dy=0.2, fov=(32, 30), offset_end=(4.6, 1.2, 12.5)))                              # the dash seen from the front quarter, he runs toward the lens' right
-    tg1 = (3.9, 3.7, -1.0)
-    cine.shot(f1 - 8, f1 + 4, dolly(orbit_pos(tg1, -10, 3, 21.0), orbit_pos(tg1, -5, 3, 17.5), tg1, (4.0, 3.9, -1.0), fov=(30, 26), easing="expo_out"))   # the hit, over the hero's shoulder, the whole hero in frame
-    cine.shot(f1 + 4, f2 - 8, autoframe(lambda f: [hero_c(f), dum_c(f)], f1 + 4, f2 - 8, azimuth=-10, elevation=6.0, fov=34.0, fill=0.8, min_radius=3.0, follow=0.45, lift=0.6, pad=1.0))
-    tg2 = (4.8, 9.0, -1.0)
-    cine.shot(f2 - 8, f2 + 6, dolly(orbit_pos(tg2, 30, -5, 21.0), orbit_pos(tg2, 24, -4, 17.5), tg2, (4.8, 8.4, -1.0), fov=(32, 28), easing="expo_out"))  # the kick, from below, hero and dummy both in frame
-    tg3 = (5.9, 2.4, -0.2)
-    cine.shot(f2 + 6, fg + 8, dolly(orbit_pos(tg3, 30, 3, 21.0), orbit_pos(tg3, 38, 3, 16.0), (5.6, 5.5, -0.2), tg3, fov=(32, 30), roll=(0.0, -2.0), easing="expo_out"))   # down with the dummy, to the floor
-    tg4 = (7.0, 2.0, -0.4)
-    cine.shot(fg + 8, N + 1, dolly(orbit_pos(tg4, 34, 3, 16.0), orbit_pos((9.5, 2.6, -0.4), 14, 12, 27.0), tg4, (9.5, 2.6, -0.4), fov=(30, 36), roll=(-2.0, 0.0), easing="sine_inout"))  # the pull-back
+    CAM = os.environ.get("DR_CAM", "back")
+    if CAM == "back":
+        # ---- camera in the manner of The Strongest Battlegrounds: behind the player, over his right shoulder, the opponent ahead; cut-ins on the hits
+        fwd_hero = lambda f, dx, dy, dz: (hero_c(f)[0] + dx, hero_c(f)[1] + dy, hero_c(f)[2] + dz)
+        cine.shot(0, 26, dolly((-18.6, 4.7, 1.4), (-16.4, 4.4, 1.2), (-1.0, 3.2, -1.3), (0.4, 3.2, -1.3), fov=52, easing="sine_inout"))                 # gameplay: hero ~half the frame, the dummy small ahead
+        cine.shot(26, f1 - 6, tracking(lambda f: fwd_hero(f, 3.2, 0.3, -0.5), (-11.7, 1.7, 3.5), fov=(54, 74), offset_end=(-10.6, 1.6, 3.3)))             # the dash: the lens follows, the field of view opens with the speed
+        cine.shot(f1 - 6, f1 + 4, tracking(lambda f: fwd_hero(f, 3.0, 1.7, -0.7), (-12.4, 0.1, 4.2), fov=(50, 42), offset_end=(-11.0, -0.1, 3.9)))        # the uppercut, close behind him, the fist goes up the frame
+        cine.shot(f1 + 4, f2 - 4, autoframe(lambda f: [hero_c(f), dum_c(f)], f1 + 4, f2 - 4, azimuth=-70.0, elevation=9.0, fov=46.0, fill=0.78, min_radius=3.2, follow=0.4, lift=0.5, pad=1.0))
+        hp0 = tuple(float(v) for v in heel)
+        cine.shot(f2 - 4, f2 + 6, dolly((hp0[0] + 12.5, hp0[1] - 2.0, hp0[2] + 6.0), (hp0[0] + 10.5, hp0[1] - 1.6, hp0[2] + 5.0), (hp0[0] - 0.8, hp0[1] + 1.8, hp0[2]),
+                                        (hp0[0] - 0.8, hp0[1] + 0.3, hp0[2]), fov=(38, 33), roll=(-4.0, 0.0), easing="expo_out"))                                  # the hit cam: behind the dummy, the heel comes down on the lens
+        gm = (float(p_g[0]) - 1.8, 2.0, float(p_g[2]) + 1.4)
+        cine.shot(f2 + 6, fg + 8, dolly(orbit_pos(gm, 24, 8, 21.0), orbit_pos(gm, 30, 5, 17.0), (gm[0] - 1.0, 5.0, gm[2]), gm, fov=(34, 32), roll=(0.0, -2.0), easing="expo_out"))   # down to the floor with the dummy
+        cine.shot(fg + 8, fg + 30, dolly(orbit_pos(gm, 26, 4, 16.5), orbit_pos(gm, 12, 7, 20.0), gm, (gm[0] - 0.6, 2.4, gm[2]), fov=34, easing="sine_inout"))               # the crater, from the side
+        cine.shot(fg + 30, N + 1, tracking(lambda f: fwd_hero(f, 4.2, 0.0, -1.0), (-13.0, 2.0, 3.6), fov=(50, 44), offset_end=(-15.5, 4.6, 5.2)))      # back behind him for the walk, rising a little at the end
+    else:
+        # ---- camera: fixed shot sizes, each one computed from a distance (fov and distance give the frame height: 2 d tan(fov/2)), hard cuts at the impacts
+        t0 = (-2.4, 3.0, -0.6)
+        cine.shot(0, 26, dolly(orbit_pos(t0, -14, 3, 27), orbit_pos(t0, -9, 3, 23), t0, (-2.0, 3.0, -0.6), fov=30, easing="sine_inout"))               # establishing: both in frame, hero ~45 % high
+        cine.shot(26, f1 - 8, tracking(hero_c, (6.0, 1.4, 14.5), look_dy=0.2, fov=(32, 30), offset_end=(4.6, 1.2, 12.5)))                              # the dash seen from the front quarter, he runs toward the lens' right
+        tg1 = (3.9, 3.7, -1.0)
+        cine.shot(f1 - 8, f1 + 4, dolly(orbit_pos(tg1, -10, 3, 21.0), orbit_pos(tg1, -5, 3, 17.5), tg1, (4.0, 3.9, -1.0), fov=(30, 26), easing="expo_out"))   # the hit, over the hero's shoulder, the whole hero in frame
+        cine.shot(f1 + 4, f2 - 8, autoframe(lambda f: [hero_c(f), dum_c(f)], f1 + 4, f2 - 8, azimuth=-10, elevation=6.0, fov=34.0, fill=0.8, min_radius=3.0, follow=0.45, lift=0.6, pad=1.0))
+        tg2 = (4.8, 9.0, -1.0)
+        cine.shot(f2 - 8, f2 + 6, dolly(orbit_pos(tg2, 30, -5, 21.0), orbit_pos(tg2, 24, -4, 17.5), tg2, (4.8, 8.4, -1.0), fov=(32, 28), easing="expo_out"))  # the kick, from below, hero and dummy both in frame
+        tg3 = (5.9, 2.4, -0.2)
+        cine.shot(f2 + 6, fg + 8, dolly(orbit_pos(tg3, 30, 3, 21.0), orbit_pos(tg3, 38, 3, 16.0), (5.6, 5.5, -0.2), tg3, fov=(32, 30), roll=(0.0, -2.0), easing="expo_out"))   # down with the dummy, to the floor
+        tg4 = (7.0, 2.0, -0.4)
+        cine.shot(fg + 8, N + 1, dolly(orbit_pos(tg4, 34, 3, 16.0), orbit_pos((9.5, 2.6, -0.4), 14, 12, 27.0), tg4, (9.5, 2.6, -0.4), fov=(30, 36), roll=(-2.0, 0.0), easing="sine_inout"))  # the pull-back
+
+
 
     # ---- hit 1: the uppercut (sizes of the references: the light is 3-4 bodies wide, the arcs are thick ribbons, long beams cross the whole frame)
     cine.punch_in(f1, 0.13, 9)
