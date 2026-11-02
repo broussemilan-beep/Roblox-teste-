@@ -84,6 +84,40 @@ def bw(img: np.ndarray, sf: dict, f: int) -> np.ndarray:
             np.int32,
         )
         cv2.fillConvexPoly(out, pts, shard_col, cv2.LINE_AA)
+    if sf.get("ink"):                                   # thick angular brush strokes radiating from the hit, a red-pink glow on their edge, fine hatching beside them
+        mask = np.zeros((h, w), np.float32)
+        hatch = np.zeros((h, w), np.float32)
+        for _ in range(sf.get("strokes", 9)):
+            a = rng.rand() * 2 * np.pi
+            r = h * (0.04 + rng.rand() * 0.14)
+            p0 = np.array([cx + np.cos(a) * r, cy + np.sin(a) * r * 0.85])
+            ang, pts = a, [p0]
+            for _k in range(5 + rng.randint(5)):
+                ang += (rng.rand() - 0.5) * 0.95
+                pts.append(pts[-1] + np.array([np.cos(ang), np.sin(ang)]) * h * (0.07 + rng.rand() * 0.15))
+            base = h * (0.018 + rng.rand() * 0.03)
+            for k in range(len(pts) - 1):
+                t = 1 - k / (len(pts) - 1)
+                wd = max(2, int(base * (0.25 + 0.75 * t) * 2))
+                a0, a1 = pts[k], pts[k + 1]
+                cv2.line(mask, tuple(int(v) for v in a0), tuple(int(v) for v in a1), 1.0, wd, cv2.LINE_AA)
+                seg = a1 - a0
+                L = float(np.hypot(*seg)) + 1e-6
+                u, nrm = seg / L, np.array([-seg[1], seg[0]]) / L
+                for j in range(max(1, int(L / (h * 0.011)))):
+                    q = a0 + seg * (j / max(1, int(L / (h * 0.011))))
+                    sd = 1 if rng.rand() < 0.5 else -1
+                    off = wd / 2 + h * 0.006
+                    ln = h * (0.014 + rng.rand() * 0.04) * (0.4 + 0.6 * t)
+                    b0 = q + nrm * sd * off
+                    b1 = b0 + (nrm * sd * 0.9 + u * 0.4) * ln
+                    cv2.line(hatch, tuple(int(v) for v in b0), tuple(int(v) for v in b1), 1.0, 1, cv2.LINE_AA)
+        glow = np.clip(cv2.GaussianBlur(mask, (0, 0), h * 0.010) * 1.8 + cv2.GaussianBlur(mask, (0, 0), h * 0.03) * 0.8, 0, 1)
+        gc = np.array(sf.get("ink_glow", (0.36, 0.2, 1.0)), np.float32)           # BGR: red-pink
+        out = out * (1 - glow[..., None]) + gc * glow[..., None]
+        hh = np.clip(hatch, 0, 1)[..., None]
+        out = out * (1 - hh) + gc * 0.9 * hh
+        out = out * (1 - np.clip(mask * 1.6, 0, 1)[..., None])
     for i in range(sf.get("prisms", 0)):
         a = rng.rand() * 2 * np.pi
         r = h * (0.05 + rng.rand() * 0.32)

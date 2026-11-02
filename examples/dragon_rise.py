@@ -116,11 +116,11 @@ GROUND_KEYS = {
 }
 GROUND_EASE = {0: "io", 12: "io", 22: "in", 29: "hold"}
 STRIKE_KEYS = {
-    44: dict(ry=-110, T_ry=-32, T_rz=-8, H_ry=34, rx=-16, T_rx=-8, H_rx=6, RA_rx=-96, RA_rz=8, LA_rx=58, LA_rz=-12, RA_slide=0.0, LA_slide=0.9, RL_rx=-42, RL_rz=4, LL_rx=44, LL_rz=-4, RL_slide=0.7, LL_slide=0.8),        # wind-up: the arm hauled back and low, the hips dropped
-    46: dict(ry=-98, T_ry=-34, T_rz=-6, H_ry=26, rx=-20, T_rx=-10, H_rx=4, RA_rx=-18, RA_rz=8, LA_rx=40, LA_rz=-12, RA_slide=0.1, LA_slide=0.9, RL_rx=-46, RL_rz=4, LL_rx=48, LL_rz=-4, RL_slide=1.2, LL_slide=1.2),       # the arm sweeps through low
-    47: dict(ry=-80, T_ry=-10, T_rz=2, H_ry=6, rx=-6, T_rx=0, H_rx=0, RA_rx=84, RA_rz=8, LA_rx=-10, LA_rz=-12, RA_slide=0.2, LA_slide=0.5, RL_rx=-38, RL_rz=4, LL_rx=52, LL_rz=-4, RL_slide=0.7, LL_slide=1.0),
-    48: dict(ry=-70, T_ry=22, T_rz=9, H_ry=-22, rx=4, T_rx=8, H_rx=-6, RA_rx=128, RA_rz=8, LA_rx=-46, LA_rz=-12, RA_slide=0.0, LA_slide=0.2, RL_rx=-32, RL_rz=4, LL_rx=54, LL_rz=-4, RL_slide=0.3, LL_slide=0.8),           # CONTACT: the fist is up and forward, the body is stretched, the back foot driving
-    51: dict(ry=-78, T_ry=10, T_rz=6, H_ry=-8, rx=8, T_rx=10, H_rx=-6, RA_rx=172, RA_rz=8, LA_rx=-60, LA_rz=-14, RA_slide=0.0, LA_slide=0.0, RL_rx=-24, RL_rz=4, LL_rx=40, LL_rz=-4, RL_slide=0.2, LL_slide=0.5),       # follow-through, held
+    44: dict(ry=-110, T_ry=-32, T_rz=-8, H_ry=34, rx=-16, T_rx=-8, H_rx=6, RA_rx=-96, RA_rz=14, LA_rx=58, LA_rz=-12, RA_slide=0.0, LA_slide=0.9, RL_rx=-42, RL_rz=4, LL_rx=44, LL_rz=-4, RL_slide=0.7, LL_slide=0.8),        # wind-up: the arm hauled back and low, the hips dropped
+    46: dict(ry=-98, T_ry=-34, T_rz=-6, H_ry=26, rx=-20, T_rx=-10, H_rx=4, RA_rx=-18, RA_rz=26, LA_rx=40, LA_rz=-12, RA_slide=0.1, LA_slide=0.9, RL_rx=-46, RL_rz=4, LL_rx=48, LL_rz=-4, RL_slide=1.2, LL_slide=1.2),       # the arm sweeps through low
+    47: dict(ry=-80, T_ry=-10, T_rz=2, H_ry=6, rx=-6, T_rx=0, H_rx=0, RA_rx=84, RA_rz=40, LA_rx=-10, LA_rz=-12, RA_slide=0.2, LA_slide=0.5, RL_rx=-38, RL_rz=4, LL_rx=52, LL_rz=-4, RL_slide=0.7, LL_slide=1.0),
+    48: dict(ry=-70, T_ry=22, T_rz=9, H_ry=-22, rx=4, T_rx=8, H_rx=-6, RA_rx=128, RA_rz=34, LA_rx=-46, LA_rz=-12, RA_slide=0.0, LA_slide=0.2, RL_rx=-32, RL_rz=4, LL_rx=54, LL_rz=-4, RL_slide=0.3, LL_slide=0.8),           # CONTACT: the fist is up and forward, the body is stretched, the back foot driving
+    51: dict(ry=-78, T_ry=10, T_rz=6, H_ry=-8, rx=8, T_rx=10, H_rx=-6, RA_rx=172, RA_rz=22, LA_rx=-60, LA_rz=-14, RA_slide=0.0, LA_slide=0.0, RL_rx=-24, RL_rz=4, LL_rx=40, LL_rz=-4, RL_slide=0.2, LL_slide=0.5),       # follow-through, held
 }
 STRIKE_EASE = {44: "in", 46: "in", 47: "in", 48: "out", 51: "io"}
 LAND_KEYS = {
@@ -432,15 +432,15 @@ def build() -> Scene:
     cine.punch_in(f1, 0.13, 9)
     cine.shake(f1, 9, 0.5)
     cine.screen_fx("white", f1, 2, alpha=0.55)
-    cine.screen_fx("bw", f1 + 2, 3, seed=5, accent=True, focus=(0.55, 0.5), shards=16, bright=1.6)
+    cine.screen_fx("bw", f1 + 2, 3, seed=5, accent=True, focus=(0.55, 0.5), shards=5, bright=1.6, ink=True, strokes=10)
     fp = tuple(float(v) for v in fist)
     cine.trail(f1 - 7, f1 + 1, 0, "Right Arm", (0, -1.0, 0), 11, 0.75, 0.0, "#ffd9a0", 0.9)                          # the fist leaves a ribbon behind it
-    gold, hot = "#ff9a1f", "#ff4d00"
-    cine.mesh("star", f1, 10, fp, r0=4.5, r1=8.0, color="#ff7a1a", a=1.0, strength=14.0, dim=1.5, ease=3.0, fade=1.2)                                  # the four-point flare on the hit
+    gold, hot = "#ff9a1f", "#ffa000"
+    cine.mesh("star", f1, 10, fp, r0=6.0, r1=12.0, color="#ff7a1a", a=1.0, strength=14.0, dim=1.5, ease=3.0, fade=1.2)                                  # the four-point flare on the hit
     cine.mesh("dome", f1, 9, (fp[0] + 0.2, 0.0, fp[2]), r0=0.6, r1=4.4, color=gold, a=1.0, strength=6.0, height=0.8, rim=0.6, fill=0.14, ease=3.0, fade=1.1, seed=3)
     cine.mesh("blades", f1, 15, (fp[0], 0.2, fp[2]), r0=1.5, r1=7.5, color="#ffe2c0", edge=hot, a=1.0, strength=10.0, n=9, spin=0.55, rise=0.45, width=1.3, ease=2.4, fade=0.9, seed=4)
     for k, (r1, dl) in enumerate(((8.5, 0), (11.5, 3))):
-        cine.mesh("wind", f1 + dl, 14, (fp[0], 0.25 + 0.15 * k, fp[2]), r0=1.5, r1=r1, color="#fff0d8", a=1.0, strength=4.5, spin=0.28, ease=2.6, fade=1.0, seed=5 + k)
+        cine.mesh("wind", f1 + dl, 14, (fp[0], 0.25 + 0.15 * k, fp[2]), r0=1.5, r1=r1, color="#fff0d8", a=1.0, strength=2.0, spin=0.28, ease=2.6, fade=1.0, seed=5 + k)
     sh = (hero_c(f1)[0] + 0.3, hero_c(f1)[1] + 0.5, hero_c(f1)[2])
     cine.slash(f1 - 5, 8, sh, (0, 0, 1), 3.3, -150, 35, 1.5, "#ffb040", "#fff2c8")                                    # the arc of the uppercut, a thick ribbon
     cine.slash(f1 - 4, 8, sh, (0, 0, 1), 4.7, -130, 55, 0.8, "#ffe0a0", "#ffffff")
@@ -462,13 +462,13 @@ def build() -> Scene:
     cine.punch_in(f2, 0.16, 10)
     cine.shake(f2, 12, 0.8)
     cine.screen_fx("black", f2, 1)
-    cine.screen_fx("bw", f2 + 1, 4, seed=9, accent=True, focus=(0.5, 0.45), shards=18, bright=1.8)
+    cine.screen_fx("bw", f2 + 1, 4, seed=9, accent=True, focus=(0.5, 0.45), shards=6, bright=1.8, ink=True, strokes=12)
     cine.flash(f2 + 5, 3, "#ffffff", 0.5)
     hp = tuple(float(v) for v in heel)
     cine.trail(f2 - 9, f2 + 1, 0, "Right Leg", (0, -1.0, 0), 12, 0.9, 0.0, "#ffd9a0", 0.9)
-    cine.mesh("star", f2, 11, hp, r0=5.5, r1=9.5, color="#ffb040", a=1.0, strength=15.0, dim=1.5, ease=3.0, fade=1.2)
+    cine.mesh("star", f2, 11, hp, r0=7.0, r1=13.0, color="#ffb040", a=1.0, strength=15.0, dim=1.5, ease=3.0, fade=1.2)
     cine.mesh("blades", f2 - 2, 15, (hp[0], hp[1], hp[2] - 0.4), r0=1.5, r1=8.0, color="#ffe2c0", edge=hot, a=1.0, strength=10.0, n=9, spin=0.5, rise=0.4, width=1.3, rot=(math.pi / 2, 0.0, 0.0), ease=2.4, fade=0.9, seed=6)
-    cine.mesh("wind", f2, 15, (hp[0], hp[1], hp[2] - 0.4), r0=1.5, r1=10.0, color="#fff0d8", a=1.0, strength=4.5, spin=0.3, rot=(math.pi / 2, 0.0, 0.0), ease=2.6, fade=1.0, seed=8)
+    cine.mesh("wind", f2, 15, (hp[0], hp[1], hp[2] - 0.4), r0=1.5, r1=10.0, color="#fff0d8", a=1.0, strength=2.0, spin=0.3, rot=(math.pi / 2, 0.0, 0.0), ease=2.6, fade=1.0, seed=8)
     cine.slash(f2 - 6, 8, (heel[0] - 0.6, heel[1] + 2.2, heel[2]), (0, 0, 1), 3.9, 155, 5, 1.7, "#ffb040", "#fff2c8")
     cine.slash(f2 - 5, 8, (heel[0] - 0.6, heel[1] + 2.2, heel[2]), (0, 0, 1), 5.3, 150, 25, 0.9, "#ffe0a0", "#ffffff")
     cine.streaks(f2 - 6, 9, (hp[0], hp[1] + 11.0, hp[2]), (hp[0], hp[1] - 1.0, hp[2]), n=20, r0=1.8, r1=2.2, w=0.07, color="#fff0d0", seed=12)
@@ -482,8 +482,8 @@ def build() -> Scene:
     cine.mesh("dome", fg, 12, gp, r0=0.8, r1=8.0, color=gold, a=1.0, strength=6.0, height=0.7, rim=0.6, fill=0.14, ease=3.0, fade=1.0, seed=9)
     cine.mesh("blades", fg, 18, (gp[0], 0.2, gp[2]), r0=2.0, r1=12.0, color="#ffe2c0", edge=hot, a=1.0, strength=10.0, n=12, spin=0.45, rise=0.5, lift=0.3, width=1.4, ease=2.2, fade=0.85, seed=10)
     for k, (r1, dl) in enumerate(((9.0, 0), (13.0, 3), (17.0, 6))):
-        cine.mesh("wind", fg + dl, 17, (gp[0], 0.15 + 0.1 * k, gp[2]), r0=1.5, r1=r1, color="#fff0d8", a=1.0, strength=4.5, spin=0.22, ease=2.4, fade=1.0, seed=11 + k)
-    cine.mesh("star", fg, 10, (gp[0], 1.8, gp[2]), r0=4.5, r1=9.0, color="#ff9a30", a=1.0, strength=14.0, ease=3.0, fade=1.2)
+        cine.mesh("wind", fg + dl, 17, (gp[0], 0.15 + 0.1 * k, gp[2]), r0=1.5, r1=r1, color="#fff0d8", a=1.0, strength=2.0, spin=0.22, ease=2.4, fade=1.0, seed=11 + k)
+    cine.mesh("star", fg, 10, (gp[0], 1.8, gp[2]), r0=6.0, r1=13.0, color="#ff9a30", a=1.0, strength=14.0, ease=3.0, fade=1.2)
     cine.cracks(fg, 22, gp, 7.5, 22, "#2a2a33", glow=None, width=0.045, seed=2, fade=(80, 50))        # like the references: thin, dark, flush with the floor
     cine.burst_debris(fg, gp, 50, 0.34, 0.6, (0.4, 1.1), ["#7f8696", "#99a0ae", "#656c7b"], seed=3, g=0.03)
     cine.emit(fg, fg + 10, origin=gp, rate=0, burst=46, vel=(0.16, 0.5), dir=(0, 1, 0), spread=1.0, grav=-0.004, life=(36, 70), size=(1.8, 4.4), color=("#c7d0da", "#7f8b99"),
