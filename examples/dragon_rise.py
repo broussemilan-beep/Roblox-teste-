@@ -441,9 +441,9 @@ def build() -> Scene:
     cine.mesh("blades", f1, 15, (fp[0], 0.2, fp[2]), r0=1.5, r1=7.5, color="#ffe2c0", edge=hot, a=1.0, strength=10.0, n=9, spin=0.55, rise=0.45, width=1.3, ease=2.4, fade=0.9, seed=4)
     for k, (r1, dl) in enumerate(((8.5, 0), (11.5, 3))):
         cine.mesh("wind", f1 + dl, 14, (fp[0], 0.25 + 0.15 * k, fp[2]), r0=1.5, r1=r1, color="#fff0d8", a=1.0, strength=2.0, spin=0.28, ease=2.6, fade=1.0, seed=5 + k)
-    sh = (hero_c(f1)[0] + 0.3, hero_c(f1)[1] + 0.5, hero_c(f1)[2])
-    cine.slash(f1 - 5, 8, sh, (0, 0, 1), 3.3, -150, 35, 1.5, "#ffb040", "#fff2c8")                                    # the arc of the uppercut, a thick ribbon
-    cine.slash(f1 - 4, 8, sh, (0, 0, 1), 4.7, -130, 55, 0.8, "#ffe0a0", "#ffffff")
+    sc1 = (fp[0] - 0.2, fp[1] - 1.5, fp[2] - 0.3)                                                                      # the hook rises on the right: ribbons in the plane that faces the lens behind him
+    cine.slash(f1 - 5, 8, sc1, (1, 0, 0), 2.7, 75, -125, 1.4, "#ffb040", "#fff2c8")
+    cine.slash(f1 - 4, 8, sc1, (1, 0, 0), 3.8, 60, -140, 0.8, "#ffe0a0", "#ffffff")
     cine.streaks(f1, 8, (fp[0], 0.5, fp[2]), (fp[0], 13.0, fp[2]), n=18, r0=1.6, r1=2.4, w=0.07, color="#fff0d0", seed=11)   # speed lines rising with him
     cine.emit(f1, f1 + 6, origin=(fp[0], 0.3, fp[2]), rate=0, burst=42, vel=(0.12, 0.35), dir=(0, 1, 0), spread=1.2, grav=0.0, life=(26, 50), size=(1.4, 3.4),
               color=("#c3ceda", "#808c9b"), alpha=(0.65, 0.0), add=False, shape="smoke", seed=3, radius=1.2)
@@ -462,15 +462,15 @@ def build() -> Scene:
     cine.punch_in(f2, 0.16, 10)
     cine.shake(f2, 12, 0.8)
     cine.screen_fx("black", f2, 1)
-    cine.screen_fx("bw", f2 + 1, 4, seed=9, accent=True, focus=(0.5, 0.45), shards=6, bright=1.8, ink=True, strokes=12)
+    cine.screen_fx("bw", f2 + 1, 3, seed=9, accent=True, focus=(0.5, 0.45), shards=6, bright=1.8, ink=True, strokes=12)
     cine.flash(f2 + 5, 3, "#ffffff", 0.5)
     hp = tuple(float(v) for v in heel)
     cine.trail(f2 - 9, f2 + 1, 0, "Right Leg", (0, -1.0, 0), 12, 0.9, 0.0, "#ffd9a0", 0.9)
     cine.mesh("star", f2, 11, hp, r0=7.0, r1=13.0, color="#ffb040", a=1.0, strength=15.0, dim=1.5, ease=3.0, fade=1.2)
     cine.mesh("blades", f2 - 2, 15, (hp[0], hp[1], hp[2] - 0.4), r0=1.5, r1=8.0, color="#ffe2c0", edge=hot, a=1.0, strength=10.0, n=9, spin=0.5, rise=0.4, width=1.3, rot=(math.pi / 2, 0.0, 0.0), ease=2.4, fade=0.9, seed=6)
     cine.mesh("wind", f2, 15, (hp[0], hp[1], hp[2] - 0.4), r0=1.5, r1=10.0, color="#fff0d8", a=1.0, strength=2.0, spin=0.3, rot=(math.pi / 2, 0.0, 0.0), ease=2.6, fade=1.0, seed=8)
-    cine.slash(f2 - 6, 8, (heel[0] - 0.6, heel[1] + 2.2, heel[2]), (0, 0, 1), 3.9, 155, 5, 1.7, "#ffb040", "#fff2c8")
-    cine.slash(f2 - 5, 8, (heel[0] - 0.6, heel[1] + 2.2, heel[2]), (0, 0, 1), 5.3, 150, 25, 0.9, "#ffe0a0", "#ffffff")
+    cine.slash(f2 - 6, 8, (heel[0] + 0.4, heel[1] + 1.8, heel[2]), (0.9, 0.1, 0.45), 3.6, -100, 70, 1.6, "#ffb040", "#fff2c8")
+    cine.slash(f2 - 5, 8, (heel[0] + 0.4, heel[1] + 1.8, heel[2]), (0.9, 0.1, 0.45), 4.9, -110, 60, 0.9, "#ffe0a0", "#ffffff")
     cine.streaks(f2 - 6, 9, (hp[0], hp[1] + 11.0, hp[2]), (hp[0], hp[1] - 1.0, hp[2]), n=20, r0=1.8, r1=2.2, w=0.07, color="#fff0d0", seed=12)
 
     # ---- the ground: the slam (a light pillar, wide thick rings, wind arcs, tall volumetric smoke, glowing seams, slabs)
@@ -479,7 +479,7 @@ def build() -> Scene:
     cine.punch_in(fg, 0.2, 12)
     cine.flash(fg, 3, "#ffffff", 0.5)
     cine.mesh("pillar", fg, 13, gp, r0=1.2, r1=1.2, color="#ffb030", a=1.0, strength=9.0, height=17.0, dim=1.8, fade=1.0, seed=7)
-    cine.mesh("dome", fg, 12, gp, r0=0.8, r1=8.0, color=gold, a=1.0, strength=6.0, height=0.7, rim=0.6, fill=0.14, ease=3.0, fade=1.0, seed=9)
+    cine.mesh("dome", fg, 8, gp, r0=0.8, r1=6.5, color=gold, a=1.0, strength=4.2, height=0.7, rim=0.6, fill=0.05, ease=3.0, fade=1.4, seed=9)
     cine.mesh("blades", fg, 18, (gp[0], 0.2, gp[2]), r0=2.0, r1=12.0, color="#ffe2c0", edge=hot, a=1.0, strength=10.0, n=12, spin=0.45, rise=0.5, lift=0.3, width=1.4, ease=2.2, fade=0.85, seed=10)
     for k, (r1, dl) in enumerate(((9.0, 0), (13.0, 3), (17.0, 6))):
         cine.mesh("wind", fg + dl, 17, (gp[0], 0.15 + 0.1 * k, gp[2]), r0=1.5, r1=r1, color="#fff0d8", a=1.0, strength=2.0, spin=0.22, ease=2.4, fade=1.0, seed=11 + k)
