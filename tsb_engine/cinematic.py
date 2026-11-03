@@ -201,6 +201,7 @@ class Cinematic:
     floor_color: str = "#d8dce3"
     sky_color: str = "#c9d3e3"
     horizon_color: str | None = None  # warm band at the horizon (look "arena")
+    mood: str = ""  # "dusk": low warm sun, blue rim light, dark ground (the light effects pop)
     seed: int = 7
     sheets: dict = field(default_factory=dict)
     look: str = "film"  # "film" (grid floor, dark) | "studio" (the Roblox Studio viewport: plain grey baseplate, light haze) | "arena" (warm stone tiles, graded sky, depth of field)
@@ -496,5 +497,5 @@ class Cinematic:
                 "tint": [round(self.tint.at(f), 3) for f in rng],
                 "tintColor": self.tint_color, "flashes": self.flashes, "fx": self.screenfx,
             },
-            "floorColor": self.floor_color, "skyColor": self.sky_color, "horizonColor": self.horizon_color, "look": self.look, "sheets": self.sheets, "aspect": round(self.aspect, 4),
+            "floorColor": self.floor_color, "skyColor": self.sky_color, "horizonColor": self.horizon_color, "mood": self.mood, "look": self.look, "sheets": self.sheets, "aspect": round(self.aspect, 4),
         }

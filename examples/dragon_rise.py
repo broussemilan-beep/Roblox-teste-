@@ -130,6 +130,15 @@ LAND_KEYS = {
     105: dict(ry=-90, T_ry=0, T_rz=0, H_ry=0, rx=0, T_rx=0, RA_rx=-6, RA_rz=8, LA_rx=6, LA_rz=-8, RL_rx=0, RL_rz=4, LL_rx=0, LL_rz=-4),                                              # upright, the arms hang
 }
 LAND_EASE = {88: "out", 92: "io", 98: "io"}
+# the turn (106-115): the head goes first, then the shoulders, then the hips; the weight settles on the planted foot
+TURN_KEYS = {
+    106: dict(ry=-90, rx=0, T_rx=0, RA_rx=-6, RA_rz=8, LA_rx=6, LA_rz=-8, RL_rx=0, RL_rz=4, LL_rx=0, LL_rz=-4),
+    108: dict(ry=-84, T_ry=-6, H_ry=48, H_rx=-4, rx=-3, T_rx=-3, RA_rx=-8, RA_rz=10, LA_rx=10, LA_rz=-10, RL_rx=4, RL_rz=4, LL_rx=-6, LL_rz=-4),
+    111: dict(ry=-36, T_ry=-10, H_ry=40, H_rx=-3, rx=-4, T_rx=-3, T_rz=3, RA_rx=-14, RA_rz=14, LA_rx=16, LA_rz=-12, RL_rx=8, RL_rz=4, LL_rx=-10, LL_rz=-4),
+    113: dict(ry=26, T_ry=-4, H_ry=22, rx=-2, T_rx=-2, RA_rx=-10, RA_rz=12, LA_rx=12, LA_rz=-12, RL_rx=4, RL_rz=4, LL_rx=-6, LL_rz=-4),
+    115: dict(ry=88, T_ry=0, H_ry=0, rx=0, T_rx=0, RA_rx=-6, RA_rz=8, LA_rx=6, LA_rz=-8, RL_rx=0, RL_rz=4, LL_rx=0, LL_rz=-4),
+}
+TURN_EASE = {106: "io", 108: "io", 111: "io", 113: "out", 115: "hold"}
 
 
 def authored_from(keys: dict, ease: dict, t0: int, t1: int) -> np.ndarray:
@@ -156,8 +165,9 @@ def hero_track():
     lib = mocap.load_library(LIB)
     dash, dxz, dair = mocap.assemble([dict(clip="49_04", t0=0.3, t1=1.0, n=14, yaw=-90)], lib, follow=np.array([[plan_x(30 + t), HERO_Z] for t in range(14)]),
                                       start_xz=(plan_x(30), HERO_Z))
-    walk, wxz, wair = mocap.assemble([dict(clip="07_01", t0=0.3, t1=1.9, n=38, yaw=-90)], lib, follow=np.array([[plan_x(106 + t), HERO_Z] for t in range(38)]),
-                                      start_xz=(plan_x(106), HERO_Z))
+    xs = np.linspace(6.6, 3.4, 28)                                  # he turns his back on the crater and walks toward the lens
+    walk, wxz, wair = mocap.assemble([dict(clip="07_01", t0=0.3, t1=1.4, n=28, yaw=90)], lib, follow=np.array([[x, HERO_Z] for x in xs]),
+                                      start_xz=(6.6, HERO_Z))
     return dash, dxz, dair, walk, wxz, wair
 
 
@@ -194,8 +204,9 @@ def hero_angles():
     st = authored_from(STRIKE_KEYS, STRIKE_EASE, 44, 51)
     mid = authored(52, 87)
     ld = authored_from(LAND_KEYS, LAND_EASE, 88, 105)
-    seg = {"g": g, "dash": dash, "st": st, "mid": mid, "ld": ld, "walk": walk}
-    parts = [g, dash, st, mid, ld, walk]
+    tn = authored_from(TURN_KEYS, TURN_EASE, 106, 115)
+    seg = {"g": g, "dash": dash, "st": st, "mid": mid, "ld": ld, "turn": tn, "walk": walk}
+    parts = [g, dash, st, mid, ld, tn, walk]
     # breathing in the guard
     for i in range(len(g)):
         g[i, 1] += 1.2 * math.sin(i * 0.5)
@@ -206,10 +217,12 @@ def hero_angles():
     assert len(ang) == M, (len(ang), M)
     xz = np.array([[plan_x(t), HERO_Z] for t in range(M)])
     xz[30:44] = dxz
-    xz[106:] = wxz
+    xz[100:116] = (6.6, HERO_Z)
+    xz[116:] = wxz
     air = np.zeros(M)
     air[30:44] = dair
-    air[106:] = wair
+    air[106:116] = 0.0
+    air[116:] = wair
     for t in range(47, 88):          # the flight starts with the strike (47): up to the apex at 72, then pulled down by the kick
         if t < 47:
             air[t] = 0.0
@@ -222,7 +235,7 @@ def hero_angles():
             u = (t - 78) / 9.0
             air[t] = (8.6 - 0.9) * (1 - u ** 1.8)
     # cross-fade 3 images over each join so that nothing pops
-    for j in (30, 44, 52, 88, 106):
+    for j in (30, 44, 52, 88, 106, 116):
         prev = ang[j - 1].copy()
         for i in range(3):
             w = (i + 1) / 4.0
@@ -389,7 +402,11 @@ def build() -> Scene:
 
     cine = Cinematic(N, fps=FPS)
     cine.look = "arena"
-    cine.sky_color, cine.horizon_color, cine.floor_color = "#3d68b6", "#f5d2a8", "#a3a9b6"
+    if os.environ.get("DR_MOOD", "dusk") == "dusk":      # the light effects need a dark picture to pop, as in the references' showcases
+        cine.mood = "dusk"
+        cine.sky_color, cine.horizon_color, cine.floor_color = "#0b1530", "#d9733d", "#2c303c"
+    else:
+        cine.sky_color, cine.horizon_color, cine.floor_color = "#3d68b6", "#f5d2a8", "#a3a9b6"
     dress(cine)
     f1, f2, fg = film_of(HIT1), film_of(HIT2), film_of(TG)
     hero_c = lambda f: tuple(float(v) for v in hero.world_parts(int(f))["Torso"][1])
@@ -410,7 +427,7 @@ def build() -> Scene:
         gm = (float(p_g[0]) - 1.8, 2.0, float(p_g[2]) + 1.4)
         cine.shot(f2 + 6, fg + 8, dolly(orbit_pos(gm, 24, 8, 21.0), orbit_pos(gm, 30, 5, 17.0), (gm[0] - 1.0, 5.0, gm[2]), gm, fov=(34, 32), roll=(0.0, -2.0), easing="expo_out"))   # down to the floor with the dummy
         cine.shot(fg + 8, fg + 30, dolly(orbit_pos(gm, 26, 4, 16.5), orbit_pos(gm, 12, 7, 20.0), gm, (gm[0] - 0.6, 2.4, gm[2]), fov=34, easing="sine_inout"))               # the crater, from the side
-        cine.shot(fg + 30, N + 1, tracking(lambda f: fwd_hero(f, 4.2, 0.0, -1.0), (-13.0, 2.0, 3.6), fov=(50, 44), offset_end=(-15.5, 4.6, 5.2)))      # back behind him for the walk, rising a little at the end
+        cine.shot(fg + 30, N + 1, dolly((-5.4, 1.5, 1.5), (-7.8, 2.0, 2.0), (7.0, 3.2, HERO_Z - 1.2), (4.6, 3.4, HERO_Z - 0.8), fov=(42, 38), easing="sine_inout"))   # he turns his back on the crater and walks toward the lens
     else:
         # ---- camera: fixed shot sizes, each one computed from a distance (fov and distance give the frame height: 2 d tan(fov/2)), hard cuts at the impacts
         t0 = (-2.4, 3.0, -0.6)
@@ -447,6 +464,11 @@ def build() -> Scene:
     cine.streaks(f1, 8, (fp[0], 0.5, fp[2]), (fp[0], 13.0, fp[2]), n=18, r0=1.6, r1=2.4, w=0.07, color="#fff0d0", seed=11)   # speed lines rising with him
     cine.emit(f1, f1 + 6, origin=(fp[0], 0.3, fp[2]), rate=0, burst=42, vel=(0.12, 0.35), dir=(0, 1, 0), spread=1.2, grav=0.0, life=(26, 50), size=(1.4, 3.4),
               color=("#c3ceda", "#808c9b"), alpha=(0.65, 0.0), add=False, shape="smoke", seed=3, radius=1.2)
+
+    # ---- dash: rings of air thrown off behind him
+    for k, ff in enumerate(range(d0_ := film_of(30) + 2, film_of(44) - 3, 2)):
+        hc = hero_c(ff)
+        cine.mesh("wind", ff, 9, (hc[0] - 0.8, hc[1] - 0.3, hc[2]), r0=1.0, r1=4.2, color="#e6f1ff", a=0.9, strength=2.4, spin=0.2, rot=(0.0, math.pi / 2, 0.0), ease=2.2, fade=1.1, seed=30 + k)
 
     # ---- dash: dust, speed lines
     d0, d1 = film_of(30), film_of(44)
@@ -490,6 +512,12 @@ def build() -> Scene:
               alpha=(0.5, 0.0), add=False, shape="smoke", seed=5, radius=2.0)
     cine.emit(fg + 6, fg + 40, origin=gp, rate=1.4, vel=(0.05, 0.22), dir=(0, 1, 0), spread=0.6, life=(36, 60), size=(1.8, 4.0), color=("#b9c4d0", "#8390a0"),
               alpha=(0.38, 0.0), add=False, shape="smoke", seed=7, radius=2.4)
+
+    # ---- the crater keeps burning: embers rise while he walks away
+    cine.emit(fg + 8, N - 1, origin=(gp[0], 0.3, gp[2]), rate=3.2, vel=(0.03, 0.12), dir=(0, 1, 0), spread=0.9, grav=-0.0012, life=(34, 70), size=(0.16, 0.05),
+              color=("#ffd27a", "#ff5a00"), alpha=(1.0, 0.0), add=True, shape="soft", seed=21, radius=2.6)
+    cine.emit(fg + 10, N - 1, origin=(gp[0], 0.2, gp[2]), rate=0.9, vel=(0.04, 0.16), dir=(0, 1, 0), spread=0.7, grav=0.0, life=(50, 90), size=(2.0, 5.5), color=("#6e6a74", "#38363e"),
+              alpha=(0.5, 0.0), add=False, shape="smoke", seed=22, radius=2.0)
 
     # ---- the landing, the walk away
     l0 = film_of(88)
