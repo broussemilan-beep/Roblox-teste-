@@ -463,12 +463,12 @@ def build() -> Scene:
     cine.slash(f1 - 4, 8, sc1, (1, 0, 0), 3.8, 60, -140, 0.8, "#ffe0a0", "#ffffff")
     cine.streaks(f1, 8, (fp[0], 0.5, fp[2]), (fp[0], 13.0, fp[2]), n=18, r0=1.6, r1=2.4, w=0.07, color="#fff0d0", seed=11)   # speed lines rising with him
     cine.emit(f1, f1 + 6, origin=(fp[0], 0.3, fp[2]), rate=0, burst=42, vel=(0.12, 0.35), dir=(0, 1, 0), spread=1.2, grav=0.0, life=(26, 50), size=(1.4, 3.4),
-              color=("#c3ceda", "#808c9b"), alpha=(0.65, 0.0), add=False, shape="smoke", seed=3, radius=1.2)
+              color=("#9aa6ba", "#566176"), alpha=(0.5, 0.0), add=False, shape="smoke", seed=3, radius=1.2)
 
     # ---- dash: rings of air thrown off behind him
-    for k, ff in enumerate(range(d0_ := film_of(30) + 2, film_of(44) - 3, 2)):
+    for k, ff in enumerate(range(film_of(30) + 3, film_of(44) - 3, 4)):
         hc = hero_c(ff)
-        cine.mesh("wind", ff, 9, (hc[0] - 0.8, hc[1] - 0.3, hc[2]), r0=1.0, r1=4.2, color="#e6f1ff", a=0.9, strength=2.4, spin=0.2, rot=(0.0, math.pi / 2, 0.0), ease=2.2, fade=1.1, seed=30 + k)
+        cine.mesh("wind", ff, 9, (hc[0] - 0.8, hc[1] - 0.3, hc[2]), r0=0.9, r1=3.0, color="#e6f1ff", a=0.7, strength=1.5, spin=0.2, rot=(0.0, math.pi / 2, 0.0), ease=2.2, fade=1.2, seed=30 + k)
 
     # ---- dash: dust, speed lines
     d0, d1 = film_of(30), film_of(44)
@@ -502,16 +502,16 @@ def build() -> Scene:
     cine.flash(fg, 3, "#ffffff", 0.5)
     cine.mesh("pillar", fg, 13, gp, r0=1.2, r1=1.2, color="#ffb030", a=1.0, strength=9.0, height=17.0, dim=1.8, fade=1.0, seed=7)
     cine.mesh("dome", fg, 8, gp, r0=0.8, r1=6.5, color=gold, a=1.0, strength=4.2, height=0.7, rim=0.6, fill=0.05, ease=3.0, fade=1.4, seed=9)
-    cine.mesh("blades", fg, 18, (gp[0], 0.2, gp[2]), r0=2.0, r1=12.0, color="#ffe2c0", edge=hot, a=1.0, strength=10.0, n=12, spin=0.45, rise=0.5, lift=0.3, width=1.4, ease=2.2, fade=0.85, seed=10)
+    cine.mesh("blades", fg, 13, (gp[0], 0.2, gp[2]), r0=2.0, r1=11.0, color="#ffe2c0", edge=hot, a=1.0, strength=6.5, n=9, spin=0.45, rise=0.5, lift=0.3, width=1.1, ease=2.2, fade=1.0, seed=10)
     for k, (r1, dl) in enumerate(((9.0, 0), (13.0, 3), (17.0, 6))):
         cine.mesh("wind", fg + dl, 17, (gp[0], 0.15 + 0.1 * k, gp[2]), r0=1.5, r1=r1, color="#fff0d8", a=1.0, strength=2.0, spin=0.22, ease=2.4, fade=1.0, seed=11 + k)
     cine.mesh("star", fg, 10, (gp[0], 1.8, gp[2]), r0=6.0, r1=13.0, color="#ff9a30", a=1.0, strength=14.0, ease=3.0, fade=1.2)
     cine.cracks(fg, 22, gp, 7.5, 22, "#2a2a33", glow=None, width=0.045, seed=2, fade=(80, 50))        # like the references: thin, dark, flush with the floor
     cine.burst_debris(fg, gp, 50, 0.34, 0.6, (0.4, 1.1), ["#7f8696", "#99a0ae", "#656c7b"], seed=3, g=0.03)
-    cine.emit(fg, fg + 10, origin=gp, rate=0, burst=46, vel=(0.16, 0.5), dir=(0, 1, 0), spread=1.0, grav=-0.004, life=(36, 70), size=(1.8, 4.4), color=("#c7d0da", "#7f8b99"),
-              alpha=(0.5, 0.0), add=False, shape="smoke", seed=5, radius=2.0)
-    cine.emit(fg + 6, fg + 40, origin=gp, rate=1.4, vel=(0.05, 0.22), dir=(0, 1, 0), spread=0.6, life=(36, 60), size=(1.8, 4.0), color=("#b9c4d0", "#8390a0"),
-              alpha=(0.38, 0.0), add=False, shape="smoke", seed=7, radius=2.4)
+    cine.emit(fg, fg + 10, origin=gp, rate=0, burst=46, vel=(0.16, 0.5), dir=(0, 1, 0), spread=1.0, grav=-0.004, life=(36, 70), size=(1.8, 4.4), color=("#9aa6ba", "#566176"),
+              alpha=(0.42, 0.0), add=False, shape="smoke", seed=5, radius=2.0)
+    cine.emit(fg + 6, fg + 40, origin=gp, rate=1.4, vel=(0.05, 0.22), dir=(0, 1, 0), spread=0.6, life=(36, 60), size=(1.8, 4.0), color=("#8793a8", "#5a6579"),
+              alpha=(0.3, 0.0), add=False, shape="smoke", seed=7, radius=2.4)
 
     # ---- the crater keeps burning: embers rise while he walks away
     cine.emit(fg + 8, N - 1, origin=(gp[0], 0.3, gp[2]), rate=3.2, vel=(0.03, 0.12), dir=(0, 1, 0), spread=0.9, grav=-0.0012, life=(34, 70), size=(0.16, 0.05),
