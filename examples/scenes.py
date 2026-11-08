@@ -153,6 +153,11 @@ def _practice_mocap() -> Scene:
     return build()
 
 
+def _dragon_combo() -> Scene:
+    from .dragon_combo import build
+    return build()
+
+
 def _dragon_rise() -> Scene:
     from .dragon_rise import build
     return build()
@@ -164,4 +169,4 @@ def _practice() -> Scene:
     return build()
 
 
-SCENES = {"dragon_rise": _dragon_rise, "practice": _practice, "practice_mocap": _practice_mocap, "run_test": _run_test, "calm": _calm, "ronin_showcase": _ronin, "heavy_punch_hit": heavy_punch_hit, "berserker_ultimate": _ultimate, "duel_short": _short, "eyes_bench": _eyes_bench}
+SCENES = {"dragon_combo": _dragon_combo, "dragon_rise": _dragon_rise, "practice": _practice, "practice_mocap": _practice_mocap, "run_test": _run_test, "calm": _calm, "ronin_showcase": _ronin, "heavy_punch_hit": heavy_punch_hit, "berserker_ultimate": _ultimate, "duel_short": _short, "eyes_bench": _eyes_bench}

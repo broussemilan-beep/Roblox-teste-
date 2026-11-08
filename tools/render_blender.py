@@ -330,15 +330,15 @@ def build(scene_name: str, frames: range, width: int, samples: int, rig: bool = 
     floor = (CINE or {}).get("floorColor", "#66646a")
     if (CINE or {}).get("look") == "arena":
         hor = (CINE or {}).get("horizonColor") or "#f3cfa0"
-        make_world(sky, hor, 0.5, 0.0) if (CINE or {}).get("mood") == "dusk" else make_world(sky, hor)
+        make_world(sky, hor, 0.5, 0.0) if (CINE or {}).get("mood") in ("dusk", "night") else make_world(sky, hor)
         make_ground(hor, floor, "arena")
-        sc.world.node_tree.nodes["Background"].inputs["Strength"].default_value = 1.25 if (CINE or {}).get("mood") == "dusk" else 1.15
+        sc.world.node_tree.nodes["Background"].inputs["Strength"].default_value = 1.25 if (CINE or {}).get("mood") == "dusk" else (1.1 if (CINE or {}).get("mood") == "night" else 1.15)
         try:
             sc.view_settings.view_transform = "AgX"
             sc.view_settings.look = "AgX - Medium High Contrast"
         except Exception:  # noqa: BLE001
             pass
-        sc.view_settings.exposure = 0.7 if (CINE or {}).get("mood") == "dusk" else 0.25
+        sc.view_settings.exposure = 0.7 if (CINE or {}).get("mood") == "dusk" else (0.9 if (CINE or {}).get("mood") == "night" else 0.25)
     elif (CINE or {}).get("look") == "studio":
         make_world("#7d8394", "#a4a9b7")
         make_ground("#a4a9b7", "#3d3e44", "studio")
@@ -429,15 +429,16 @@ def build(scene_name: str, frames: range, width: int, samples: int, rig: bool = 
     sc.camera = cam
     sun_d = bpy.data.lights.new("sun", "SUN")
     dusk = (CINE or {}).get('mood') == 'dusk'
-    sun_d.energy = 5.0 if dusk else {'studio': 2.4, 'arena': 5.2}.get((CINE or {}).get('look'), 1.8)
-    sun_d.color = (1.0, 0.76, 0.54) if dusk else ((1.0, 0.82, 0.62) if (CINE or {}).get('look') == 'arena' else (1.0, 0.93, 0.86))
+    night = (CINE or {}).get('mood') == 'night'
+    sun_d.energy = 4.2 if night else 5.0 if dusk else {'studio': 2.4, 'arena': 5.2}.get((CINE or {}).get('look'), 1.8)
+    sun_d.color = (0.62, 0.72, 1.0) if night else (1.0, 0.76, 0.54) if dusk else ((1.0, 0.82, 0.62) if (CINE or {}).get('look') == 'arena' else (1.0, 0.93, 0.86))
     sun_d.angle = math.radians(2.5)
     sun = bpy.data.objects.new("sun", sun_d)
     sc.collection.objects.link(sun)
-    sun.rotation_euler = (math.radians(70), math.radians(0), math.radians(138)) if dusk else (math.radians(48), math.radians(0), math.radians(138)) if (CINE or {}).get('look') == 'arena' else (math.radians(34), math.radians(0), math.radians(104)) if (CINE or {}).get('look') == 'studio' else (math.radians(52), math.radians(8), math.radians(-38))   # Studio: the sun is on the right, shadows fall left and a little toward the camera
+    sun.rotation_euler = (math.radians(58), math.radians(0), math.radians(150)) if night else (math.radians(70), math.radians(0), math.radians(138)) if dusk else (math.radians(48), math.radians(0), math.radians(138)) if (CINE or {}).get('look') == 'arena' else (math.radians(34), math.radians(0), math.radians(104)) if (CINE or {}).get('look') == 'studio' else (math.radians(52), math.radians(8), math.radians(-38))   # Studio: the sun is on the right, shadows fall left and a little toward the camera
     rim_d = bpy.data.lights.new("rim", "AREA")
-    rim_d.energy = 3200 if dusk else (1800 if (CINE or {}).get('look') == 'arena' else 800)
-    rim_d.color = (0.35, 0.55, 1.0) if dusk else (0.55, 0.7, 1.0)
+    rim_d.energy = 5200 if night else 3200 if dusk else (1800 if (CINE or {}).get('look') == 'arena' else 800)
+    rim_d.color = (1.0, 0.32, 0.9) if night else (0.35, 0.55, 1.0) if dusk else (0.55, 0.7, 1.0)
     rim_d.size = 10
     rim = bpy.data.objects.new("rim", rim_d)
     sc.collection.objects.link(rim)
