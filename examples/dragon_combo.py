@@ -161,6 +161,55 @@ CONTACTS = [
 GROUND_HIT = 122                       # the dummy reaches the floor
 GROUND_POS = (12.0, 0.62, HERO_Z - 0.35)
 
+# --------------------------------------------------------------------------------------------------------------------------------------------------------------
+# the time warp (v2): the combo was authored at fighting-game speed (a hit every ~0.25 s) which nobody can read; the middle of the film is slowed down
+# (wind-ups longer, a real hit-stop, the spin readable), the dash a little, the opening and the walk stay at the authored speed.  Everything is authored on the
+# old clock (frames 0..239) and resampled at the end, so contacts keep landing together.
+N_OLD = N
+_HOLDS = set()
+for _c in CONTACTS:
+    _HOLDS.update(range(_c["f"], _c["f"] + _c["hold"]))
+
+
+def _warp():
+    t = [0.0]
+    for f in range(1, N_OLD):
+        if f < 31:
+            s = 1.0
+        elif f <= 46:
+            s = 1.3
+        elif f <= 152:
+            if f in _HOLDS and f - 1 in _HOLDS:
+                s = 2.6                          # hit-stop: the pose is held (with its tremor)
+            elif 97 <= f <= 101:
+                s = 2.3                          # the spin must be readable
+            elif 46 < f <= 50 or 68 < f <= 76:
+                s = 2.1                          # wind-ups (the jab, the long uppercut)
+            else:
+                s = 1.8
+        else:
+            s = 1.0
+        t.append(t[-1] + s)
+    return np.array(t)
+
+
+TW = _warp()
+NN = int(round(TW[-1])) + 1                      # length of the film after the warp
+
+
+def T(f: int) -> int:
+    """Old frame -> frame on the film clock."""
+    return int(round(float(TW[f])))
+
+
+def retime(a: np.ndarray) -> np.ndarray:
+    """Resample per-frame data (old clock) on the film clock with a monotone cubic."""
+    old = np.interp(np.arange(NN), TW, np.arange(N_OLD))
+    a = np.asarray(a, float)
+    flat = a.reshape(N_OLD, -1)
+    out = np.stack([pchip(np.arange(N_OLD), flat[:, i], old) for i in range(flat.shape[1])], 1)
+    return out.reshape((NN,) + a.shape[1:])
+
 DUMMY_NEUTRAL = dict(ry=90, rx=0, rz=0, T_rx=0, T_ry=0, T_rz=0, H_rx=0, H_ry=0, RA_rx=0, RA_rz=8, RA_slide=0.0, LA_rx=0, LA_rz=-8, LA_slide=0.0, RL_rx=0, RL_rz=4, RL_slide=0.0, LL_rx=0, LL_rz=-4, LL_slide=0.0)
 
 
@@ -242,7 +291,7 @@ def hero_angles(lib):
 
 
 def key_hero(hero: Character, ang, xz, air):
-    for f in range(N):
+    for f in range(len(ang)):
         a = ang[f]
         K(hero.anim, f, "linear", R=root_pose(float(xz[f, 0]), 3.0 + PR.lowest(a) + float(air[f]), float(xz[f, 1]), a[1], a[0], a[2]),
           T=P((a[3], a[4], a[5])), H=P((a[6], a[7], 0)), RA=P((a[8], 0, a[9]), PR.limb_pos(a, 0)), LA=P((a[10], 0, a[11]), PR.limb_pos(a, 1)),
@@ -250,9 +299,9 @@ def key_hero(hero: Character, ang, xz, air):
 
 
 def key_dummy(dummy: Character, pos, ang):
-    for f in range(N):
+    for f in range(len(ang)):
         a = ang[f]
-        h = max(float(pos[f, 1]), 3.0 + PR.lowest(a)) if f >= GROUND_HIT else float(pos[f, 1])
+        h = max(float(pos[f, 1]), 3.0 + PR.lowest(a)) if f >= T(GROUND_HIT) else float(pos[f, 1])
         K(dummy.anim, f, "linear", R=root_pose(float(pos[f, 0]), h, float(pos[f, 2]), a[1], a[0], a[2]), T=P((0, 0, 0)), H=P((a[6], a[7], 0)),
           RA=P((a[8], 0, a[9]), PR.limb_pos(a, 0)), LA=P((a[10], 0, a[11]), PR.limb_pos(a, 1)), RL=P((a[12], 0, a[13]), PR.limb_pos(a, 2)), LL=P((a[14], 0, a[15]), PR.limb_pos(a, 3)))
 
@@ -354,7 +403,7 @@ def build_motion():
     ang, dxz, dair, wxz, wair = hero_angles(lib)
     xz, air, pos, tips = solve(ang, dxz, dair, wxz, wair)
     dang = dummy_angles()
-    return ang, xz, air, pos, dang, tips
+    return retime(ang), retime(xz), retime(air), retime(pos), retime(dang), tips
 
 
 def build() -> Scene:
