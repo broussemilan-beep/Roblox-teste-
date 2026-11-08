@@ -197,7 +197,7 @@ def pose_rig(rig: dict, chd: dict, char, f: int, hold: int, keyer, parts: list[s
 
 
 
-def make_ground(far_color: str, floor: str, style: str = "film"):
+def make_ground(far_color: str, floor: str, style: str = "film", mood: str = ""):
     bpy.ops.mesh.primitive_plane_add(size=4000, location=(0, 0, 0))
     ob = bpy.context.object
     ob.name = "ground"
@@ -251,6 +251,9 @@ def make_ground(far_color: str, floor: str, style: str = "film"):
     nt.links.new(mp.outputs["Vector"], tex.inputs["Vector"])
     bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled")
     bsdf.inputs["Roughness"].default_value = 0.62 if style == "arena" else 0.85
+    if mood == "night":          # a matt floor: at a grazing angle the glossy lobe mirrored the moon and the sky into a white sheet
+        bsdf.inputs["Roughness"].default_value = 0.92
+        bsdf.inputs["Specular IOR Level"].default_value = 0.08
     nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
     # depth haze: far away the floor melts into the horizon colour
     geo = nt.nodes.new("ShaderNodeNewGeometry")
@@ -331,7 +334,7 @@ def build(scene_name: str, frames: range, width: int, samples: int, rig: bool = 
     if (CINE or {}).get("look") == "arena":
         hor = (CINE or {}).get("horizonColor") or "#f3cfa0"
         make_world(sky, hor, 0.5, 0.0) if (CINE or {}).get("mood") in ("dusk", "night") else make_world(sky, hor)
-        make_ground(hor, floor, "arena")
+        make_ground(hor, floor, "arena", (CINE or {}).get("mood") or "")
         sc.world.node_tree.nodes["Background"].inputs["Strength"].default_value = 1.25 if (CINE or {}).get("mood") == "dusk" else (1.1 if (CINE or {}).get("mood") == "night" else 1.15)
         try:
             sc.view_settings.view_transform = "AgX"

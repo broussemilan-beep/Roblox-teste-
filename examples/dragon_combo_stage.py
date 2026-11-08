@@ -80,7 +80,7 @@ def build_scene() -> Scene:
     gm = (gx - 1.2, 2.0, gz + 1.2)
     # the slam: one wide shot from above the crater that pushes in slowly (the cracks and the smoke have to be seen)
     cine.shot(T(122), T(140), dolly(orbit_pos(gm, 26, 9, 22.0), orbit_pos(gm, 30, 6, 16.0), (gm[0] - 1.0, 4.5, gm[2]), gm, fov=(36, 34), roll=(0.0, -1.5), easing="expo_out"))
-    cine.shot(T(140), T(153), tracking(lambda f: (hero_c(f)[0], hero_c(f)[1] + 0.4, hero_c(f)[2] - 0.2), (-8.0, -1.2, 4.2), fov=(38, 36)))                          # he turns toward the lens
+    cine.shot(T(140), T(153), tracking(lambda f: (hero_c(f)[0], hero_c(f)[1] + 0.4, hero_c(f)[2] - 0.2), (-12.0, 0.0, 7.0), fov=(34, 33)))                          # he turns toward the lens
     cine.shot(T(153), T(193), dolly((-2.0, 1.7, 3.8), (-6.0, 2.2, 4.8), (8.0, 3.3, HERO_Z), (5.2, 3.4, HERO_Z), fov=42, easing="sine_inout"))                       # he walks toward the lens
     cine.shot(T(193), N + 1, dolly((-6.0, 2.2, 4.8), (-13.0, 7.5, 8.0), (5.2, 3.4, HERO_Z), (8.0, 2.6, HERO_Z), fov=(42, 38), easing="sine_inout"))                # the final crane
 
@@ -143,7 +143,7 @@ def build_scene() -> Scene:
     for k, (r1, dl) in enumerate(((9.0, 0), (14.0, 4))):
         cine.mesh("wind", g0 + dl, 18, (gx, 0.15 + 0.1 * k, gz), r0=1.5, r1=r1, color=V_CORE, a=0.9, strength=2.0, spin=0.22, ease=2.4, fade=1.0, seed=11 + k)
     cine.mesh("star", g0, 9, (gx, 1.8, gz), r0=4.0, r1=8.0, color=V_EDGE, a=1.0, strength=10.0, dim=0.7, ease=3.0, fade=1.3, seed=g0)
-    cine.mesh("smoke", g0, 110, (gx, 0.8, gz), n=9, r0=2.4, r1=5.0, spread=3.6, color="#7c84ac", a=1.0, rise=3.2, seed=31, fade=1.0)
+    cine.mesh("smoke", g0, 70, (gx, 0.8, gz), n=9, r0=2.4, r1=5.0, spread=3.6, color="#7c84ac", a=1.0, rise=3.2, seed=31, fade=1.0)
     for k, (r1, col) in enumerate(((7.5, "#ffffff"), (11.0, V_CORE), (15.0, V_MAIN))):
         cine.ring(g0 + 3 * k, 18 + 3 * k, gp, 0.5, r1, 0.5 - 0.1 * k, 0.04, col, 0.9 - 0.15 * k, 0.0)
     cine.burst_debris(g0, gp, 50, 0.34, 0.6, (0.4, 1.1), ["#40476e", "#565f8a", "#343a5e"], seed=3, g=0.03)
