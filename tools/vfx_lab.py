@@ -25,6 +25,8 @@ CASES = {
     "dome": dict(kind="dome", t0=0, dur=100, c=(0, 0.0, 0), r0=5.0, r1=5.0, color="#ff9a1f", a=1.0, strength=5.0, rim=0.6, fill=0.12, height=0.9, **{"in": 0.01, "fade": 0.2}),
     "blades": dict(kind="blades", t0=0, dur=100, c=(0, 0.1, 0), r0=7.0, r1=7.0, color="#d9a0ff", edge="#7a2cff", a=1.0, strength=5.5, n=9, spin=0.1, **{"in": 0.01, "fade": 0.2}),
     "wind": dict(kind="wind", t0=0, dur=100, c=(0, 0.1, 0), r0=7.0, r1=7.0, color="#e8e8ff", a=1.0, strength=2.4, **{"in": 0.01, "fade": 0.2}),
+    "crater": dict(kind="crater", t0=0, dur=100, c=(0, 0.0, 0), r0=9.0, r1=9.0, color="#f4e4ff", edge="#b03cff", a=1.0, strength=7.0, seed=2, branches=18, **{"in": 0.01, "fade": 0.2}),
+    "smoke": dict(kind="smoke", t0=0, dur=100, c=(0, 0.4, 0), n=7, r0=2.4, r1=3.6, spread=2.2, color="#9aa4c0", a=3.0, rise=1.4, seed=3, **{"in": 0.01}),
     "pillar": dict(kind="pillar", t0=0, dur=100, c=(0, 0.0, 0), r0=1.2, r1=1.2, color="#ff3030", a=1.0, strength=5.0, height=14.0, **{"in": 0.01, "fade": 0.2}),
 }
 

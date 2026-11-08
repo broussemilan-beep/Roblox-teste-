@@ -427,17 +427,26 @@ def build(scene_name: str, frames: range, width: int, samples: int, rig: bool = 
     cam = bpy.data.objects.new("cam", cam_data)
     sc.collection.objects.link(cam)
     sc.camera = cam
+    if (CINE or {}).get("mood") == "night":      # a soft warm fill riding on the lens: the hero seen from behind is not a black silhouette
+        fill_d = bpy.data.lights.new("fill", "AREA")
+        fill_d.energy = 900
+        fill_d.color = (1.0, 0.86, 0.78)
+        fill_d.size = 14
+        fill = bpy.data.objects.new("fill", fill_d)
+        sc.collection.objects.link(fill)
+        fill.parent = cam
+        fill.location = (0.0, 1.5, 0.0)
     sun_d = bpy.data.lights.new("sun", "SUN")
     dusk = (CINE or {}).get('mood') == 'dusk'
     night = (CINE or {}).get('mood') == 'night'
-    sun_d.energy = 4.2 if night else 5.0 if dusk else {'studio': 2.4, 'arena': 5.2}.get((CINE or {}).get('look'), 1.8)
+    sun_d.energy = 3.4 if night else 5.0 if dusk else {'studio': 2.4, 'arena': 5.2}.get((CINE or {}).get('look'), 1.8)
     sun_d.color = (0.62, 0.72, 1.0) if night else (1.0, 0.76, 0.54) if dusk else ((1.0, 0.82, 0.62) if (CINE or {}).get('look') == 'arena' else (1.0, 0.93, 0.86))
     sun_d.angle = math.radians(2.5)
     sun = bpy.data.objects.new("sun", sun_d)
     sc.collection.objects.link(sun)
     sun.rotation_euler = (math.radians(58), math.radians(0), math.radians(150)) if night else (math.radians(70), math.radians(0), math.radians(138)) if dusk else (math.radians(48), math.radians(0), math.radians(138)) if (CINE or {}).get('look') == 'arena' else (math.radians(34), math.radians(0), math.radians(104)) if (CINE or {}).get('look') == 'studio' else (math.radians(52), math.radians(8), math.radians(-38))   # Studio: the sun is on the right, shadows fall left and a little toward the camera
     rim_d = bpy.data.lights.new("rim", "AREA")
-    rim_d.energy = 5200 if night else 3200 if dusk else (1800 if (CINE or {}).get('look') == 'arena' else 800)
+    rim_d.energy = 1900 if night else 3200 if dusk else (1800 if (CINE or {}).get('look') == 'arena' else 800)
     rim_d.color = (1.0, 0.32, 0.9) if night else (0.35, 0.55, 1.0) if dusk else (0.55, 0.7, 1.0)
     rim_d.size = 10
     rim = bpy.data.objects.new("rim", rim_d)

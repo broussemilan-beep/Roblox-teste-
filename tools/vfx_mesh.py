@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import math
 
+import bmesh
 import bpy
 import mathutils
 import numpy as np
@@ -119,6 +120,63 @@ def tex_band(tint: str, w: int = 1024, h: int = 128, seed: int = 5) -> np.ndarra
     inten = np.clip(across * gate * fine, 0, 1)
     rgb = _hex(tint) * (1 - inten[..., None] ** 2) + 1.0 * inten[..., None] ** 2
     return np.dstack([rgb, inten]).astype(np.float32)
+
+
+def _box_blur(a: np.ndarray, r: int) -> np.ndarray:
+    """Separable box blur (numpy only: the Blender python has no cv2)."""
+    k = 2 * r + 1
+    out = a
+    for ax in (0, 1):
+        c = np.cumsum(np.pad(out, [(r + 1, r) if i == ax else (0, 0) for i in range(2)], mode="edge"), axis=ax)
+        sl = [slice(None)] * 2
+        hi, lo = list(sl), list(sl)
+        hi[ax], lo[ax] = slice(k, None), slice(0, -k)
+        out = (c[tuple(hi)] - c[tuple(lo)]) / k
+    return out
+
+
+def tex_cracks(tint: str, edge: str, n: int = 1024, seed: int = 2, branches: int = 16) -> np.ndarray:
+    """Floor cracks seen from above: thin branching fissures from the centre, hot white in the middle of each line, a violet/magenta glow around it."""
+    rng = np.random.default_rng(seed)
+    mask = np.zeros((n, n), np.float32)
+    c = n / 2.0
+
+    def stamp(x, y, v=1.0):
+        xi, yi = int(x), int(y)
+        if 1 <= xi < n - 1 and 1 <= yi < n - 1:
+            mask[yi - 1:yi + 2, xi - 1:xi + 2] = np.maximum(mask[yi - 1:yi + 2, xi - 1:xi + 2], v)
+
+    def walk(x, y, ang, length, depth):
+        step = 4.0
+        for i in range(int(length / step)):
+            ang += rng.uniform(-0.28, 0.28)
+            x += math.cos(ang) * step
+            y += math.sin(ang) * step
+            stamp(x, y)
+            if depth < 2 and rng.random() < 0.05:
+                walk(x, y, ang + rng.choice((-1, 1)) * rng.uniform(0.5, 1.0), length * rng.uniform(0.25, 0.5), depth + 1)
+
+    for i in range(branches):
+        a0 = 2 * math.pi * i / branches + rng.uniform(-0.15, 0.15)
+        walk(c + math.cos(a0) * 10, c + math.sin(a0) * 10, a0, rng.uniform(0.35, 0.92) * c, 0)
+    core = _box_blur(mask, 1) * 2.0
+    glow = 0.9 * _box_blur(mask, 3) + 0.5 * _box_blur(mask, 9) + 0.3 * _box_blur(mask, 24)
+    r = np.hypot(*np.mgrid[-1:1:n * 1j, -1:1:n * 1j])
+    inten = np.clip(core + glow * 2.0, 0, 1) * np.clip(1 - (r / 0.98) ** 6, 0, 1)
+    m = np.clip(core, 0, 1)[..., None]
+    rgb = _hex(edge) * (1 - m) + _hex(tint) * (m * 0.5) + 1.0 * (m ** 2) * 0.9
+    return np.dstack([np.clip(rgb, 0, 1), inten]).astype(np.float32)
+
+
+def tex_scorch(n: int = 512, seed: int = 4) -> np.ndarray:
+    """A burnt, ragged disc: black in the middle, fading out (alpha only, the colour is black)."""
+    rng = np.random.default_rng(seed)
+    y, x = np.mgrid[-1:1:n * 1j, -1:1:n * 1j]
+    r = np.hypot(x, y)
+    ang = np.arctan2(y, x)
+    rag = 1.0 + 0.12 * sum(rng.uniform(0.3, 1.0) * np.sin(ang * k + rng.uniform(0, 6.28)) for k in (3, 5, 8, 13)) / 2.0
+    a = np.clip(1.0 - (r / (0.78 * rag)) ** 2.5, 0, 1) ** 0.8
+    return np.dstack([np.zeros((n, n, 3), np.float32), a.astype(np.float32) * 0.92])
 
 
 # ------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -282,6 +340,145 @@ def fx_material(name: str, img: bpy.types.Image, strength: float, fresnel: float
     return mat, A
 
 
+def crater_material(name: str, img, strength: float):
+    """Emissive cracks that spread outward: ``A`` = brightness, ``R`` = reveal radius (0..1 of the decal)."""
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    mix = nt.nodes.new("ShaderNodeMixShader")
+    tr = nt.nodes.new("ShaderNodeBsdfTransparent")
+    em = nt.nodes.new("ShaderNodeEmission")
+    tx = nt.nodes.new("ShaderNodeTexImage")
+    tx.image = img
+    tx.extension = "EXTEND"
+    uv = nt.nodes.new("ShaderNodeUVMap")
+    uv.uv_map = "uv"
+    A = nt.nodes.new("ShaderNodeValue")
+    R = nt.nodes.new("ShaderNodeValue")
+    sub = nt.nodes.new("ShaderNodeVectorMath")
+    sub.operation = "SUBTRACT"
+    sub.inputs[1].default_value = (0.5, 0.5, 0.0)
+    ln = nt.nodes.new("ShaderNodeVectorMath")
+    ln.operation = "LENGTH"
+    d2 = nt.nodes.new("ShaderNodeMath")
+    d2.operation = "MULTIPLY"
+    d2.inputs[1].default_value = 2.0
+    rv = nt.nodes.new("ShaderNodeMath")
+    rv.operation = "SUBTRACT"
+    rv2 = nt.nodes.new("ShaderNodeMath")
+    rv2.operation = "MULTIPLY"
+    rv2.inputs[1].default_value = 14.0
+    rv2.use_clamp = True
+    sm = nt.nodes.new("ShaderNodeMath")
+    sm.operation = "MULTIPLY"
+    sm.inputs[1].default_value = strength
+    am = nt.nodes.new("ShaderNodeMath")
+    am.operation = "MINIMUM"
+    am.inputs[1].default_value = 1.0
+    f1 = nt.nodes.new("ShaderNodeMath")
+    f1.operation = "MULTIPLY"
+    f2 = nt.nodes.new("ShaderNodeMath")
+    f2.operation = "MULTIPLY"
+    L = nt.links.new
+    L(uv.outputs["UV"], tx.inputs["Vector"])
+    L(uv.outputs["UV"], sub.inputs[0])
+    L(sub.outputs[0], ln.inputs[0])
+    L(ln.outputs["Value"], d2.inputs[0])
+    L(R.outputs[0], rv.inputs[0])
+    L(d2.outputs[0], rv.inputs[1])
+    L(rv.outputs[0], rv2.inputs[0])
+    L(tx.outputs["Color"], em.inputs["Color"])
+    L(A.outputs[0], sm.inputs[0])
+    L(sm.outputs[0], em.inputs["Strength"])
+    L(A.outputs[0], am.inputs[0])
+    L(tx.outputs["Alpha"], f1.inputs[0])
+    L(rv2.outputs[0], f1.inputs[1])
+    L(f1.outputs[0], f2.inputs[0])
+    L(am.outputs[0], f2.inputs[1])
+    L(f2.outputs[0], mix.inputs["Fac"])
+    L(tr.outputs[0], mix.inputs[1])
+    L(em.outputs[0], mix.inputs[2])
+    L(mix.outputs[0], out.inputs["Surface"])
+    return mat, A, R
+
+
+def scorch_material(img):
+    mat = bpy.data.materials.new("fx_scorch")
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    mix = nt.nodes.new("ShaderNodeMixShader")
+    tr = nt.nodes.new("ShaderNodeBsdfTransparent")
+    bs = nt.nodes.new("ShaderNodeBsdfDiffuse")
+    bs.inputs["Color"].default_value = (0.012, 0.01, 0.016, 1)
+    tx = nt.nodes.new("ShaderNodeTexImage")
+    tx.image = img
+    uv = nt.nodes.new("ShaderNodeUVMap")
+    uv.uv_map = "uv"
+    A = nt.nodes.new("ShaderNodeValue")
+    am = nt.nodes.new("ShaderNodeMath")
+    am.operation = "MULTIPLY"
+    nt.links.new(uv.outputs["UV"], tx.inputs["Vector"])
+    nt.links.new(tx.outputs["Alpha"], am.inputs[0])
+    nt.links.new(A.outputs[0], am.inputs[1])
+    nt.links.new(am.outputs[0], mix.inputs["Fac"])
+    nt.links.new(tr.outputs[0], mix.inputs[1])
+    nt.links.new(bs.outputs[0], mix.inputs[2])
+    nt.links.new(mix.outputs[0], out.inputs["Surface"])
+    return mat, A
+
+
+def smoke_material(color, seed: int, emit: float = 0.0):
+    """A volume (no surface): noise density inside a unit sphere, soft towards its edge, scaled by the animated ``A``."""
+    mat = bpy.data.materials.new("fx_smoke")
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    vol = nt.nodes.new("ShaderNodeVolumePrincipled")
+    vol.inputs["Color"].default_value = (*[float(v) for v in _lin(_hex(color))], 1.0)
+    vol.inputs["Emission Strength"].default_value = emit
+    vol.inputs["Emission Color"].default_value = (0.5, 0.2, 0.9, 1.0)
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    mp = nt.nodes.new("ShaderNodeMapping")
+    mp.inputs["Location"].default_value = (seed * 3.7, seed * 1.9, seed * 5.3)
+    nz = nt.nodes.new("ShaderNodeTexNoise")
+    nz.inputs["Scale"].default_value = 2.4
+    nz.inputs["Detail"].default_value = 6.0
+    nz.inputs["Roughness"].default_value = 0.62
+    mr = nt.nodes.new("ShaderNodeMapRange")
+    mr.inputs["From Min"].default_value = 0.36
+    mr.inputs["From Max"].default_value = 0.72
+    ln = nt.nodes.new("ShaderNodeVectorMath")
+    ln.operation = "LENGTH"
+    fo = nt.nodes.new("ShaderNodeMapRange")
+    fo.inputs["From Min"].default_value = 0.25
+    fo.inputs["From Max"].default_value = 0.98
+    fo.inputs["To Min"].default_value = 1.0
+    fo.inputs["To Max"].default_value = 0.0
+    m1 = nt.nodes.new("ShaderNodeMath")
+    m1.operation = "MULTIPLY"
+    A = nt.nodes.new("ShaderNodeValue")
+    m2 = nt.nodes.new("ShaderNodeMath")
+    m2.operation = "MULTIPLY"
+    L = nt.links.new
+    L(tc.outputs["Object"], mp.inputs["Vector"])
+    L(mp.outputs[0], nz.inputs["Vector"])
+    L(nz.outputs["Fac"], mr.inputs["Value"])
+    L(tc.outputs["Object"], ln.inputs[0])
+    L(ln.outputs["Value"], fo.inputs["Value"])
+    L(mr.outputs["Result"], m1.inputs[0])
+    L(fo.outputs["Result"], m1.inputs[1])
+    L(m1.outputs[0], m2.inputs[0])
+    L(A.outputs[0], m2.inputs[1])
+    L(m2.outputs[0], vol.inputs["Density"])
+    L(vol.outputs["Volume"], out.inputs["Volume"])
+    return mat, A
+
+
 # ------------------------------------------------------------------------------------------------------------------------------------------------------------
 # one animated instance per fx entry
 
@@ -298,6 +495,7 @@ class Fx:
         self.pos = C3 @ c
         self.cam = cam
         self.objs: list[tuple[bpy.types.Object, bpy.types.Node, float]] = []     # (object, brightness node, brightness weight)
+        self._R: dict = {}
         k = self.kind
         tint, edge = e.get("color", "#ff9a1f"), e.get("edge", e.get("color", "#ff5a00"))
         seed = int(e.get("seed", 1))
@@ -343,6 +541,43 @@ class Fx:
                 ob.data.materials.append(mat)
                 ob.rotation_mode = "XYZ"
                 ob["phase"] = 2 * math.pi * i / n + rng.uniform(-0.2, 0.2)
+                ob["sz"] = rng.uniform(0.5, 1.45)
+                self.objs.append((ob, A, 1.0))
+        elif k == "crater":
+            img = _image("cracks", tex_cracks(tint, edge, seed=seed, branches=int(e.get("branches", 16))))
+            mat, A, R = crater_material("fx_cracks", img, e.get("strength", 6.0))
+            ob = _mesh_obj("fx_cracks", [(-1, -1, 0), (1, -1, 0), (1, 1, 0), (-1, 1, 0)], [(0, 1, 2, 3)], [(0, 0), (1, 0), (1, 1), (0, 1)])
+            ob.data.materials.append(mat)
+            self._R[ob.name] = R
+            self.objs.append((ob, A, 1.0))
+            simg = _image("scorch", tex_scorch(seed=seed))
+            smat, SA = scorch_material(simg)
+            so = _mesh_obj("fx_scorch", [(-1, -1, 0), (1, -1, 0), (1, 1, 0), (-1, 1, 0)], [(0, 1, 2, 3)], [(0, 0), (1, 0), (1, 1), (0, 1)])
+            so.data.materials.append(smat)
+            so["scorch"] = 1
+            self.objs.append((so, SA, 1.0))
+        elif k == "smoke":
+            sc = bpy.context.scene
+            sc.cycles.volume_step_rate = 2.5
+            sc.cycles.volume_max_steps = 40
+            n = int(e.get("n", 6))
+            for i in range(n):
+                rng = np.random.default_rng(seed * 100 + i)
+                bm = bmesh.new()
+                bmesh.ops.create_icosphere(bm, subdivisions=2, radius=1.0)
+                me = bpy.data.meshes.new("fx_puff")
+                bm.to_mesh(me)
+                bm.free()
+                ob = bpy.data.objects.new("fx_puff", me)
+                bpy.context.scene.collection.objects.link(ob)
+                ob.visible_shadow = True
+                mat, A = smoke_material(e.get("color", "#9aa4c0"), seed * 13 + i, emit=e.get("emit", 0.0))
+                ob.data.materials.append(mat)
+                a_ = rng.uniform(0, 2 * math.pi)
+                rr = e.get("spread", 2.0) * math.sqrt(rng.uniform())
+                ob["off"] = (math.cos(a_) * rr, math.sin(a_) * rr, rng.uniform(0.0, e.get("lift0", 0.5)))
+                ob["sz"] = rng.uniform(0.55, 1.25)
+                ob["delay"] = rng.uniform(0.0, 0.25)
                 self.objs.append((ob, A, 1.0))
         for ob, _, _ in self.objs:
             ob.hide_render = True
@@ -388,6 +623,28 @@ class Fx:
                 spin = e.get("spin", 0.5) * (1 - (1 - u) ** 2) * 3.0
                 rot[2] += ob["phase"] + spin
                 loc.z += e.get("lift", 0.0) * u
+                sc = [grow * ob["sz"]] * 3
+            elif k == "crater":
+                loc.z += 0.04 if "scorch" not in ob else 0.02
+                sc = [grow, grow, 1.0]
+                if "scorch" in ob:
+                    a = a_peak * min(1.0, u / 0.05) * (1 - max(0.0, (u - 0.85) / 0.15))
+                else:
+                    Rn = self._R[ob.name]
+                    Rn.outputs[0].default_value = min(1.0, 1.4 * _ease_out(u * 5.0, 2.2))
+                    Rn.outputs[0].keyframe_insert("default_value", frame=f)
+                    a = a_peak * min(1.0, u / 0.03) * (1 - max(0.0, (u - 0.5) / 0.5) ** 1.5)
+            elif k == "smoke":
+                ud = max(0.0, (u - ob["delay"]) / (1 - ob["delay"]))
+                if ud <= 0.0:
+                    ob.hide_render = True
+                    ob.keyframe_insert("hide_render", frame=f)
+                    continue
+                g = r0 + (r1 - r0) * _ease_out(ud, e.get("ease", 2.2))
+                sc = [g * ob["sz"]] * 3
+                off = ob["off"]
+                loc = loc + mathutils.Vector((off[0] * (0.5 + ud), off[1] * (0.5 + ud), off[2] + e.get("rise", 1.2) * ud))
+                a = e.get("a", 1.0) * min(1.0, ud / 0.12) * (1 - ud) ** e.get("fade", 1.1)
             ob.location = loc
             ob.scale = sc
             ob.rotation_mode = "ZYX"
